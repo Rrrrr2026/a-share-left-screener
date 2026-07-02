@@ -1,0 +1,21 @@
+# 运行时产物 / 数据 (不上传)
+data/
+dashboard/dashboard_data.js
+*.db
+*.pkl
+*.csv
+*.xlsx
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 注意: docs/ 目录用于 GitHub Pages, 需要上传(含 docs/dashboard_data.js)
+!docs/dashboard_data.js
