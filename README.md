@@ -6,6 +6,18 @@
 
 ---
 
+## 0. 在线查看 (GitHub Pages)
+
+已托管到 GitHub Pages,任何设备浏览器直接打开(公开可见):
+
+**https://rrrrr2026.github.io/a-share-left-screener/**
+
+> 页面上的数据是**上次发布时的快照**。要更新线上数据:本机先 `python run_pipeline.py` 生成最新结果,再**双击 `发布更新到网上.bat`**(会把 `dashboard/` 拷到 `docs/` 并 `git push`);等 1–2 分钟 Pages 自动重建,刷新网址即可。
+
+其它查看方式见 §8(局域网共享 / 本地双击打开)。
+
+---
+
 ## 1. 一分钟上手
 
 ```bash
