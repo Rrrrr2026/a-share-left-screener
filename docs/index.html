@@ -264,18 +264,18 @@
       case "roe": return `<span class="num">${isNum(v)?v.toFixed(1)+"%":dash}</span>`;
       case "price": case "breakdown_price": case "pb": case "eps": case "volume_ratio":
         return `<span class="num">${f(v,2)}</span>`;
-      case "code": return `<a href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSym(v))}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="text-sky-300 font-mono hover:underline" title="在 TradingView 打开 ${v||""}">${v||dash} ↗</a>`;
+      case "code": return `<a href="https://www.tradingview.com/symbols/${encodeURIComponent(tvSym(v))}/" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="text-sky-300 font-mono hover:underline" title="在 TradingView 打开 ${v||""} 概览页">${v||dash} ↗</a>`;
       case "name": return `<span class="text-white">${v||dash}</span>`;
       default: return `<span>${(v==null||v==="")?dash:v}</span>`;
     }
   }
 
-  // A股代码 -> TradingView 交易所前缀 (沪 SSE / 深 SZSE / 北 BSE)
+  // A股代码 -> TradingView 概览页路径 (沪 SSE / 深 SZSE / 北 BSE, /symbols/ 路径用短横)
   function tvSym(code){
     code = String(code||"");
-    if(/^(6|9)/.test(code)) return "SSE:"+code;
-    if(/^(0|2|3)/.test(code)) return "SZSE:"+code;
-    if(/^(8|4|92)/.test(code)) return "BSE:"+code;
+    if(/^(6|9)/.test(code)) return "SSE-"+code;
+    if(/^(0|2|3)/.test(code)) return "SZSE-"+code;
+    if(/^(8|4|92)/.test(code)) return "BSE-"+code;
     return code;
   }
 
@@ -336,7 +336,7 @@
   // ---------- 个股详情 ----------
   let detailChart=null, roeChart=null;
   function openDetail(c){
-    $("#dTitle").innerHTML = `${c.name||""} <a href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSym(c.code))}" target="_blank" rel="noopener" class="text-sky-300 font-mono text-base hover:underline" title="在 TradingView 打开">${c.code||""} ↗</a> <span class="badge ${tagClass(c.tag)} ml-2">${c.tag||""}</span>`;
+    $("#dTitle").innerHTML = `${c.name||""} <a href="https://www.tradingview.com/symbols/${encodeURIComponent(tvSym(c.code))}/" target="_blank" rel="noopener" class="text-sky-300 font-mono text-base hover:underline" title="在 TradingView 打开概览页">${c.code||""} ↗</a> <span class="badge ${tagClass(c.tag)} ml-2">${c.tag||""}</span>`;
     $("#dSub").textContent = `${c.industry||"—"} · 现价 ${f(c.price)} · 综合分 ${f(c.final_score,1)}（技术 ${f(c.tech_score,2)} / 基本面 ${f(c.fund_score,0)} / 景气 ${f(c.prosperity_score,0)}）`;
     $("#dConclusion").textContent = c.conclusion || "—";
 
