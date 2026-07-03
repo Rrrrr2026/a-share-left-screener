@@ -40,7 +40,8 @@ def _series_to_list(s, bars):
             for v in s.values]
 
 
-def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = None):
+def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = None,
+             bench_close: pd.Series | None = None):
     """
     df: 个股日线 (date,open,high,low,close[,volume,amount])。
     返回 (record:dict, detail:dict) 或 (None, None)。
@@ -153,7 +154,28 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
     if not np.isnan(drawdown) and drawdown >= c["drawdown_min"]:
         score += w["drawdown"] * min(1.0, drawdown / 0.5)
 
-    n_hit = sum(1 for k in ("channel", "pivot", "ma") if signals[k]) + (1 if hit_osc else 0)
+    # --- 6) 布林带下轨(额外支撑参考) + 量能确认 ---
+    boll_low = ind.bollinger_lower(close, c.get("boll_n", 20), c.get("boll_k", 2.0))
+    boll_low_val = ind.safe_last(boll_low)
+    if not np.isnan(boll_low_val) and boll_low_val < px:
+        d_boll = (px - boll_low_val) / px * 100.0
+        if 0 <= d_boll <= c["near_lower_pct"]:
+            support_cands.append(("布林下轨", boll_low_val))
+    vol_ratio_calc, vol_confirm_txt = None, ""
+    if "volume" in df.columns:
+        vol = df["volume"].astype(float)
+        avg20v = vol.tail(20).mean()
+        if avg20v and not np.isnan(avg20v) and avg20v > 0:
+            vol_ratio_calc = round(float(vol.iloc[-1] / avg20v), 2)
+            shrink = vol_ratio_calc < c.get("vol_shrink_ratio", 0.85)
+            spike_up = vol_ratio_calc > 1.5 and float(close.iloc[-1]) > float(close.iloc[-2])
+            if support_cands and (shrink or spike_up):
+                score += w.get("vol_confirm", 0.0) * (0.7 if shrink else 0.5)
+                vol_confirm_txt = "缩量企稳" if shrink else "放量"
+    signals["vol"] = vol_confirm_txt
+
+    n_hit = (sum(1 for k in ("channel", "pivot", "ma") if signals[k])
+             + (1 if hit_osc else 0) + (1 if vol_confirm_txt else 0))
 
     # ---- 关键位: 主支撑(离现价最近且<=现价附近) / 距支撑% / 破位参考位 ----
     support_label, support_price, dist_support = None, None, None
@@ -179,6 +201,13 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
     k, d_, j = ind.kdj(high, low, close)
     kk, dd, jj = ind.safe_last(k), ind.safe_last(d_), ind.safe_last(j)
     kdj_tag = ind.kdj_tag(kk, dd, jj)
+
+    # ---- 风控指标 + 行内sparkline + 斐波那契回撤 ----
+    atrp = ind.atr_pct(high, low, close)
+    maxdd = ind.max_drawdown(close, 250)
+    beta_v = ind.beta(close, bench_close, 120) if bench_close is not None else np.nan
+    spark = ind.downsample(close.tail(60), 40)   # 近60日收盘降采样, 行内走势
+    fib = ind.fib_levels(high_52w, low_52w)
 
     # ---- 量比/换手 (优先用快照, 否则留空) ----
     vol_ratio = turnover = amount_today = None
@@ -211,10 +240,19 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         "ret_half_year_pct": _nz(ret_half),
         "ret_1m_pct": _nz(ret_1m),
         "turnover": turnover,
-        "volume_ratio": vol_ratio,
+        "volume_ratio": vol_ratio if vol_ratio is not None else vol_ratio_calc,
         "amount_today": amount_today,
         "avg_amt20_yi": _nz(amt_yi),
         "kdj_k": _nz(kk), "kdj_d": _nz(dd), "kdj_j": _nz(jj), "kdj_tag": kdj_tag,
+        # 新增: sparkline / 风控 / 量能 / 斐波那契
+        "spark": spark,
+        "atr_pct": _nz(atrp),
+        "max_dd_pct": _nz(maxdd),
+        "beta": _nz(beta_v),
+        "vol_ratio_calc": vol_ratio_calc,
+        "sig_vol": signals.get("vol", ""),
+        "boll_low": _nz(boll_low_val),
+        "fib_382": fib["f382"], "fib_500": fib["f500"], "fib_618": fib["f618"],
     }
 
     # ---- 详情图表逐日序列 ----
@@ -252,5 +290,7 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         "kdj_d": _series_to_list(d_, bars),
         "kdj_j": _series_to_list(j, bars),
         "rsi": _series_to_list(r, bars),
+        "boll_lower": _series_to_list(boll_low, bars),
+        "fib": {"f382": fib["f382"], "f500": fib["f500"], "f618": fib["f618"]},
     }
     return record, detail

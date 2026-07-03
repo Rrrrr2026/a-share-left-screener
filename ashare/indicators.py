@@ -140,3 +140,70 @@ def safe_last(series: pd.Series, default=np.nan):
         return v if not np.isnan(v) else default
     except Exception:
         return default
+
+
+# ---------------------------------------------------------------------------
+#  风控 / 波动 / 支撑增强
+# ---------------------------------------------------------------------------
+def atr(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd.Series:
+    """真实波幅均值 ATR。"""
+    h, l, c = high.astype(float), low.astype(float), close.astype(float)
+    pc = c.shift(1)
+    tr = pd.concat([(h - l), (h - pc).abs(), (l - pc).abs()], axis=1).max(axis=1)
+    return tr.rolling(n).mean()
+
+
+def atr_pct(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> float:
+    """ATR 占现价百分比 (波动率代理)。"""
+    a = atr(high, low, close, n)
+    av = safe_last(a)
+    px = float(close.iloc[-1])
+    return float(av / px * 100.0) if (px and not np.isnan(av)) else np.nan
+
+
+def max_drawdown(close: pd.Series, bars: int = 250) -> float:
+    """最近 bars 根的最大回撤 (%, 负值)。"""
+    s = close.tail(bars).astype(float).dropna()
+    if len(s) < 5:
+        return np.nan
+    dd = (s / s.cummax() - 1.0)
+    return float(dd.min() * 100.0)
+
+
+def beta(stock_close: pd.Series, bench_close: pd.Series, bars: int = 120) -> float:
+    """相对基准的 Beta (按位置对齐最近 bars 根日收益)。同市场日历近似对齐。"""
+    sr = stock_close.astype(float).pct_change().dropna()
+    br = bench_close.astype(float).pct_change().dropna()
+    n = min(len(sr), len(br), bars)
+    if n < 20:
+        return np.nan
+    sr, br = sr.tail(n).values, br.tail(n).values
+    var = float(np.var(br))
+    if var == 0:
+        return np.nan
+    return float(np.cov(sr, br)[0, 1] / var)
+
+
+def bollinger_lower(close: pd.Series, n: int = 20, k: float = 2.0) -> pd.Series:
+    ma = close.rolling(n).mean()
+    sd = close.rolling(n).std()
+    return ma - k * sd
+
+
+def fib_levels(hi: float, lo: float) -> dict:
+    """从区间高->低的斐波那契回撤价 (支撑参考)。"""
+    rng = float(hi) - float(lo)
+    return {"f382": round(hi - 0.382 * rng, 3),
+            "f500": round(hi - 0.5 * rng, 3),
+            "f618": round(hi - 0.618 * rng, 3)}
+
+
+def downsample(series: pd.Series, points: int = 40) -> list:
+    """把序列均匀降采样到 points 个点 (行内 sparkline 用)。"""
+    s = series.dropna().astype(float)
+    if len(s) == 0:
+        return []
+    if len(s) <= points:
+        return [round(float(x), 3) for x in s.values]
+    idx = np.linspace(0, len(s) - 1, points).astype(int)
+    return [round(float(s.values[i]), 3) for i in idx]

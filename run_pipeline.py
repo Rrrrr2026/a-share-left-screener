@@ -136,11 +136,14 @@ def run(full_market: bool, use_cache: bool):
     # 网络IO密集 -> 线程池并发; 只做技术打分, 便宜且快。
     workers = CONFIG["fetch"]["max_workers"] or min(16, (os.cpu_count() or 4) * 2)
 
+    _bench = ds.fetch_benchmark_close()
+    bench_close = _bench["close"] if (_bench is not None and not _bench.empty) else None
+
     def _scan_stock(code, name, industry):
         h = ds.fetch_hist(code)
         if h is None:
             return None
-        rec, detail = m2.scan_one(code, name, h, spot_map.get(code))
+        rec, detail = m2.scan_one(code, name, h, spot_map.get(code), bench_close=bench_close)
         if rec is None or rec["tech_score"] < CONFIG["tech"]["min_tech_score"]:
             return None
         rec["industry"] = industry

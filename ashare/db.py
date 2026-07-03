@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS tech_scan(
     high_52w REAL, low_52w REAL, pos_52w_pct REAL, ret_half_year_pct REAL, ret_1m_pct REAL,
     turnover REAL, volume_ratio REAL, amount_today REAL, avg_amt20_yi REAL,
     kdj_k REAL, kdj_d REAL, kdj_j REAL, kdj_tag TEXT,
+    spark_json TEXT, atr_pct REAL, max_dd_pct REAL, beta REAL, vol_ratio_calc REAL,
+    sig_vol TEXT, boll_low REAL, fib_382 REAL, fib_500 REAL, fib_618 REAL,
     PRIMARY KEY(run_date, code)
 );
 CREATE TABLE IF NOT EXISTS fundamental(
@@ -41,6 +43,7 @@ CREATE TABLE IF NOT EXISTS fundamental(
     pb REAL, pb_pct REAL, dividend_yield REAL,
     eps REAL, eps_yoy REAL, roe REAL,
     revenue_yoy REAL, netprofit_yoy REAL, gross_margin REAL, debt_ratio REAL,
+    target_price REAL, analyst_rating TEXT, analyst_count REAL, upside_pct REAL,
     roe_trend_json TEXT, fund_flags_json TEXT,
     PRIMARY KEY(run_date, code)
 );
@@ -77,7 +80,14 @@ def init_db():
 
 def _migrate(conn):
     """给老库补新列(不丢历史)。SQLite 无 ADD COLUMN IF NOT EXISTS, 手动判断。"""
-    want = {"tech_scan": [("ret_1m_pct", "REAL")]}
+    want = {
+        "tech_scan": [("ret_1m_pct", "REAL"), ("spark_json", "TEXT"), ("atr_pct", "REAL"),
+                      ("max_dd_pct", "REAL"), ("beta", "REAL"), ("vol_ratio_calc", "REAL"),
+                      ("sig_vol", "TEXT"), ("boll_low", "REAL"), ("fib_382", "REAL"),
+                      ("fib_500", "REAL"), ("fib_618", "REAL")],
+        "fundamental": [("target_price", "REAL"), ("analyst_rating", "TEXT"),
+                        ("analyst_count", "REAL"), ("upside_pct", "REAL")],
+    }
     for table, cols in want.items():
         have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
         for name, typ in cols:
@@ -143,14 +153,21 @@ def save_industry_scores(run_date: str, df):
 
 
 def save_tech(run_date: str, records: list[dict]):
-    _upsert("tech_scan", [{**r, "run_date": run_date} for r in records])
+    rows = []
+    for r in records:
+        row = {**r, "run_date": run_date}
+        if isinstance(row.get("spark"), list):
+            row["spark_json"] = json.dumps(row["spark"])   # 列表转JSON存
+        rows.append(row)
+    _upsert("tech_scan", rows)
 
 
 def save_fundamental(run_date: str, code: str, f: dict):
     row = {k: f.get(k) for k in (
         "pe_ttm", "pe_pct", "pe_industry_median", "pe_vs_industry", "pb", "pb_pct",
         "dividend_yield", "eps", "eps_yoy", "roe", "revenue_yoy", "netprofit_yoy",
-        "gross_margin", "debt_ratio")}
+        "gross_margin", "debt_ratio",
+        "target_price", "analyst_rating", "analyst_count", "upside_pct")}
     row.update({
         "run_date": run_date, "code": code,
         "roe_trend_json": json.dumps(f.get("roe_trend", []), ensure_ascii=False),
@@ -192,6 +209,25 @@ def fetch_table(table: str, run_date: str) -> list[dict]:
     with get_conn() as conn:
         cur = conn.execute(f"SELECT * FROM {table} WHERE run_date=?", (run_date,))
         return [dict(r) for r in cur.fetchall()]
+
+
+def recent_run_dates(limit: int = 5) -> list[str]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT run_date FROM run_log ORDER BY run_date DESC LIMIT ?", (limit,)).fetchall()
+    return [r["run_date"] for r in rows]
+
+
+def recent_appearance_counts(run_dates: list[str]) -> dict:
+    """给定若干 run_date, 返回 code -> 在这些日子里作为候选出现的次数 (连续上榜信号)。"""
+    if not run_dates:
+        return {}
+    qs = ",".join("?" * len(run_dates))
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT code, COUNT(DISTINCT run_date) c FROM final_rank "
+            f"WHERE run_date IN ({qs}) GROUP BY code", run_dates).fetchall()
+    return {r["code"]: r["c"] for r in rows}
 
 
 def fetch_run_log(run_date: str) -> dict | None:

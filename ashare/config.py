@@ -104,7 +104,10 @@ CONFIG = {
             "ma":      0.8,
             "oversold_div": 1.2,
             "drawdown": 0.6,
+            "vol_confirm": 0.5,         # 支撑处量能确认(缩量企稳/放量企稳)
         },
+        "boll_n": 20, "boll_k": 2.0,    # 布林带下轨(额外支撑参考)
+        "vol_shrink_ratio": 0.85,       # 支撑处近量/20日均量 < 此值 = 缩量企稳
         "min_tech_score": 1.0,          # 技术分低于此值不进入候选 (后续仍做基本面)
         "detail_bars": 250,             # 详情页 K 线保留多少根
     },
