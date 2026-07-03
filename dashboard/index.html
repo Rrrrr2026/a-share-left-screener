@@ -295,7 +295,7 @@
         tooltip:{ formatter:p=>`<b>${p.name}</b><br/>景气总分：<b>${p.value}</b>` },
         series:[{ type:"treemap", roam:false, nodeClick:false, breadcrumb:{show:false},
           label:{show:true, formatter:"{b}\n{c}", color:"#fff", fontSize:12},
-          itemStyle:{borderColor:"var(--bg)",borderWidth:2,gapWidth:2}, data }]
+          itemStyle:{borderColor:(document.body.classList.contains("light")?"#eef2f8":"#0b1220"),borderWidth:2,gapWidth:2}, data }]
       });
     } else {
       const arr = inds.slice(0,15).slice().reverse();
