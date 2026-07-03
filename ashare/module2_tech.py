@@ -205,7 +205,12 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
     # ---- 风控指标 + 行内sparkline + 斐波那契回撤 ----
     atrp = ind.atr_pct(high, low, close)
     maxdd = ind.max_drawdown(close, 250)
-    beta_v = ind.beta(close, bench_close, 120) if bench_close is not None else np.nan
+    if bench_close is not None:
+        # 用日期做索引, beta() 内部按日期交集对齐 (避免停牌/日历差导致的错位配对)
+        close_dated = pd.Series(close.values, index=df["date"].astype(str).values)
+        beta_v = ind.beta(close_dated, bench_close, 120)
+    else:
+        beta_v = np.nan
     spark = ind.downsample(close.tail(60), 40)   # 近60日收盘降采样, 行内走势
     fib = ind.fib_levels(high_52w, low_52w)
 

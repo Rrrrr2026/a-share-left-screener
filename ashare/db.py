@@ -81,7 +81,12 @@ def init_db():
 def _migrate(conn):
     """给老库补新列(不丢历史)。SQLite 无 ADD COLUMN IF NOT EXISTS, 手动判断。"""
     want = {
-        "tech_scan": [("ret_1m_pct", "REAL"), ("spark_json", "TEXT"), ("atr_pct", "REAL"),
+        "tech_scan": [("support_label", "TEXT"), ("support_price", "REAL"),
+                      ("dist_support_pct", "REAL"), ("breakdown_price", "REAL"),
+                      ("high_52w", "REAL"), ("low_52w", "REAL"), ("pos_52w_pct", "REAL"),
+                      ("ret_half_year_pct", "REAL"),
+                      ("kdj_k", "REAL"), ("kdj_d", "REAL"), ("kdj_j", "REAL"), ("kdj_tag", "TEXT"),
+                      ("ret_1m_pct", "REAL"), ("spark_json", "TEXT"), ("atr_pct", "REAL"),
                       ("max_dd_pct", "REAL"), ("beta", "REAL"), ("vol_ratio_calc", "REAL"),
                       ("sig_vol", "TEXT"), ("boll_low", "REAL"), ("fib_382", "REAL"),
                       ("fib_500", "REAL"), ("fib_618", "REAL")],

@@ -66,7 +66,7 @@
     </div>
     <div class="text-right text-sm text-slate-400">
       <div class="flex items-center justify-end gap-3">
-        <button id="themeBtn" class="segbtn" title="切换深色/浅色">🌙 深色</button>
+        <button id="themeBtn" class="segbtn" title="点击切换：白天 / 黑夜 / 跟随系统">🌙 黑夜</button>
         <span>最后更新：<span id="updatedAt" class="text-slate-200">—</span></span>
       </div>
       <div class="mt-1">数据源：akshare（东财行业 · 前复权日线）· 价格单位 人民币￥</div>
@@ -234,7 +234,8 @@
     return `<span class="num" style="display:inline-block;min-width:54px;padding:1px 6px;border-radius:6px;background:${bg}">${v.toFixed(2)}%</span>`;
   }
   function sparkSVG(arr){
-    if(!Array.isArray(arr)||arr.length<2) return `<span class="num text-slate-500">${dash}</span>`;
+    arr = Array.isArray(arr) ? arr.filter(v=>typeof v==="number"&&isFinite(v)) : [];  // 剔除NaN/null, 防止SVG坐标损坏
+    if(arr.length<2) return `<span class="num text-slate-500">${dash}</span>`;
     const w=90,h=24,pad=2;
     const min=Math.min.apply(null,arr), max=Math.max.apply(null,arr), rng=(max-min)||1;
     const pts=arr.map((v,i)=>{
@@ -250,15 +251,28 @@
       `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="1.8" fill="${col}"/></svg>`;
   }
 
-  // ---------- 主题 ----------
-  const THEME_KEY="ashare_theme_v1";
-  function applyTheme(light){
-    document.body.classList.toggle("light", light);
-    $("#themeBtn").textContent = light ? "☀️ 浅色" : "🌙 深色";
-    try{ localStorage.setItem(THEME_KEY, light?"light":"dark"); }catch(e){}
+  // ---------- 主题 (白天 / 黑夜 / 跟随系统) ----------
+  const THEME_KEY="ashare_theme_v2";
+  const mqLight = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
+  let themeMode = "dark";
+  try{ themeMode = localStorage.getItem(THEME_KEY) || localStorage.getItem("ashare_theme_v1") || "dark"; }catch(e){}
+  if(["light","dark","auto"].indexOf(themeMode)<0) themeMode="dark";
+  function effLight(){ return themeMode==="light" || (themeMode==="auto" && mqLight && mqLight.matches); }
+  function applyTheme(){
+    document.body.classList.toggle("light", effLight());
+    $("#themeBtn").textContent = themeMode==="light" ? "☀️ 白天" : (themeMode==="dark" ? "🌙 黑夜" : "🖥️ 跟随系统");
+    try{ localStorage.setItem(THEME_KEY, themeMode); }catch(e){}
   }
-  applyTheme((localStorage.getItem(THEME_KEY)||"dark")==="light");
-  $("#themeBtn").onclick = ()=>{ applyTheme(!document.body.classList.contains("light")); renderIndustryChart(); };
+  applyTheme();
+  $("#themeBtn").onclick = ()=>{           // 点击循环: 黑夜 -> 白天 -> 跟随系统
+    themeMode = themeMode==="dark" ? "light" : (themeMode==="light" ? "auto" : "dark");
+    applyTheme(); renderIndustryChart();
+  };
+  if(mqLight){                             // 跟随系统模式下, 系统切换主题时实时联动
+    const onMq = ()=>{ if(themeMode==="auto"){ applyTheme(); renderIndustryChart(); } };
+    if(mqLight.addEventListener) mqLight.addEventListener("change", onMq);
+    else if(mqLight.addListener) mqLight.addListener(onMq);
+  }
   function ec(){ return document.body.classList.contains("light") ? null : "dark"; }
   function tc(){ const l=document.body.classList.contains("light");
     return l? {axis:"#64748b",grid:"#e2e8f0",label:"#334155",base:"#93b0d6"}
@@ -274,8 +288,17 @@
 
   // ---------- 行业景气榜 ----------
   let indChart=null, indKind="bar";
+  window.addEventListener("resize", ()=>{ if(indChart) indChart.resize(); });  // 只挂一次, 避免重复渲染累积监听
+  function ensureIndOption(name){
+    // 图上点的行业可能没有候选股(下拉框里没有该选项): 动态补一项, 保证下拉框与筛选状态同步
+    const sel=$("#filterInd");
+    if(name && !Array.from(sel.options).some(o=>o.value===name)){
+      const o=document.createElement("option"); o.value=name; o.textContent=name; sel.appendChild(o);
+    }
+  }
   function setInd(name){
     state.ind = (state.ind===name) ? "" : name;
+    ensureIndOption(state.ind);
     $("#filterInd").value = state.ind||"";
     persist(); render();
     $("#mainTable").scrollIntoView({behavior:"smooth", block:"start"});
@@ -319,8 +342,9 @@
       });
     }
     indChart.off("click");
-    indChart.on("click", p=>{ if(p&&p.name) setInd(p.name); });
-    window.addEventListener("resize", ()=>indChart&&indChart.resize());
+    // 只响应真实行业名的系列点击 (树图留白/面包屑等区域的点击不触发筛选)
+    const knownInds = new Set((DATA.industries||[]).map(d=>d.industry));
+    indChart.on("click", p=>{ if(p && p.componentType==="series" && p.name && knownInds.has(p.name)) setInd(p.name); });
   }
   $("#segBar").onclick=()=>{ indKind="bar"; $("#segBar").classList.add("on"); $("#segTree").classList.remove("on"); renderIndustryChart(); };
   $("#segTree").onclick=()=>{ indKind="treemap"; $("#segTree").classList.add("on"); $("#segBar").classList.remove("on"); renderIndustryChart(); };
@@ -361,6 +385,7 @@
     const set = Array.from(new Set(DATA.candidates.map(c=>c.industry).filter(Boolean))).sort();
     const sel = $("#filterInd");
     set.forEach(n=>{ const o=document.createElement("option"); o.value=n; o.textContent=n; sel.appendChild(o); });
+    ensureIndOption(state.ind);   // 上次保存的筛选行业可能不在候选里
     sel.value = state.ind||""; $("#filterTag").value = state.tag||""; $("#search").value = state.search||"";
     $("#favOnly").checked = !!state.favOnly;
   })();

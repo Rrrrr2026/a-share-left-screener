@@ -171,14 +171,23 @@ def max_drawdown(close: pd.Series, bars: int = 250) -> float:
 
 
 def beta(stock_close: pd.Series, bench_close: pd.Series, bars: int = 120) -> float:
-    """相对基准的 Beta (按位置对齐最近 bars 根日收益)。同市场日历近似对齐。"""
+    """相对基准的 Beta。
+    两序列若带日期索引(如 'YYYY-MM-DD'), 先按日期求交集严格对齐(个股停牌/两源日历不一致
+    时按位置对齐会把不同交易日的收益配对, 算出错误Beta); 整数索引则退回末端位置对齐。
+    协方差与方差统一用 ddof=1, 避免 n/(n-1) 的系统性偏差。"""
     sr = stock_close.astype(float).pct_change().dropna()
     br = bench_close.astype(float).pct_change().dropna()
+    date_like = not (sr.index.dtype.kind in "iu" and br.index.dtype.kind in "iu")
+    if date_like:
+        common = sr.index.intersection(br.index)
+        if len(common) < 20:
+            return np.nan
+        sr, br = sr.loc[common], br.loc[common]
     n = min(len(sr), len(br), bars)
     if n < 20:
         return np.nan
     sr, br = sr.tail(n).values, br.tail(n).values
-    var = float(np.var(br))
+    var = float(np.var(br, ddof=1))
     if var == 0:
         return np.nan
     return float(np.cov(sr, br)[0, 1] / var)

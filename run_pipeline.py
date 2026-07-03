@@ -137,7 +137,11 @@ def run(full_market: bool, use_cache: bool):
     workers = CONFIG["fetch"]["max_workers"] or min(16, (os.cpu_count() or 4) * 2)
 
     _bench = ds.fetch_benchmark_close()
-    bench_close = _bench["close"] if (_bench is not None and not _bench.empty) else None
+    if _bench is not None and not _bench.empty:
+        # 日期作索引 -> beta() 按日期交集对齐
+        bench_close = _bench.set_index(_bench["date"].astype(str))["close"]
+    else:
+        bench_close = None
 
     def _scan_stock(code, name, industry):
         h = ds.fetch_hist(code)
