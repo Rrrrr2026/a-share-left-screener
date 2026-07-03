@@ -30,7 +30,7 @@ MAIN_COLUMNS = [
     ("tag", "结论标签"), ("final_score", "综合分"), ("tech_score", "技术分"),
     ("fund_score", "基本面分"), ("price", "现价"), ("dist_support_pct", "距支撑%"),
     ("support_disp", "关键支撑位"), ("breakdown_price", "破位位"),
-    ("pos_52w_pct", "52周位置%"), ("ret_half_year_pct", "近半年涨跌%"),
+    ("pos_52w_pct", "52周位置%"), ("ret_1m_pct", "近一月涨%"), ("ret_half_year_pct", "近半年涨跌%"),
     ("turnover", "换手率"), ("volume_ratio", "量比"), ("kdj_tag", "KDJ"),
     ("pe_disp", "市盈率TTM(分位)"), ("pb", "市净率"), ("eps", "EPS"), ("roe", "ROE"),
 ]
@@ -84,6 +84,7 @@ def build_payload(run_date: str | None = None) -> dict:
             "pos_52w_pct": t.get("pos_52w_pct"),
             "high_52w": t.get("high_52w"), "low_52w": t.get("low_52w"),
             "ret_half_year_pct": t.get("ret_half_year_pct"),
+            "ret_1m_pct": t.get("ret_1m_pct"),
             "turnover": t.get("turnover"), "volume_ratio": t.get("volume_ratio"),
             "amount_today": t.get("amount_today"), "avg_amt20_yi": t.get("avg_amt20_yi"),
             "kdj_tag": t.get("kdj_tag"),

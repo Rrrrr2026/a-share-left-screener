@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS tech_scan(
     sig_channel TEXT, sig_pivot TEXT, sig_ma TEXT, sig_osc TEXT,
     dist_lower REAL, dist_pivot REAL, dist_ma REAL, drawdown_pct REAL, rsi REAL,
     support_label TEXT, support_price REAL, dist_support_pct REAL, breakdown_price REAL,
-    high_52w REAL, low_52w REAL, pos_52w_pct REAL, ret_half_year_pct REAL,
+    high_52w REAL, low_52w REAL, pos_52w_pct REAL, ret_half_year_pct REAL, ret_1m_pct REAL,
     turnover REAL, volume_ratio REAL, amount_today REAL, avg_amt20_yi REAL,
     kdj_k REAL, kdj_d REAL, kdj_j REAL, kdj_tag TEXT,
     PRIMARY KEY(run_date, code)
@@ -71,7 +71,21 @@ def get_conn():
 def init_db():
     with get_conn() as conn:
         conn.executescript(_SCHEMA)
+        _migrate(conn)
     log.info("DB 初始化: %s", DB_PATH)
+
+
+def _migrate(conn):
+    """给老库补新列(不丢历史)。SQLite 无 ADD COLUMN IF NOT EXISTS, 手动判断。"""
+    want = {"tech_scan": [("ret_1m_pct", "REAL")]}
+    for table, cols in want.items():
+        have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        for name, typ in cols:
+            if name not in have:
+                try:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {typ}")
+                except Exception as e:
+                    log.debug("migrate %s.%s 失败: %s", table, name, e)
 
 
 _RUN_TABLES = ("industry_score", "tech_scan", "fundamental",

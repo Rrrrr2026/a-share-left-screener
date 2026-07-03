@@ -30,7 +30,7 @@
 </style>
 </head>
 <body class="min-h-screen">
-<div class="max-w-[1500px] mx-auto px-4 py-5">
+<div class="max-w-[1900px] mx-auto px-6 py-5">
 
   <!-- 标题 -->
   <header class="flex items-center justify-between flex-wrap gap-3 mb-4">
@@ -188,7 +188,8 @@
   }
 
   // ---------- 主表 ----------
-  const COLS = DATA.columns && DATA.columns.length ? DATA.columns : [
+  const COLORDER_KEY = "ashare_colorder_v1";
+  let COLS = DATA.columns && DATA.columns.length ? DATA.columns.slice() : [
     {key:"code",label:"代码"},{key:"name",label:"名称"},{key:"industry",label:"所属行业"},
     {key:"tag",label:"结论标签"},{key:"final_score",label:"综合分"},{key:"tech_score",label:"技术分"},
     {key:"fund_score",label:"基本面分"},{key:"price",label:"现价"},{key:"dist_support_pct",label:"距支撑%"},
@@ -197,7 +198,10 @@
     {key:"kdj_tag",label:"KDJ"},{key:"pe_disp",label:"市盈率TTM(分位)"},{key:"pb",label:"市净率"},
     {key:"eps",label:"EPS"},{key:"roe",label:"ROE"}
   ];
-  const NUMERIC = new Set(["final_score","tech_score","fund_score","price","dist_support_pct","breakdown_price","pos_52w_pct","ret_half_year_pct","turnover","volume_ratio","pb","eps","roe"]);
+  const NUMERIC = new Set(["final_score","tech_score","fund_score","price","dist_support_pct","breakdown_price","pos_52w_pct","ret_1m_pct","ret_half_year_pct","turnover","volume_ratio","pb","eps","roe"]);
+  // 应用上次保存的列顺序
+  try{ const saved=JSON.parse(localStorage.getItem(COLORDER_KEY)||"null");
+    if(Array.isArray(saved)&&saved.length){ COLS.sort((a,b)=>{ let ia=saved.indexOf(a.key), ib=saved.indexOf(b.key); return (ia<0?999:ia)-(ib<0?999:ib); }); } }catch(e){}
 
   const LS_KEY = "ashare_filters_v1";
   let state = {search:"", ind:"", tag:"", sortKey:"final_score", sortDir:"desc"};
@@ -215,17 +219,35 @@
     const tr = $("#headRow"); tr.innerHTML="";
     COLS.forEach(c=>{
       const th=document.createElement("th");
-      th.className="sortable"; th.dataset.key=c.key;
+      th.className="sortable"; th.dataset.key=c.key; th.draggable=true;
+      th.title="点击排序 · 按住拖动可调整列的位置";
       const arrow = state.sortKey===c.key ? (state.sortDir==="asc"?" ▲":" ▼") : "";
-      th.innerHTML = c.label + `<span class="text-sky-400">${arrow}</span>`;
+      th.innerHTML = `<span style="cursor:grab" class="select-none">⋮⋮</span> ` + c.label + `<span class="text-sky-400">${arrow}</span>`;
       if(NUMERIC.has(c.key)) th.classList.add("text-right");
       th.onclick=()=>{
+        if(th.dataset.dragging){ delete th.dataset.dragging; return; }
         if(state.sortKey===c.key){ state.sortDir = state.sortDir==="asc"?"desc":"asc"; }
         else { state.sortKey=c.key; state.sortDir = NUMERIC.has(c.key)?"desc":"asc"; }
         persist(); render();
       };
+      th.addEventListener("dragstart", e=>{ e.dataTransfer.setData("text/plain", c.key); e.dataTransfer.effectAllowed="move"; th.style.opacity="0.35"; });
+      th.addEventListener("dragend", ()=>{ th.style.opacity=""; });
+      th.addEventListener("dragover", e=>{ e.preventDefault(); e.dataTransfer.dropEffect="move"; th.style.boxShadow="inset 3px 0 0 #38bdf8"; });
+      th.addEventListener("dragleave", ()=>{ th.style.boxShadow=""; });
+      th.addEventListener("drop", e=>{ e.preventDefault(); th.style.boxShadow=""; th.dataset.dragging="1"; reorderCols(e.dataTransfer.getData("text/plain"), c.key); });
       tr.appendChild(th);
     });
+  }
+
+  function reorderCols(fromKey, toKey){
+    if(!fromKey || fromKey===toKey) return;
+    const fi=COLS.findIndex(x=>x.key===fromKey);
+    if(fi<0) return;
+    const [moved]=COLS.splice(fi,1);
+    const ti=COLS.findIndex(x=>x.key===toKey);
+    COLS.splice(ti<0?COLS.length:ti, 0, moved);
+    try{ localStorage.setItem(COLORDER_KEY, JSON.stringify(COLS.map(x=>x.key))); }catch(e){}
+    render();
   }
 
   function cellHTML(c, key){
@@ -233,7 +255,7 @@
     switch(key){
       case "tag": return `<span class="badge ${tagClass(v)}">${v||dash}</span>`;
       case "dist_support_pct": return supportCell(v);
-      case "ret_half_year_pct": return signPctCell(v);
+      case "ret_1m_pct": case "ret_half_year_pct": return signPctCell(v);
       case "pos_52w_pct": return `<span class="num">${pct(v,1)}</span>`;
       case "turnover": return `<span class="num">${isNum(v)?v.toFixed(2)+"%":dash}</span>`;
       case "final_score": return `<span class="num font-semibold text-white">${f(v,1)}</span>`;
@@ -242,10 +264,19 @@
       case "roe": return `<span class="num">${isNum(v)?v.toFixed(1)+"%":dash}</span>`;
       case "price": case "breakdown_price": case "pb": case "eps": case "volume_ratio":
         return `<span class="num">${f(v,2)}</span>`;
-      case "code": return `<span class="text-sky-300 font-mono">${v||dash}</span>`;
+      case "code": return `<a href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSym(v))}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="text-sky-300 font-mono hover:underline" title="在 TradingView 打开 ${v||""}">${v||dash} ↗</a>`;
       case "name": return `<span class="text-white">${v||dash}</span>`;
       default: return `<span>${(v==null||v==="")?dash:v}</span>`;
     }
+  }
+
+  // A股代码 -> TradingView 交易所前缀 (沪 SSE / 深 SZSE / 北 BSE)
+  function tvSym(code){
+    code = String(code||"");
+    if(/^(6|9)/.test(code)) return "SSE:"+code;
+    if(/^(0|2|3)/.test(code)) return "SZSE:"+code;
+    if(/^(8|4|92)/.test(code)) return "BSE:"+code;
+    return code;
   }
 
   function currentRows(){
@@ -305,7 +336,7 @@
   // ---------- 个股详情 ----------
   let detailChart=null, roeChart=null;
   function openDetail(c){
-    $("#dTitle").innerHTML = `${c.name||""} <span class="text-sky-300 font-mono text-base">${c.code||""}</span> <span class="badge ${tagClass(c.tag)} ml-2">${c.tag||""}</span>`;
+    $("#dTitle").innerHTML = `${c.name||""} <a href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSym(c.code))}" target="_blank" rel="noopener" class="text-sky-300 font-mono text-base hover:underline" title="在 TradingView 打开">${c.code||""} ↗</a> <span class="badge ${tagClass(c.tag)} ml-2">${c.tag||""}</span>`;
     $("#dSub").textContent = `${c.industry||"—"} · 现价 ${f(c.price)} · 综合分 ${f(c.final_score,1)}（技术 ${f(c.tech_score,2)} / 基本面 ${f(c.fund_score,0)} / 景气 ${f(c.prosperity_score,0)}）`;
     $("#dConclusion").textContent = c.conclusion || "—";
 

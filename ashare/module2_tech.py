@@ -173,6 +173,7 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
     low_52w = float(low.tail(win52).min())
     pos_52w = (px - low_52w) / (high_52w - low_52w) * 100.0 if high_52w > low_52w else np.nan
     ret_half = ind.cumulative_return(close, 120)
+    ret_1m = ind.cumulative_return(close, 21)     # 近一月涨幅 (≈21个交易日)
 
     # ---- KDJ ----
     k, d_, j = ind.kdj(high, low, close)
@@ -208,6 +209,7 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         "low_52w": round(low_52w, 2),
         "pos_52w_pct": _nz(pos_52w),
         "ret_half_year_pct": _nz(ret_half),
+        "ret_1m_pct": _nz(ret_1m),
         "turnover": turnover,
         "volume_ratio": vol_ratio,
         "amount_today": amount_today,
