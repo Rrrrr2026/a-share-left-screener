@@ -104,6 +104,7 @@ def build_payload(run_date: str | None = None) -> dict:
             "revenue_yoy": f.get("revenue_yoy"), "netprofit_yoy": f.get("netprofit_yoy"),
             "gross_margin": f.get("gross_margin"), "debt_ratio": f.get("debt_ratio"),
             "roe_trend": _loads(f.get("roe_trend_json")),
+            "roe_trend_q": _loads(f.get("roe_trend_q_json")),
             "fund_flags": _loads(f.get("fund_flags_json")),
             # 新增: sparkline / 风控 / 量能 / 斐波那契 / 分析师(A股多为空) / 连续上榜
             "spark": _loads(t.get("spark_json"), default=[]),

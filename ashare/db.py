@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS fundamental(
     eps REAL, eps_yoy REAL, roe REAL,
     revenue_yoy REAL, netprofit_yoy REAL, gross_margin REAL, debt_ratio REAL,
     target_price REAL, analyst_rating TEXT, analyst_count REAL, upside_pct REAL,
-    roe_trend_json TEXT, fund_flags_json TEXT,
+    roe_trend_json TEXT, roe_trend_q_json TEXT, fund_flags_json TEXT,
     PRIMARY KEY(run_date, code)
 );
 CREATE TABLE IF NOT EXISTS final_rank(
@@ -95,7 +95,8 @@ def _migrate(conn):
                       ("sig_vol", "TEXT"), ("boll_low", "REAL"), ("fib_382", "REAL"),
                       ("fib_500", "REAL"), ("fib_618", "REAL")],
         "fundamental": [("target_price", "REAL"), ("analyst_rating", "TEXT"),
-                        ("analyst_count", "REAL"), ("upside_pct", "REAL")],
+                        ("analyst_count", "REAL"), ("upside_pct", "REAL"),
+                        ("roe_trend_q_json", "TEXT")],
         "final_rank": [("conclusion_en", "TEXT")],
     }
     for table, cols in want.items():
@@ -181,6 +182,7 @@ def save_fundamental(run_date: str, code: str, f: dict):
     row.update({
         "run_date": run_date, "code": code,
         "roe_trend_json": json.dumps(f.get("roe_trend", []), ensure_ascii=False),
+        "roe_trend_q_json": json.dumps(f.get("roe_trend_q", []), ensure_ascii=False),
         "fund_flags_json": json.dumps(f.get("fund_flags", []), ensure_ascii=False),
     })
     _upsert("fundamental", [row])

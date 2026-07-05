@@ -84,14 +84,22 @@ def pull_fundamentals(code: str, industry: str | None = None,
     if fin is not None and not fin.empty:
         if "roe" in fin.columns:
             res["roe"] = _last(fin["roe"])
-            roe_s = pd.to_numeric(fin["roe"], errors="coerce")
-            tail = fin.tail(8)
-            res["roe_trend"] = [
-                {"date": (str(d.date()) if hasattr(d, "date") else str(d)),
-                 "value": (None if pd.isna(v) else round(float(v), 2))}
-                for d, v in zip(tail.get("date", pd.Series([None] * len(tail))),
-                                pd.to_numeric(tail["roe"], errors="coerce"))
-            ]
+
+            def _roe_list(df):
+                return [
+                    {"date": (str(d.date()) if hasattr(d, "date") else str(d)),
+                     "value": (None if pd.isna(v) else round(float(v), 2))}
+                    for d, v in zip(df.get("date", pd.Series([None] * len(df))),
+                                    pd.to_numeric(df["roe"], errors="coerce"))
+                ]
+            # 季度(近8季, 原口径) + 年度(取年报12-31行, 近6年) —— 供 ROE 图 年度/季度 切换
+            res["roe_trend_q"] = _roe_list(fin.tail(8))
+            try:
+                _dts = pd.to_datetime(fin.get("date"), errors="coerce")
+                _ann = fin[(_dts.dt.month == 12) & (_dts.dt.day == 31)]
+                res["roe_trend"] = _roe_list(_ann.tail(6)) if not _ann.empty else _roe_list(fin.tail(8))
+            except Exception:
+                res["roe_trend"] = _roe_list(fin.tail(8))
         if "eps" in fin.columns:
             res["eps"] = _last(fin["eps"])
             eps_s = pd.to_numeric(fin["eps"], errors="coerce").dropna()

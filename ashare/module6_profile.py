@@ -335,6 +335,49 @@ def _cashflow(code: str, net_by_year: dict | None = None) -> dict | None:
     if c_audit:
         av = ann.iloc[-1][c_audit]
         out["audit"] = str(av).strip() if pd.notna(av) else None
+
+    # ---- 季度现金流(近8季): sina累计口径 -> 差分成单季, 供图表"季度"细化 ----
+    try:
+        d2 = df.copy()
+        d2["_dt"] = pd.to_datetime(d2["报告日"], errors="coerce")
+        d2 = d2.dropna(subset=["_dt"]).sort_values("_dt")
+
+        def _cum(c):
+            m = {}
+            if c and c in d2.columns:
+                for _, r in d2.iterrows():
+                    v = _num(r[c])
+                    if v is not None:
+                        m[pd.Timestamp(r["_dt"])] = v
+            return m
+        maps = {"ocf": _cum(c_ocf), "capex": _cum(c_capex),
+                "acq": _cum(c_acq), "dividend": _cum(c_div)}
+
+        def _single(m, ts):
+            cur = m.get(ts)
+            if cur is None:
+                return None
+            if ts.month == 3:
+                return cur                       # Q1 累计=单季
+            prevm = {6: 3, 9: 6, 12: 9}.get(ts.month)
+            for x in m:
+                if x.year == ts.year and x.month == prevm:
+                    return cur - m[x]            # 本期累计 - 同年上一季累计
+            return None
+        qdts = sorted({pd.Timestamp(x) for x in d2["_dt"]})[-8:]
+        toY = lambda v: _r(v / YI, 2) if v is not None else None
+        if qdts:
+            out["q_years"] = [t.strftime("%y") + "Q" + str((t.month - 1) // 3 + 1) for t in qdts]
+            so = [_single(maps["ocf"], t) for t in qdts]
+            sc = [_single(maps["capex"], t) for t in qdts]
+            out["q_ocf"] = [toY(v) for v in so]
+            out["q_capex"] = [toY(-v) if v is not None else None for v in sc]
+            out["q_acq"] = [toY(-_single(maps["acq"], t)) if _single(maps["acq"], t) is not None else None for t in qdts]
+            out["q_dividend"] = [toY(-_single(maps["dividend"], t)) if _single(maps["dividend"], t) is not None else None for t in qdts]
+            out["q_fcf"] = [toY(so[i] - sc[i]) if (so[i] is not None and sc[i] is not None) else None for i in range(len(qdts))]
+            out["q_net_income"] = [None] * len(qdts)   # 单季归母净利无免费源
+    except Exception as e:
+        log.debug("cashflow quarterly %s: %s", code, e)
     return out
 
 
