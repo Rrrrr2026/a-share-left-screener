@@ -44,6 +44,7 @@
   thead th { position:sticky; top:0; background:var(--head); z-index:2; color:var(--dim); }
   .star{ cursor:pointer; font-size:16px; line-height:1; color:#64748b; }
   .star.on{ color:#facc15; }
+  /* 明色主题下把深色 Tailwind 文本改为可读色 */
   body.light .text-white{color:#0f172a!important}
   body.light .text-slate-400{color:#64748b!important}
   body.light .text-slate-300,body.light .text-slate-200,body.light .text-slate-100{color:#1e293b!important}
@@ -52,6 +53,21 @@
   .miniStat{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:6px 12px; font-size:13px; }
   .segbtn{ padding:4px 12px; border-radius:8px; border:1px solid var(--inputborder); background:var(--input); color:var(--dim); font-size:13px; cursor:pointer; }
   .segbtn.on{ background:#0ea5e9; color:#fff; border-color:#0ea5e9; }
+  /* ---- 详情抽屉 分页签 & 版式 ---- */
+  .sec-title{ font-size:15px; font-weight:600; color:var(--text); display:flex; align-items:center; gap:8px; }
+  .sec-title::before{ content:""; width:3px; height:14px; border-radius:2px; background:#38bdf8; flex:none; }
+  .dtab{ animation:fadein .18s ease; }
+  @keyframes fadein{ from{opacity:.35} to{opacity:1} }
+  .newsrow{ display:flex; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border); align-items:flex-start; }
+  .newsrow:last-child{ border-bottom:none; }
+  .newsrow:hover{ background:var(--rowhover); }
+  .kv{ display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px dashed var(--gridline); font-size:13px; }
+  .kv:last-child{ border-bottom:none; }
+  .meterbg{ background:var(--gridline); border-radius:4px; height:6px; flex:1; }
+  .meterfill{ height:100%; border-radius:4px; }
+  .note-warn{ border-left:3px solid #f59e0b; background:rgba(245,158,11,.07); }
+  .note-good{ border-left:3px solid #22c55e; background:rgba(34,197,94,.07); }
+  .note-info{ border-left:3px solid #64748b; background:rgba(148,163,184,.08); }
   @media (max-width:640px){ th,td{ padding:6px 6px; font-size:12px; } }
 </style>
 </head>
@@ -61,42 +77,44 @@
   <!-- 标题 -->
   <header class="flex items-center justify-between flex-wrap gap-3 mb-4">
     <div>
-      <h1 class="text-2xl font-bold text-white">A股 · 「左侧支撑位」筛选与监控台</h1>
-      <p class="text-sm text-slate-400 mt-1">高景气行业内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分</p>
+      <h1 class="text-2xl font-bold text-white" data-i18n="title">美股 · 「左侧支撑位」筛选与监控台</h1>
+      <p class="text-sm text-slate-400 mt-1" data-i18n="subtitle">全美股(市值≥$1B) · 高景气板块内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分</p>
     </div>
     <div class="text-right text-sm text-slate-400">
       <div class="flex items-center justify-end gap-3">
+        <button id="langBtn" class="segbtn" title="中文 / English">EN</button>
         <button id="themeBtn" class="segbtn" title="点击切换：白天 / 黑夜 / 跟随系统">🌙 黑夜</button>
-        <span>最后更新：<span id="updatedAt" class="text-slate-200">—</span></span>
+        <span><span data-i18n="updated">最后更新：</span><span id="updatedAt" class="text-slate-200">—</span></span>
       </div>
-      <div class="mt-1">数据源：akshare（东财行业 · 前复权日线）· 价格单位 人民币￥</div>
+      <div class="mt-1" data-i18n="datasource">数据源：Yahoo Finance（全美股 · GICS 板块）· 价格单位 USD</div>
     </div>
   </header>
 
   <!-- 免责声明 -->
-  <div class="card border-amber-500/40 bg-amber-500/5 px-4 py-3 mb-4 text-[13px] leading-relaxed text-amber-200/90">
-    ⚠️ <b>免责声明</b>：本系统仅对A股做技术/基本面数据的自动化整理与形态筛选，<b>不构成任何投资建议</b>。
-    "左侧买入"是在下跌中、支撑确认前进场，风险天然更高（可能继续下跌或破位）。
+  <div class="card border-amber-500/40 bg-amber-500/5 px-4 py-3 mb-4 text-[13px] leading-relaxed text-amber-200/90" data-i18n-html="disclaimer">
+    ⚠️ <b>免责声明</b>：本系统仅对美股做技术/基本面数据的自动化整理与形态筛选，<b>不构成任何投资建议</b>。
+    "左侧买入"是在下跌中、支撑确认前进场，风险天然更高（可能继续下跌或破位）。价格单位为美元(USD)。
     所有标的需<b>人工复核</b>，使用者自负盈亏与风控。
   </div>
 
   <!-- 概览卡 -->
   <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-    <div class="card p-4"><div class="text-slate-400 text-xs">今日扫描数</div><div id="ovScanned" class="text-2xl font-bold text-white mt-1">—</div></div>
-    <div class="card p-4"><div class="text-slate-400 text-xs">命中候选数</div><div id="ovHit" class="text-2xl font-bold text-sky-300 mt-1">—</div></div>
-    <div class="card p-4"><div class="text-slate-400 text-xs">入选景气行业</div><div id="ovInds" class="text-2xl font-bold text-emerald-300 mt-1">—</div></div>
-    <div class="card p-4"><div class="text-slate-400 text-xs">数据日期</div><div id="ovDate" class="text-2xl font-bold text-white mt-1">—</div></div>
+    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_scanned">今日扫描数</div><div id="ovScanned" class="text-2xl font-bold text-white mt-1">—</div></div>
+    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_hit">命中候选数</div><div id="ovHit" class="text-2xl font-bold text-sky-300 mt-1">—</div></div>
+    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_inds">入选景气板块</div><div id="ovInds" class="text-2xl font-bold text-emerald-300 mt-1">—</div></div>
+    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_date">数据日期</div><div id="ovDate" class="text-2xl font-bold text-white mt-1">—</div></div>
   </section>
+  <!-- 派生统计条 -->
   <section id="ovStrip" class="flex flex-wrap gap-2 mb-5"></section>
 
   <!-- 行业景气榜 -->
   <section class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-      <h2 class="text-lg font-semibold text-white">行业景气榜</h2>
+      <h2 class="text-lg font-semibold text-white" data-i18n="sec_board">板块景气榜</h2>
       <div class="flex items-center gap-2">
-        <span class="text-xs text-slate-400 mr-1">点击行业可筛选主表 · 绿色=入选</span>
-        <button class="segbtn on" id="segBar">条形图</button>
-        <button class="segbtn" id="segTree">矩形树图</button>
+        <span class="text-xs text-slate-400 mr-1" data-i18n="sec_hint">点击板块可筛选主表 · 绿色=入选</span>
+        <button class="segbtn on" id="segBar" data-i18n="seg_bar">条形图</button>
+        <button class="segbtn" id="segTree" data-i18n="seg_tree">矩形树图</button>
       </div>
     </div>
     <div id="industryChart" style="width:100%;height:380px;"></div>
@@ -105,42 +123,43 @@
   <!-- 权重实验室 -->
   <section class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-      <h2 class="text-lg font-semibold text-white">综合分权重实验室</h2>
+      <h2 class="text-lg font-semibold text-white" data-i18n="wlab_title">综合分权重实验室</h2>
       <div class="flex items-center gap-3">
-        <span class="text-xs text-slate-400">拖动滑块即时重算「综合分」并重新排序（不改变原始命中）</span>
-        <button id="wReset" class="segbtn">恢复默认 50/30/20</button>
+        <span class="text-xs text-slate-400" data-i18n="wlab_hint">拖动滑块即时重算「综合分」并重新排序（不改变原始命中）</span>
+        <button id="wReset" class="segbtn" data-i18n="wlab_reset">恢复默认 50/30/20</button>
       </div>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-      <div><div class="flex justify-between text-sm mb-1"><span class="text-slate-300">技术面权重</span><span id="wtV" class="text-sky-300 font-semibold">50%</span></div><input id="wt" type="range" min="0" max="100" value="50" class="w-full"/></div>
-      <div><div class="flex justify-between text-sm mb-1"><span class="text-slate-300">基本面权重</span><span id="wfV" class="text-sky-300 font-semibold">30%</span></div><input id="wf" type="range" min="0" max="100" value="30" class="w-full"/></div>
-      <div><div class="flex justify-between text-sm mb-1"><span class="text-slate-300">景气权重</span><span id="wpV" class="text-sky-300 font-semibold">20%</span></div><input id="wp" type="range" min="0" max="100" value="20" class="w-full"/></div>
+      <div><div class="flex justify-between text-sm mb-1"><span class="text-slate-300" data-i18n="w_tech">技术面权重</span><span id="wtV" class="text-sky-300 font-semibold">50%</span></div><input id="wt" type="range" min="0" max="100" value="50" class="w-full"/></div>
+      <div><div class="flex justify-between text-sm mb-1"><span class="text-slate-300" data-i18n="w_fund">基本面权重</span><span id="wfV" class="text-sky-300 font-semibold">30%</span></div><input id="wf" type="range" min="0" max="100" value="30" class="w-full"/></div>
+      <div><div class="flex justify-between text-sm mb-1"><span class="text-slate-300" data-i18n="w_prosp">景气权重</span><span id="wpV" class="text-sky-300 font-semibold">20%</span></div><input id="wp" type="range" min="0" max="100" value="20" class="w-full"/></div>
     </div>
   </section>
 
   <!-- 候选股主表 -->
   <section class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
-      <h2 class="text-lg font-semibold text-white">候选股主表 <span id="rowCount" class="text-sm text-slate-400 font-normal"></span></h2>
+      <h2 class="text-lg font-semibold text-white"><span data-i18n="tbl_title">候选股主表</span> <span id="rowCount" class="text-sm text-slate-400 font-normal"></span></h2>
       <div class="flex items-center gap-2 flex-wrap text-sm">
-        <input id="search" placeholder="搜索 代码 / 名称" class="w-40" />
-        <select id="filterInd"><option value="">全部行业</option></select>
+        <input id="search" placeholder="搜索 代码 / 名称" data-i18n-ph="search_ph" class="w-40" />
+        <select id="filterInd"><option value="">全部板块</option></select>
         <select id="filterTag">
           <option value="">全部标签</option>
           <option value="✅ 强左侧">✅ 强左侧</option>
           <option value="⚠️ 技术好但基本面弱">⚠️ 技术好但基本面弱</option>
           <option value="🔎 观察">🔎 观察</option>
         </select>
-        <button id="advBtn" class="segbtn">高级筛选 ▾</button>
-        <label class="flex items-center gap-1 text-slate-300 cursor-pointer select-none"><input id="favOnly" type="checkbox" class="w-auto"/> 只看自选</label>
-        <button id="exportBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg">导出CSV</button>
+        <button id="advBtn" class="segbtn" data-i18n="adv_btn">高级筛选 ▾</button>
+        <label class="flex items-center gap-1 text-slate-300 cursor-pointer select-none"><input id="favOnly" type="checkbox" class="w-auto"/> <span data-i18n="fav_only">只看自选</span></label>
+        <button id="exportBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg" data-i18n="export">导出CSV</button>
       </div>
     </div>
+    <!-- 高级区间筛选 -->
     <div id="advPanel" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
-      <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span>综合分 ≥</span><span id="fScoreV">0</span></div><input id="fScore" type="range" min="0" max="100" value="0" class="w-full"/></div>
-      <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span>距支撑绝对值 ≤</span><span id="fDistV">不限</span></div><input id="fDist" type="range" min="0" max="30" value="30" class="w-full"/></div>
-      <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span>ROE ≥</span><span id="fRoeV">不限</span></div><input id="fRoe" type="range" min="-10" max="40" value="-10" class="w-full"/></div>
-      <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span>最大回撤劣于 ≥</span><span id="fDdV">不限</span></div><input id="fDd" type="range" min="-80" max="0" value="-80" class="w-full"/></div>
+      <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_score">综合分 ≥</span><span id="fScoreV">0</span></div><input id="fScore" type="range" min="0" max="100" value="0" class="w-full"/></div>
+      <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_dist">距支撑绝对值 ≤</span><span id="fDistV">不限</span></div><input id="fDist" type="range" min="0" max="30" value="30" class="w-full"/></div>
+      <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_roe">ROE ≥</span><span id="fRoeV">不限</span></div><input id="fRoe" type="range" min="-10" max="40" value="-10" class="w-full"/></div>
+      <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_up">最大回撤劣于 ≥</span><span id="fUpV">不限</span></div><input id="fUp" type="range" min="-80" max="0" value="-80" class="w-full"/></div>
     </div>
     <div class="overflow-x-auto" style="max-height:64vh;">
       <table id="mainTable">
@@ -148,42 +167,106 @@
         <tbody id="tableBody"></tbody>
       </table>
     </div>
-    <div id="emptyHint" class="text-center text-slate-500 py-8 hidden">无符合条件的标的。可放宽筛选或调整 CONFIG 阈值。</div>
+    <div id="emptyHint" class="text-center text-slate-500 py-8 hidden" data-i18n="empty_hint">无符合条件的标的。可放宽筛选或调整 CONFIG 阈值。</div>
   </section>
 
-  <p class="text-xs text-slate-500 text-center mb-8">
+  <p class="text-xs text-slate-500 text-center mb-8" data-i18n="footer">
     "左侧买入"风险更高，所有标的需人工复核 · 本页所有数据仅供研究，不构成投资建议。
   </p>
 </div>
 
 <!-- 个股详情抽屉 -->
 <div id="overlay" class="fixed inset-0 bg-black/60 hidden z-40"></div>
-<aside id="drawer" class="drawer fixed top-0 right-0 h-full w-full md:w-[62%] lg:w-[56%] border-l z-50 translate-x-full overflow-y-auto" style="background:var(--drawer);border-color:var(--border)">
+<aside id="drawer" class="drawer fixed top-0 right-0 h-full w-full md:w-[68%] lg:w-[60%] border-l z-50 translate-x-full overflow-y-auto" style="background:var(--drawer);border-color:var(--border)">
   <div class="p-5">
-    <div class="flex items-start justify-between mb-3">
+    <div class="flex items-start justify-between mb-2">
       <div>
         <h3 id="dTitle" class="text-xl font-bold text-white">—</h3>
         <div id="dSub" class="text-sm text-slate-400 mt-1">—</div>
       </div>
       <button id="closeDrawer" class="text-slate-400 hover:text-white text-2xl leading-none px-2">×</button>
     </div>
-    <div id="dConclusion" class="card p-3 text-[13px] leading-relaxed text-slate-200 mb-3"></div>
-    <div id="dChips" class="flex flex-wrap gap-2 mb-3"></div>
-    <div id="dRisk" class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2"></div>
-    <div id="dFib" class="text-xs text-slate-400 mb-3"></div>
-    <div id="detailChart" style="width:100%;height:640px;"></div>
-    <div class="mt-4">
-      <div class="flex items-center justify-between mb-2">
-        <h4 class="text-base font-semibold text-white">TradingView 交互图（实时）</h4>
-        <a id="tvLink" href="#" target="_blank" rel="noopener" class="text-sky-300 text-sm hover:underline">在 TradingView 打开概览页 ↗</a>
-      </div>
-      <div id="tvWrap" style="height:460px;border:1px solid var(--border);border-radius:12px;overflow:hidden;"></div>
+
+    <!-- 页签导航 -->
+    <div id="dTabs" class="flex gap-2 flex-wrap sticky top-0 z-10 py-2 mb-3" style="background:var(--drawer)">
+      <button class="segbtn on" data-tab="tabOv" data-i18n="tab_ov">总览</button>
+      <button class="segbtn" data-tab="tabCo" data-i18n="tab_co">公司与业务</button>
+      <button class="segbtn" data-tab="tabCf" data-i18n="tab_cf">现金流与风险</button>
+      <button class="segbtn" data-tab="tabNw" data-i18n="tab_nw">消息与博弈</button>
     </div>
-    <h4 class="text-base font-semibold text-white mt-4 mb-2">基本面速览</h4>
-    <div id="dFund" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-      <div class="card p-3"><div class="text-sm text-slate-300 mb-2">估值历史分位</div><div id="dVal"></div></div>
-      <div class="card p-3"><div class="text-sm text-slate-300 mb-2">ROE 多年趋势</div><div id="dRoe" style="height:130px;"></div></div>
+
+    <!-- ① 总览 -->
+    <div id="tabOv" class="dtab">
+      <div id="dConclusion" class="card p-3 text-[13px] leading-relaxed text-slate-200 mb-3"></div>
+      <div id="dChips" class="flex flex-wrap gap-2 mb-3"></div>
+      <div id="dRisk" class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2"></div>
+      <div id="dFib" class="text-xs text-slate-400 mb-3"></div>
+      <div id="detailChart" style="width:100%;height:600px;"></div>
+      <div class="mt-4">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="sec-title" data-i18n="tv_title">TradingView 交互图（实时）</h4>
+          <a id="tvLink" href="#" target="_blank" rel="noopener" class="text-sky-300 text-sm hover:underline" data-i18n="tv_link">在 TradingView 打开概览页 ↗</a>
+        </div>
+        <div id="tvWrap" style="height:440px;border:1px solid var(--border);border-radius:12px;overflow:hidden;"></div>
+      </div>
+      <h4 class="sec-title mt-5 mb-2" data-i18n="fund_glance">基本面速览</h4>
+      <div id="dFund" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 mb-2">
+        <div class="card p-3"><div class="text-sm text-slate-300 mb-2" data-i18n="val_pct">估值分位</div><div id="dVal"></div></div>
+        <div class="card p-3"><div class="text-sm text-slate-300 mb-2" data-i18n="roe_trend">ROE 多年趋势</div><div id="dRoe" style="height:130px;"></div></div>
+      </div>
+    </div>
+
+    <!-- ② 公司与业务 -->
+    <div id="tabCo" class="dtab hidden">
+      <h4 class="sec-title mb-2" data-i18n="co_profile">公司简介</h4>
+      <div id="dProfile" class="card p-4 mb-4"></div>
+      <h4 class="sec-title mb-2" data-i18n="co_mgmt">管理层增减持</h4>
+      <div id="dOfficers" class="card overflow-x-auto mb-1"></div>
+      <div class="text-xs text-slate-500 mb-4" data-i18n="co_mgmt_note">注：A股免费数据源仅提供高管/关联人的增减持动向（来源 东方财富）；薪酬满意度/流动率等无公开源。</div>
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-2">
+        <div class="card p-4">
+          <h4 class="sec-title mb-1"><span data-i18n="co_seg">主营构成</span> <span id="dPieYear" class="text-xs text-slate-400 font-normal"></span></h4>
+          <div class="text-xs text-slate-500 mb-1" data-i18n="co_seg_note">按主营构成（分产品/地区）拆解收入占比；增速或毛利率异常项会标注。</div>
+          <div id="dPieChart" style="height:270px"></div>
+          <div id="dPieNotes" class="text-xs mt-1 leading-relaxed"></div>
+        </div>
+        <div class="card p-4">
+          <h4 class="sec-title mb-1" data-i18n="co_rev_growth">营收增速</h4>
+          <div class="text-xs text-slate-500 mb-1" data-i18n="co_rev_growth_note">年度营收(柱) 与 同比增速(线)；下图为近8个季度营收。</div>
+          <div id="dRevChart" style="height:190px"></div>
+          <div id="dQRevChart" style="height:130px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ 现金流与风险 -->
+    <div id="tabCf" class="dtab hidden">
+      <h4 class="sec-title mb-1" data-i18n="cf_title">现金流分析 — 钱流向哪了</h4>
+      <div class="text-xs text-slate-500 mb-2" data-i18n="cf_note">单位: 百万美元；收购/回购/分红/资本开支为流出(取绝对值展示)；虚线为净利润 —— 与经营现金流对比可判断盈利质量。</div>
+      <div class="card p-4 mb-3"><div id="dCashChart" style="height:300px"></div></div>
+      <div id="dCashNotes" class="space-y-2 mb-4"></div>
+      <h4 class="sec-title mb-2" data-i18n="risk_title">风险分析</h4>
+      <div id="dRiskPanel" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4"></div>
+      <h4 class="sec-title mb-2"><span data-i18n="policy_title">政策分析</span> <span class="text-xs text-slate-400 font-normal" data-i18n="policy_sub">板块级要点 · 静态梳理 · 非实时</span></h4>
+      <div id="dPolicy" class="card p-4 mb-2"></div>
+    </div>
+
+    <!-- ④ 消息与博弈 -->
+    <div id="tabNw" class="dtab hidden">
+      <div class="flex items-center justify-between mb-1">
+        <h4 class="sec-title" data-i18n="nw_title">利好 vs 利空 · 近期新闻</h4>
+        <span id="dNewsSum" class="text-sm"></span>
+      </div>
+      <div class="text-xs text-slate-500 mb-2" data-i18n="nw_note">标题关键词粗分类，仅供快速浏览；点击标题打开原文。</div>
+      <div id="dNewsList" class="card mb-4"></div>
+      <h4 class="sec-title mb-2"><span data-i18n="margin_title">融资融券多空博弈</span> <span id="dMarginDate" class="text-xs text-slate-400 font-normal"></span></h4>
+      <div id="dMargin" class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-1"></div>
+      <div id="dMarginNote" class="text-xs text-slate-400 mb-4 leading-relaxed"></div>
+      <h4 class="sec-title mb-2"><span data-i18n="lhb_title">龙虎榜</span> <span class="text-xs text-slate-400 font-normal" data-i18n="lhb_sub">近60日 · 游资/机构席位</span></h4>
+      <div id="dLhb" class="card p-4 mb-4"></div>
+      <h4 class="sec-title mb-2"><span data-i18n="block_title">大宗交易（暗池代理）</span> <span id="dBlockSum" class="text-xs text-slate-400 font-normal"></span></h4>
+      <div id="dBlock" class="card p-4 mb-2"></div>
     </div>
   </div>
 </aside>
@@ -191,30 +274,235 @@
 <script>
 (function(){
   "use strict";
-  const DATA = (window.__ASHARE__) || {meta:{},industries:[],candidates:[],details:{},columns:[]};
+  const DATA = (window.__ASHARE__) || (window.__US__) || {meta:{},industries:[],candidates:[],details:{},columns:[]};
   const hasECharts = (typeof echarts !== "undefined");
   const $ = s => document.querySelector(s);
   const CUR = "￥";
-
-  // A股代码 -> TradingView 概览页路径 (沪 SSE / 深 SZSE / 北 BSE)
-  function tvSym(code){
-    code = String(code||"");
+  function tvSym(code){ code=String(code||"");
     if(/^(6|9)/.test(code)) return "SSE-"+code;
     if(/^(0|2|3)/.test(code)) return "SZSE-"+code;
-    if(/^(8|4|92)/.test(code)) return "BSE-"+code;
-    return code;
+    if(/^(8|4|92)/.test(code)) return "BSE-"+code; return code; }
+  function tvEmbedSym(code){ return tvSym(code).replace("-",":"); }
+
+  // ================= 国际化 i18n (中文 / English 一键切换) =================
+  const LANG_KEY="ashare_lang_v1";
+  let LANG = "zh"; try{ LANG = localStorage.getItem(LANG_KEY) || "zh"; }catch(e){}
+  if(LANG!=="en") LANG="zh";
+  const T = {
+    zh:{
+      title:"A股 · 「左侧支撑位」筛选与监控台",
+      subtitle:"高景气行业内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分",
+      updated:"最后更新：", datasource:"数据源：akshare（东财行业 · 前复权日线）· 价格单位 人民币￥",
+      disclaimer:'⚠️ <b>免责声明</b>：本系统仅对A股做技术/基本面数据的自动化整理与形态筛选，<b>不构成任何投资建议</b>。“左侧买入”是在下跌中、支撑确认前进场，风险天然更高（可能继续下跌或破位）。所有标的需<b>人工复核</b>，使用者自负盈亏与风控。',
+      ov_scanned:"今日扫描数", ov_hit:"命中候选数", ov_inds:"入选景气行业", ov_date:"数据日期",
+      sec_board:"行业景气榜", sec_hint:"点击行业可筛选主表 · 绿色=入选", seg_bar:"条形图", seg_tree:"矩形树图",
+      wlab_title:"综合分权重实验室", wlab_hint:"拖动滑块即时重算「综合分」并重新排序（不改变原始命中）",
+      wlab_reset:"恢复默认 50/30/20", w_tech:"技术面权重", w_fund:"基本面权重", w_prosp:"景气权重",
+      tbl_title:"候选股主表", search_ph:"搜索 代码 / 名称", all_inds:"全部行业", all_tags:"全部标签",
+      adv_btn:"高级筛选 ▾", fav_only:"只看自选", export:"导出CSV",
+      f_score:"综合分 ≥", f_dist:"距支撑绝对值 ≤", f_roe:"ROE ≥", f_up:"最大回撤劣于 ≥", unlimited:"不限",
+      empty_hint:"无符合条件的标的。可放宽筛选或调整 CONFIG 阈值。",
+      footer:"“左侧买入”风险更高，所有标的需人工复核 · 本页所有数据仅供研究，不构成投资建议。",
+      tab_ov:"总览", tab_co:"公司与业务", tab_cf:"现金流与风险", tab_nw:"消息与博弈",
+      tv_title:"TradingView 交互图（实时）", tv_link:"在 TradingView 打开概览页 ↗",
+      fund_glance:"基本面速览", val_pct:"估值历史分位", roe_trend:"ROE 多年趋势",
+      co_profile:"公司简介", co_mgmt:"管理层增减持",
+      co_mgmt_note:"注：A股免费数据源仅提供高管/关联人的增减持动向（来源 东方财富）；薪酬满意度/流动率等无公开源。",
+      co_seg:"主营构成", co_seg_note:"按主营构成（分产品/地区）拆解收入占比；增速或毛利率异常项会标注。",
+      co_rev_growth:"营收增速", co_rev_growth_note:"年度营收(柱) 与 同比增速(线)，另一柱为归母净利润；下图为近8个季度单季营收。",
+      cf_title:"现金流分析 — 钱流向哪了",
+      cf_note:"单位: 亿元；资本开支/收购/分红为流出(取绝对值展示)；虚线为归母净利润 —— 与经营现金流对比可判断盈利质量。",
+      risk_title:"风险分析", policy_title:"政策分析", policy_sub:"行业级要点 · 静态梳理 · 非实时",
+      nw_title:"利好 vs 利空 · 近期新闻", nw_note:"标题关键词粗分类，仅供快速浏览；点击标题打开原文。",
+      margin_title:"融资融券多空博弈", lhb_title:"龙虎榜", lhb_sub:"近60日 · 游资/机构席位",
+      block_title:"大宗交易（暗池代理）",
+      // 表头列
+      col_code:"代码", col_name:"名称", col_industry:"所属行业", col_tag:"结论标签", col_streak:"连续上榜",
+      col_final:"综合分", col_tech:"技术分", col_fund:"基本面分", col_price:"现价", col_spark:"近期走势",
+      col_dist:"距支撑%", col_support:"关键支撑位", col_break:"破位位", col_pos52:"52周位置%",
+      col_ret1m:"近一月涨%", col_rethy:"近半年涨跌%", col_turnover:"换手率", col_volratio:"量比", col_kdj:"KDJ",
+      col_pe:"市盈率TTM(分位)", col_pb:"市净率", col_eps:"EPS", col_roe:"ROE",
+      th_sort:"点击排序 · 按住拖动可调整列的位置", star_col:"自选",
+      p_trend:"趋势", p_momentum:"动量", p_breadth:"广度", p_capital:"资金", p_fund:"基本面",
+      prosperity_total:"景气总分", selected_paren:"(入选)",
+      tag_strong:"✅ 强左侧", tag_weak:"⚠️ 技术好但基本面弱", tag_watch:"🔎 观察",
+      kdj_gold:"金叉", kdj_dead:"死叉", kdj_ob:"超买", kdj_os:"超卖", kdj_neutral:"中性",
+      tone_pos:"利好", tone_neg:"利空", tone_neutral:"中性",
+      sig_channel:"贴近上升通道下轨", sig_pivot:"接近前期低点", sig_ma_prefix:"回踩",
+      c_support:"关键支撑", c_dist:"距支撑", c_break:"破位参考",
+      cur_price:"现价", composite:"综合分", of_tech:"技术", of_fund:"基本面", of_prosp:"景气",
+      strip_strong:"强左侧", strip_avgdist:"平均距支撑", strip_avgup:"平均最大回撤", strip_fav:"自选",
+      // 总览风控卡 (A股无券商目标价)
+      r_beta:"Beta(沪深300,120日)", r_vol:"日均波动ATR%", r_maxdd:"最大回撤(1年)", r_volstate:"量能状态", r_boll:"布林下轨",
+      fc_pe:"市盈率TTM", fc_pe_med:"行业PE中位", fc_pb:"市净率PB", fc_eps:"EPS", fc_roe:"ROE",
+      fc_rev:"营收同比", fc_np:"净利同比", fc_gm:"毛利率", fc_debt:"资产负债率", fc_div:"股息率",
+      fc_52r:"52周区间", fc_52p:"52周位置",
+      val_pe_l:"市盈率 历史分位", val_pb_l:"市净率PB 分位",
+      pct_suffix:"分位", v_low:"偏低", v_high:"偏高", v_mid:"中等",
+      // 公司简介 / 管理层
+      pf_sector:"所属行业", pf_hq:"总部", pf_legal:"法人", pf_list:"上市", pf_regcap:"注册资本", pf_web:"官网",
+      no_summary:"暂无公司简介", no_officer:"暂无管理层增减持记录",
+      mg_date:"日期", mg_person:"变动人", mg_relation:"关系", mg_change:"变动数量(股)", mg_price:"均价", mg_way:"途径",
+      // 主营构成 / 营收
+      no_seg:"暂无主营构成数据", seg_total:"合计", of_rev:"占营收", gm_l:"毛利率", yoy_l:"同比",
+      no_rev:"暂无营收数据", rev_annual:"年度营收", rev_net:"归母净利", rev_yoy:"同比增速", rev_qtr:"单季营收",
+      // 现金流
+      no_echarts:"未能加载 ECharts（需联网），无法绘制图表。", no_cash:"暂无现金流数据", no_notes:"暂无自动要点",
+      cf_ocf:"经营现金流", cf_fcf:"自由现金流", cf_capex:"资本开支", cf_acq:"收购/并表", cf_div:"分红", cf_ni:"归母净利",
+      // 风险
+      no_risk:"暂无风险指标数据", risk_ratios:"偿债 / 盈利 / 审计",
+      rk_debt:"资产负债率", rk_curr:"流动比率", rk_quick:"速动比率", rk_gm:"销售毛利率", rk_roe:"净资产收益率", rk_audit:"审计意见",
+      warn_debt:"资产负债率 ", warn_debt2:"%，杠杆偏高", warn_curr:"流动比率 ", warn_curr2:" < 1，短期偿债压力",
+      warn_quick:"速动比率 ", warn_quick2:" < 1，速动偿债能力弱", warn_gm:"销售毛利率 ", warn_gm2:"%，毛利偏薄",
+      // 政策
+      policy_note_a:" 行业", policy_note_b:" · 要点为行业级静态梳理，请结合最新新闻核实", policy_generic:"通用",
+      // 新闻 / 两融 / 龙虎榜 / 大宗
+      nw_none:"暂无新闻",
+      mg_fin_bal:"融资余额", mg_fin_buy:"融资买入", mg_short_bal:"融券余额", mg_short_vol:"融券余量", mg_total:"两融余额",
+      margin_none:"暂无融资融券数据（北交所或未纳入两融标的）", margin_read:"解读：",
+      margin_r_bull:"融资余额远高于融券 —— 杠杆资金偏多头", margin_r_bear:"融券余额相对偏高 —— 存在一定看空/对冲力量",
+      margin_r_bal:"融资融券大致均衡", margin_wan:"万股", yi_u:"亿",
+      lhb_none:"近60日未登上龙虎榜", lhb_count:"上榜次数", lhb_last:"最近上榜", lhb_net:"最近净买额", lhb_reason:"上榜原因",
+      block_none:"近三月无大宗交易", block_cnt:"上榜次数", block_prem:"平均折溢率", block_amt:"总成交额", block_over:"成交额/流通市值", block_inst:"机构专用买入",
+      block_recent:"近期大宗明细", blk_date:"日期", blk_price:"成交价", blk_prem:"折溢率", blk_amt:"成交额(万)", blk_buyer:"买方", blk_seller:"卖方",
+      block_note:"大宗交易是A股公开数据中最接近“暗池”的口径（场外协议成交、盘后披露）。折价成交常见于减持/出货，机构专用席位买入是产业资本/机构承接信号；单笔仅供参考。",
+      rows_of:"共", rows_of2:"只",
+    },
+    en:{
+      title:"A-Shares · Left-Side Support Screener",
+      subtitle:"Within high-prosperity industries · pullback-to-support / near prior-low setups · technical × fundamental cross-score",
+      updated:"Updated: ", datasource:"Source: akshare (EM industries · adjusted daily bars) · prices in CNY ￥",
+      disclaimer:'⚠️ <b>Disclaimer</b>: This tool only performs automated organization and pattern screening of technical/fundamental data for China A-shares and is <b>not investment advice</b>. "Left-side buying" enters during a decline, before support is confirmed, and is inherently higher-risk. Verify every name <b>manually</b>; users bear their own P&amp;L and risk.',
+      ov_scanned:"Scanned today", ov_hit:"Candidates", ov_inds:"Selected industries", ov_date:"Data date",
+      sec_board:"Industry Prosperity", sec_hint:"Click an industry to filter · green = selected", seg_bar:"Bar", seg_tree:"Treemap",
+      wlab_title:"Composite-Score Weight Lab", wlab_hint:"Drag sliders to recompute the composite score & re-sort (raw hits unchanged)",
+      wlab_reset:"Reset to 50/30/20", w_tech:"Technical weight", w_fund:"Fundamental weight", w_prosp:"Prosperity weight",
+      tbl_title:"Candidate Table", search_ph:"Search code / name", all_inds:"All industries", all_tags:"All tags",
+      adv_btn:"Filters ▾", fav_only:"Watchlist only", export:"Export CSV",
+      f_score:"Score ≥", f_dist:"|Dist to support| ≤", f_roe:"ROE ≥", f_up:"Max drawdown worse-than ≥", unlimited:"Any",
+      empty_hint:"No matches. Loosen the filters or adjust the CONFIG thresholds.",
+      footer:"Left-side entries carry higher risk; verify every name manually · data for research only, not investment advice.",
+      tab_ov:"Overview", tab_co:"Company & Business", tab_cf:"Cash Flow & Risk", tab_nw:"News & Positioning",
+      tv_title:"TradingView Chart (live)", tv_link:"Open TradingView overview ↗",
+      fund_glance:"Fundamentals at a Glance", val_pct:"Valuation History Percentile", roe_trend:"ROE Multi-Year Trend",
+      co_profile:"Company Profile", co_mgmt:"Insider Transactions",
+      co_mgmt_note:"Note: A-share free sources only provide executive/related-party buy-sell activity (source: East Money); pay satisfaction / turnover have no public source.",
+      co_seg:"Business Segments", co_seg_note:"Revenue split by segment (product/region); abnormal growth or gross margin is flagged.",
+      co_rev_growth:"Revenue Growth", co_rev_growth_note:"Annual revenue (bar) & YoY growth (line), plus net profit; lower chart is last 8 single quarters.",
+      cf_title:"Cash Flow — Where the Money Goes",
+      cf_note:"In 00M CNY (亿); capex/acquisitions/dividends are outflows (abs); dashed line is net profit — compare vs operating cash flow to judge earnings quality.",
+      risk_title:"Risk Analysis", policy_title:"Policy Analysis", policy_sub:"Industry-level notes · static · not real-time",
+      nw_title:"Bullish vs Bearish · Recent News", nw_note:"Rough keyword classification for quick scanning; click a headline to open the source.",
+      margin_title:"Margin Trading (long/short)", lhb_title:"Dragon-Tiger List", lhb_sub:"Last 60d · hot-money / institutional seats",
+      block_title:"Block Trades (dark-pool proxy)",
+      col_code:"Code", col_name:"Name", col_industry:"Industry", col_tag:"Verdict", col_streak:"Streak",
+      col_final:"Score", col_tech:"Tech", col_fund:"Fund.", col_price:"Price", col_spark:"Trend",
+      col_dist:"Dist Supp%", col_support:"Key Support", col_break:"Breakdown", col_pos52:"52w Pos%",
+      col_ret1m:"1M Ret%", col_rethy:"6M Ret%", col_turnover:"Turnover", col_volratio:"Vol Ratio", col_kdj:"KDJ",
+      col_pe:"P/E TTM (pctile)", col_pb:"P/B", col_eps:"EPS", col_roe:"ROE",
+      th_sort:"Click to sort · drag to reorder columns", star_col:"Watchlist",
+      p_trend:"Trend", p_momentum:"Momentum", p_breadth:"Breadth", p_capital:"Capital", p_fund:"Fund.",
+      prosperity_total:"Prosperity", selected_paren:"(selected)",
+      tag_strong:"✅ Strong Left", tag_weak:"⚠️ Tech-strong, Weak Fund.", tag_watch:"🔎 Watch",
+      kdj_gold:"Golden X", kdj_dead:"Dead X", kdj_ob:"Overbought", kdj_os:"Oversold", kdj_neutral:"Neutral",
+      tone_pos:"Bullish", tone_neg:"Bearish", tone_neutral:"Neutral",
+      sig_channel:"Near rising-channel lower band", sig_pivot:"Near prior low", sig_ma_prefix:"Pullback to ",
+      c_support:"Key support", c_dist:"Dist to support", c_break:"Breakdown ref",
+      cur_price:"Price", composite:"Score", of_tech:"Tech", of_fund:"Fund.", of_prosp:"Prosp.",
+      strip_strong:"Strong-Left", strip_avgdist:"Avg dist-to-support", strip_avgup:"Avg max drawdown", strip_fav:"Watchlist",
+      r_beta:"Beta (CSI300, 120d)", r_vol:"Daily ATR%", r_maxdd:"Max Drawdown (1Y)", r_volstate:"Volume", r_boll:"Boll. lower",
+      fc_pe:"P/E TTM", fc_pe_med:"Industry P/E median", fc_pb:"P/B", fc_eps:"EPS", fc_roe:"ROE",
+      fc_rev:"Revenue YoY", fc_np:"Net profit YoY", fc_gm:"Gross margin", fc_debt:"Debt ratio", fc_div:"Dividend yield",
+      fc_52r:"52w range", fc_52p:"52w position",
+      val_pe_l:"P/E history percentile", val_pb_l:"P/B percentile",
+      pct_suffix:"pctile", v_low:"low", v_high:"high", v_mid:"mid",
+      pf_sector:"Industry", pf_hq:"HQ", pf_legal:"Legal rep", pf_list:"Listed", pf_regcap:"Reg. capital", pf_web:"Website",
+      no_summary:"No company profile", no_officer:"No recent insider-transaction records",
+      mg_date:"Date", mg_person:"Person", mg_relation:"Relation", mg_change:"Change (sh)", mg_price:"Avg px", mg_way:"Method",
+      no_seg:"No business-segment data", seg_total:"total", of_rev:"of revenue", gm_l:"gross margin", yoy_l:"YoY",
+      no_rev:"No revenue data", rev_annual:"Annual revenue", rev_net:"Net profit", rev_yoy:"YoY growth", rev_qtr:"Quarterly revenue",
+      no_echarts:"Could not load ECharts (needs internet); cannot draw chart.", no_cash:"No cash-flow data", no_notes:"No auto notes",
+      cf_ocf:"Operating CF", cf_fcf:"Free CF", cf_capex:"Capex", cf_acq:"Acquisitions", cf_div:"Dividends", cf_ni:"Net profit",
+      no_risk:"No risk-metric data", risk_ratios:"Solvency / Profitability / Audit",
+      rk_debt:"Debt ratio", rk_curr:"Current ratio", rk_quick:"Quick ratio", rk_gm:"Gross margin", rk_roe:"ROE", rk_audit:"Audit opinion",
+      warn_debt:"Debt ratio ", warn_debt2:"% — leverage on the high side", warn_curr:"Current ratio ", warn_curr2:" < 1 — near-term solvency pressure",
+      warn_quick:"Quick ratio ", warn_quick2:" < 1 — weak quick solvency", warn_gm:"Gross margin ", warn_gm2:"% — thin margin",
+      policy_note_a:"", policy_note_b:" industry notes are a static overview; verify against the latest news", policy_generic:"General",
+      nw_none:"No news",
+      mg_fin_bal:"Financing bal.", mg_fin_buy:"Financing buy", mg_short_bal:"Short bal.", mg_short_vol:"Short volume", mg_total:"Margin bal.",
+      margin_none:"No margin-trading data (Beijing exchange or not a margin target)", margin_read:"Read: ",
+      margin_r_bull:"Financing balance far above securities-lending — leveraged money leans long", margin_r_bear:"Securities-lending balance relatively high — some short/hedge pressure",
+      margin_r_bal:"Financing and lending roughly balanced", margin_wan:"0k sh", yi_u:"00M",
+      lhb_none:"Not on the Dragon-Tiger list in the last 60d", lhb_count:"Appearances", lhb_last:"Latest", lhb_net:"Latest net buy", lhb_reason:"Reason",
+      block_none:"No block trades in the last 3 months", block_cnt:"Appearances", block_prem:"Avg premium/discount", block_amt:"Total turnover", block_over:"Turnover / float cap", block_inst:"Institutional-seat buys",
+      block_recent:"Recent block trades", blk_date:"Date", blk_price:"Px", blk_prem:"Prem/Disc", blk_amt:"Turnover(0k)", blk_buyer:"Buyer", blk_seller:"Seller",
+      block_note:"Block trades are the closest public A-share proxy for a 'dark pool' (off-exchange negotiated trades, disclosed after close). Discounts often signal selling/exit; institutional-seat buys signal industrial/institutional absorption; single trades are only indicative.",
+      rows_of:"", rows_of2:" names",
+    }
+  };
+  function t(k){ const d=T[LANG]; return (d && d[k]!=null) ? d[k] : (T.zh[k]!=null?T.zh[k]:k); }
+  // 数据枚举值的显示翻译 (底层值保持中文, 只翻译展示)
+  function tagText(tag){ if(!tag) return dash;
+    if(tag.indexOf("强左侧")>=0) return t("tag_strong");
+    if(tag.indexOf("基本面弱")>=0) return t("tag_weak");
+    if(tag.indexOf("观察")>=0) return t("tag_watch"); return tag; }
+  const KDJ_MAP={ "金叉":"kdj_gold","死叉":"kdj_dead","超买":"kdj_ob","超卖":"kdj_os","中性":"kdj_neutral" };
+  function kdjText(s){ if(!s||s==="—") return s; if(LANG==="zh") return s;
+    return s.split("/").map(x=>KDJ_MAP[x]?t(KDJ_MAP[x]):x).join("/"); }
+  const RATE_MAP={ "强力买入":"rate_sb","买入":"rate_b","持有":"rate_h","卖出":"rate_s","强力卖出":"rate_ss","跑赢":"rate_up","跑输":"rate_down" };
+  function rateText(s){ if(!s) return s; if(LANG==="zh") return s; return RATE_MAP[s]?t(RATE_MAP[s]):s; }
+  const TONE_MAP={ "利好":"tone_pos","利空":"tone_neg","中性":"tone_neutral" };
+  function toneText(s){ if(LANG==="zh") return s; return TONE_MAP[s]?t(TONE_MAP[s]):s; }
+  // 技术信号文字(超卖/缩柱/底背离拼接) / 量能 / 支撑标签 的显示翻译
+  const OSC_EN={"超卖":"Oversold","缩柱":"Shrinking hist","底背离":"Bull. divergence"};
+  function oscText(s){ if(!s) return s; if(LANG==="zh") return s;
+    const parts=[]; ["超卖","缩柱","底背离"].forEach(k=>{ if(s.indexOf(k)>=0) parts.push(OSC_EN[k]); });
+    return parts.length?parts.join(" · "):s; }
+  const VOL_EN={"缩量企稳":"Volume drying up","放量":"Volume spike"};
+  function volText(s){ if(!s) return s; if(LANG==="zh") return s; return VOL_EN[s]||s; }
+  const SUPP_EN={"通道下轨":"Channel lower","前低":"Prior low","布林下轨":"Boll. lower"};
+  function supportDispText(s){ if(s==null) return s; if(LANG==="zh") return s;
+    s=String(s); for(const k in SUPP_EN){ if(s.indexOf(k)===0) return s.replace(k,SUPP_EN[k]); } return s; }
+  // 列 key -> 翻译键
+  const COL_I18N={ code:"col_code",name:"col_name",industry:"col_industry",tag:"col_tag",streak:"col_streak",
+    final_score:"col_final",tech_score:"col_tech",fund_score:"col_fund",price:"col_price",spark:"col_spark",
+    dist_support_pct:"col_dist",support_disp:"col_support",breakdown_price:"col_break",pos_52w_pct:"col_pos52",
+    ret_1m_pct:"col_ret1m",ret_half_year_pct:"col_rethy",turnover:"col_turnover",volume_ratio:"col_volratio",
+    kdj_tag:"col_kdj",pe_disp:"col_pe",pb:"col_pb",eps:"col_eps",roe:"col_roe" };
+  function colLabel(c){ const k=COL_I18N[c.key]; return (k? t(k) : c.label); }
+  function applyStaticI18n(){
+    document.documentElement.lang = (LANG==="en")?"en":"zh-CN";
+    document.querySelectorAll("[data-i18n]").forEach(el=>{ el.textContent=t(el.dataset.i18n); });
+    document.querySelectorAll("[data-i18n-html]").forEach(el=>{ el.innerHTML=t(el.dataset.i18nHtml); });
+    document.querySelectorAll("[data-i18n-ph]").forEach(el=>{ el.placeholder=t(el.dataset.i18nPh); });
+    document.querySelectorAll("[data-i18n-title]").forEach(el=>{ el.title=t(el.dataset.i18nTitle); });
+    // 标签下拉: 值保持中文, 只翻译显示文字
+    Array.from($("#filterTag").options).forEach(o=>{ if(o.value) o.textContent=tagText(o.value); else o.textContent=t("all_tags"); });
+    // 板块下拉的"全部板块"占位
+    const fi=$("#filterInd"); if(fi.options[0]) fi.options[0].textContent=t("all_inds");
+    if($("#langBtn")) $("#langBtn").textContent = (LANG==="en")?"中文":"EN";
   }
-  function tvEmbedSym(code){ return tvSym(code).replace("-", ":"); }  // 内嵌图用冒号
+  function applyLang(){
+    applyStaticI18n();
+    syncWeightUI(); syncAdvUI(); renderIndustryChart(); render(); updateStrip();
+    if(curC && !$("#drawer").classList.contains("translate-x-full")) openDetail(curC);
+  }
+  // ========================================================================
 
   // ---------- 数值格式化 ----------
   const isNum = v => typeof v === "number" && isFinite(v);
   const dash = "—";
   function f(v, d=2){ return isNum(v) ? v.toFixed(d) : (v==null||v===""?dash:v); }
   function pct(v, d=2){ if(!isNum(v)) return dash; return v.toFixed(d)+"%"; }
-  function signPctCell(v){
+  function signPctCell(v){ // 涨跌幅: 涨红跌绿
     if(!isNum(v)) return `<span class="num">${dash}</span>`;
     const cls = v>0?"pos":(v<0?"neg":"");
     return `<span class="num ${cls}">${v>0?"+":""}${v.toFixed(2)}%</span>`;
+  }
+  function upsideCell(v){ // 距目标价%: 正=尚有空间(青), 负=已超目标(橙)
+    if(!isNum(v)) return `<span class="num">${dash}</span>`;
+    const col = v>=0 ? "#14b8a6" : "#f59e0b";
+    return `<span class="num" style="color:${col};font-weight:600">${v>0?"+":""}${v.toFixed(1)}%</span>`;
   }
   function streakCell(v){
     if(!isNum(v)||v<=1) return `<span class="num text-slate-500">—</span>`;
@@ -245,7 +533,8 @@
     }).join(" ");
     const up = arr[arr.length-1]>=arr[0];
     const col = up ? "#ef4444" : "#16a34a";   // 涨红跌绿
-    const lastX = w-pad, lastY = h-pad-((arr[arr.length-1]-min)/rng)*(h-2*pad);
+    const lastX = pad+(arr.length-1)*(w-2*pad)/(arr.length-1);
+    const lastY = h-pad-((arr[arr.length-1]-min)/rng)*(h-2*pad);
     return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="vertical-align:middle">`+
       `<polyline fill="none" stroke="${col}" stroke-width="1.4" points="${pts}"/>`+
       `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="1.8" fill="${col}"/></svg>`;
@@ -290,14 +579,14 @@
   let indChart=null, indKind="bar";
   window.addEventListener("resize", ()=>{ if(indChart) indChart.resize(); });  // 只挂一次, 避免重复渲染累积监听
   function ensureIndOption(name){
-    // 图上点的行业可能没有候选股(下拉框里没有该选项): 动态补一项, 保证下拉框与筛选状态同步
+    // 图上点的板块可能没有候选股(下拉框里没有该选项): 动态补一项, 保证下拉框与筛选状态同步
     const sel=$("#filterInd");
     if(name && !Array.from(sel.options).some(o=>o.value===name)){
       const o=document.createElement("option"); o.value=name; o.textContent=name; sel.appendChild(o);
     }
   }
   function setInd(name){
-    state.ind = (state.ind===name) ? "" : name;
+    state.ind = (state.ind===name) ? "" : name;   // 再次点击取消
     ensureIndOption(state.ind);
     $("#filterInd").value = state.ind||"";
     persist(); render();
@@ -305,7 +594,7 @@
   }
   function renderIndustryChart(){
     const el=$("#industryChart");
-    if(!hasECharts){ el.innerHTML='<div class="text-amber-400 text-sm p-4">未能加载 ECharts（需联网加载图表库），表格功能不受影响。</div>'; return; }
+    if(!hasECharts){ el.innerHTML=`<div class="text-amber-400 text-sm p-4">${LANG==="en"?"Could not load ECharts (needs internet); table still works.":"未能加载 ECharts（需联网加载图表库），表格功能不受影响。"}</div>`; return; }
     if(indChart){ indChart.dispose(); }
     const C=tc();
     indChart = echarts.init(el, ec());
@@ -315,7 +604,7 @@
         itemStyle:{color: d.selected? "#16a34a" : C.base} }));
       indChart.setOption({
         backgroundColor:"transparent",
-        tooltip:{ formatter:p=>`<b>${p.name}</b><br/>景气总分：<b>${p.value}</b>` },
+        tooltip:{ formatter:p=>`<b>${p.name}</b><br/>${t("prosperity_total")}：<b>${p.value}</b>` },
         series:[{ type:"treemap", roam:false, nodeClick:false, breadcrumb:{show:false},
           label:{show:true, formatter:"{b}\n{c}", color:"#fff", fontSize:12},
           itemStyle:{borderColor:(document.body.classList.contains("light")?"#eef2f8":"#0b1220"),borderWidth:2,gapWidth:2}, data }]
@@ -331,9 +620,9 @@
         tooltip:{trigger:"axis", axisPointer:{type:"shadow"},
           formatter:(p)=>{ const i=arr[p[0].dataIndex];
             const row=(lab,v)=>`${lab}：<b>${isNum(v)?v.toFixed(0):"—"}</b>`;
-            return `<b>${i.industry}</b> ${i.selected?'<span style="color:#22c55e">(入选)</span>':''}<br/>`+
-              `景气总分：<b>${isNum(i.prosperity_score)?i.prosperity_score.toFixed(1):"—"}</b><br/>`+
-              [row("趋势",i.trend),row("动量",i.momentum),row("广度",i.breadth),row("资金",i.capital),row("基本面",i.fundamental)].join("　");
+            return `<b>${i.industry}</b> ${i.selected?'<span style="color:#22c55e">'+t("selected_paren")+'</span>':''}<br/>`+
+              `${t("prosperity_total")}：<b>${isNum(i.prosperity_score)?i.prosperity_score.toFixed(1):"—"}</b><br/>`+
+              [row(t("p_trend"),i.trend),row(t("p_momentum"),i.momentum),row(t("p_breadth"),i.breadth),row(t("p_capital"),i.capital),row(t("p_fund"),i.fundamental)].join("　");
           }},
         xAxis:{type:"value", max:100, axisLabel:{color:C.axis}, splitLine:{lineStyle:{color:C.grid}}},
         yAxis:{type:"category", data:names, axisLabel:{color:C.label}},
@@ -342,7 +631,7 @@
       });
     }
     indChart.off("click");
-    // 只响应真实行业名的系列点击 (树图留白/面包屑等区域的点击不触发筛选)
+    // 只响应真实板块名的系列点击 (树图留白/面包屑等区域的点击不触发筛选)
     const knownInds = new Set((DATA.industries||[]).map(d=>d.industry));
     indChart.on("click", p=>{ if(p && p.componentType==="series" && p.name && knownInds.has(p.name)) setInd(p.name); });
   }
@@ -352,13 +641,11 @@
   // ---------- 主表列 ----------
   const COLORDER_KEY = "ashare_colorder_v2";
   let COLS = DATA.columns && DATA.columns.length ? DATA.columns.slice() : [
-    {key:"code",label:"代码"},{key:"name",label:"名称"},{key:"industry",label:"所属行业"},
+    {key:"code",label:"代码"},{key:"name",label:"名称"},{key:"industry",label:"所属板块"},
     {key:"tag",label:"结论标签"},{key:"streak",label:"连续上榜"},{key:"final_score",label:"综合分"},
-    {key:"tech_score",label:"技术分"},{key:"fund_score",label:"基本面分"},{key:"price",label:"现价"},
+    {key:"tech_score",label:"技术分"},{key:"fund_score",label:"基本面分"},{key:"price",label:"现价$"},
     {key:"spark",label:"近期走势"},{key:"dist_support_pct",label:"距支撑%"},{key:"support_disp",label:"关键支撑位"},
-    {key:"pos_52w_pct",label:"52周位置%"},{key:"ret_1m_pct",label:"近一月涨%"},{key:"turnover",label:"换手率"},
-    {key:"volume_ratio",label:"量比"},{key:"kdj_tag",label:"KDJ"},{key:"pe_disp",label:"市盈率TTM(分位)"},
-    {key:"pb",label:"市净率"},{key:"eps",label:"EPS"},{key:"roe",label:"ROE"}
+    {key:"pos_52w_pct",label:"52周位置%"},{key:"ret_1m_pct",label:"近一月涨%"},{key:"roe",label:"ROE"},{key:"upside_pct",label:"距目标价%"}
   ];
   const NUMERIC = new Set(["final_score","tech_score","fund_score","tech_norm","prosperity_score","price","dist_support_pct",
     "breakdown_price","pos_52w_pct","ret_1m_pct","ret_half_year_pct","avg_amt20_yi","dividend_yield","pb","eps","roe",
@@ -369,7 +656,7 @@
   const LS_KEY = "ashare_filters_v2";
   let state = {search:"", ind:"", tag:"", sortKey:"final_score", sortDir:"desc",
               weights:{t:50,f:30,p:20}, favOnly:false,
-              minScore:0, maxDist:30, minRoe:-10, minDd:-80};
+              minScore:0, maxDist:30, minRoe:-10, minUp:-80};
   try{ Object.assign(state, JSON.parse(localStorage.getItem(LS_KEY)||"{}")); }catch(e){}
   if(!state.weights) state.weights={t:50,f:30,p:20};
 
@@ -385,7 +672,7 @@
     const set = Array.from(new Set(DATA.candidates.map(c=>c.industry).filter(Boolean))).sort();
     const sel = $("#filterInd");
     set.forEach(n=>{ const o=document.createElement("option"); o.value=n; o.textContent=n; sel.appendChild(o); });
-    ensureIndOption(state.ind);   // 上次保存的筛选行业可能不在候选里
+    ensureIndOption(state.ind);   // 上次保存的筛选板块可能不在候选里
     sel.value = state.ind||""; $("#filterTag").value = state.tag||""; $("#search").value = state.search||"";
     $("#favOnly").checked = !!state.favOnly;
   })();
@@ -418,13 +705,13 @@
 
   function buildHead(){
     const tr = $("#headRow"); tr.innerHTML="";
-    const star=document.createElement("th"); star.textContent="★"; star.title="自选"; star.style.width="30px"; tr.appendChild(star);
+    const star=document.createElement("th"); star.textContent="★"; star.title=t("star_col"); star.style.width="30px"; tr.appendChild(star);
     COLS.forEach(c=>{
       const th=document.createElement("th");
       th.className="sortable"; th.dataset.key=c.key; th.draggable=true;
-      th.title="点击排序 · 按住拖动可调整列的位置";
+      th.title=t("th_sort");
       const arrow = state.sortKey===c.key ? (state.sortDir==="asc"?" ▲":" ▼") : "";
-      th.innerHTML = `<span style="cursor:grab" class="select-none">⋮⋮</span> ` + c.label + `<span class="text-sky-400">${arrow}</span>`;
+      th.innerHTML = `<span style="cursor:grab" class="select-none">⋮⋮</span> ` + colLabel(c) + `<span class="text-sky-400">${arrow}</span>`;
       if(NUMERIC.has(c.key)) th.classList.add("text-right");
       th.onclick=()=>{
         if(th.dataset.dragging){ delete th.dataset.dragging; return; }
@@ -453,14 +740,15 @@
   function cellHTML(c, key){
     const v = (key==="final_score") ? getVal(c,key) : c[key];
     switch(key){
-      case "tag": return `<span class="badge ${tagClass(v)}">${v||dash}</span>`;
+      case "tag": return `<span class="badge ${tagClass(v)}">${v?escH(tagText(v)):dash}</span>`;
+      case "kdj_tag": return `<span>${v?escH(kdjText(v)):dash}</span>`;
       case "streak": return streakCell(c.streak);
       case "spark": return sparkSVG(c.spark);
       case "dist_support_pct": return supportCell(v);
+      case "upside_pct": return upsideCell(v);
       case "ret_1m_pct": case "ret_half_year_pct": return signPctCell(v);
       case "pos_52w_pct": return `<span class="num">${pct(v,1)}</span>`;
-      case "turnover": return `<span class="num">${isNum(v)?v.toFixed(2)+"%":dash}</span>`;
-      case "volume_ratio": return `<span class="num">${f(v,2)}</span>`;
+      case "avg_amt20_yi": return `<span class="num">${isNum(v)?(v>=1000?(v/1000).toFixed(1)+"B":v.toFixed(0)+"M"):dash}</span>`;
       case "dividend_yield": return `<span class="num">${isNum(v)?v.toFixed(2)+"%":dash}</span>`;
       case "final_score": return `<span class="num font-semibold text-white">${f(v,1)}</span>`;
       case "tech_score": return `<span class="num">${f(v,2)}</span>`;
@@ -469,9 +757,11 @@
       case "price": return `<span class="num">${CUR}${f(v,2)}</span>`;
       case "breakdown_price": case "pb": case "eps":
         return `<span class="num">${f(v,2)}</span>`;
+      case "turnover": return `<span class="num">${isNum(v)?v.toFixed(2)+"%":dash}</span>`;
+      case "volume_ratio": return `<span class="num">${f(v,2)}</span>`;
       case "code": return `<a href="https://www.tradingview.com/symbols/${encodeURIComponent(tvSym(v))}/" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="text-sky-300 font-mono hover:underline" title="在 TradingView 打开 ${v||""} 概览页">${v||dash} ↗</a>`;
-      case "name": return `<span class="text-white">${v||dash}</span>`;
-      default: return `<span>${(v==null||v==="")?dash:v}</span>`;
+      case "name": return `<span class="text-white">${v?escH(v):dash}</span>`;
+      default: return `<span>${(v==null||v==="")?dash:escH(v)}</span>`;
     }
   }
 
@@ -485,7 +775,7 @@
     if(state.minScore>0) rows = rows.filter(c=> isNum(getVal(c,"final_score")) && getVal(c,"final_score")>=state.minScore);
     if(state.maxDist<30) rows = rows.filter(c=> isNum(c.dist_support_pct) && Math.abs(c.dist_support_pct)<=state.maxDist);
     if(state.minRoe>-10) rows = rows.filter(c=> isNum(c.roe) && c.roe>=state.minRoe);
-    if(state.minDd>-80) rows = rows.filter(c=> isNum(c.max_dd_pct) && c.max_dd_pct>=state.minDd);
+    if(state.minUp>-80) rows = rows.filter(c=> isNum(c.max_dd_pct) && c.max_dd_pct>=state.minUp);
     const k=state.sortKey, dir=state.sortDir==="asc"?1:-1;
     rows.sort((a,b)=>{
       let x=getVal(a,k), y=getVal(b,k);
@@ -502,7 +792,7 @@
     const rows = currentRows();
     const body = $("#tableBody"); body.innerHTML="";
     $("#emptyHint").classList.toggle("hidden", rows.length>0);
-    $("#rowCount").textContent = `（${rows.length} / ${DATA.candidates.length}）`;
+    $("#rowCount").textContent = `(${rows.length} / ${DATA.candidates.length})`;
     const frag = document.createDocumentFragment();
     rows.forEach(c=>{
       const tr=document.createElement("tr");
@@ -510,7 +800,7 @@
                  : c.tag&&c.tag.indexOf("基本面弱")>=0 ? "rgba(245,158,11,.05)" : "transparent";
       tr.style.background = tint;
       const on = favs.has(c.code);
-      const starTd = `<td><span class="star ${on?'on':''}" data-code="${c.code}" title="加入/移出自选">${on?'★':'☆'}</span></td>`;
+      const starTd = `<td><span class="star ${on?'on':''}" data-code="${c.code}" title="${t('star_col')}">${on?'★':'☆'}</span></td>`;
       tr.innerHTML = starTd + COLS.map(col=>`<td class="${NUMERIC.has(col.key)?'num':''}">${cellHTML(c,col.key)}</td>`).join("");
       tr.querySelector(".star").onclick = e=>{ e.stopPropagation(); toggleFav(c.code); };
       tr.onclick=()=>openDetail(c);
@@ -524,15 +814,16 @@
     const cs=DATA.candidates;
     const strong=cs.filter(c=>c.tag&&c.tag.indexOf("强左侧")>=0).length;
     const dists=cs.map(c=>c.dist_support_pct).filter(isNum);
-    const dds=cs.map(c=>c.max_dd_pct).filter(isNum);
+    const ups=cs.map(c=>c.max_dd_pct).filter(isNum);
     const avg=a=>a.length? (a.reduce((s,x)=>s+x,0)/a.length):null;
     const inds=new Set(cs.map(c=>c.industry).filter(Boolean)).size;
+    const U=(n)=>LANG==="en"?"":" 只", G=(n)=>LANG==="en"?"":" 个";
     const items=[
-      ["✅ 强左侧", strong+" 只", "#4ade80"],
-      ["平均距支撑", isNum(avg(dists))?avg(dists).toFixed(2)+"%":dash, "#38bdf8"],
-      ["平均最大回撤", isNum(avg(dds))?avg(dds).toFixed(1)+"%":dash, "#f59e0b"],
-      ["覆盖行业", inds+" 个", "#c084fc"],
-      ["我的自选", favs.size+" 只", "#facc15"],
+      [t("strip_strong"), strong+U(), "#4ade80"],
+      [t("strip_avgdist"), isNum(avg(dists))?avg(dists).toFixed(2)+"%":dash, "#38bdf8"],
+      [t("strip_avgup"), isNum(avg(ups))?avg(ups).toFixed(1)+"%":dash, "#f59e0b"],
+      [t("col_industry"), inds+G(), "#c084fc"],
+      [t("strip_fav"), favs.size+U(), "#facc15"],
     ];
     $("#ovStrip").innerHTML = items.map(([k,v,col])=>`<span class="miniStat"><span class="text-slate-400">${k}</span> <b style="color:${col}">${v}</b></span>`).join("");
   }
@@ -544,32 +835,397 @@
   $("#filterTag").onchange = e=>{ state.tag=e.target.value; persist(); render(); };
   $("#favOnly").onchange = e=>{ state.favOnly=e.target.checked; persist(); render(); };
   $("#advBtn").onclick = ()=> $("#advPanel").classList.toggle("hidden");
-  function bindRange(id, key, fmt, offVal){
-    const el=$("#"+id), lab=$("#"+id+"V");
-    el.value=state[key];
-    lab.textContent = (state[key]===offVal)? "不限" : fmt(state[key]);
-    el.addEventListener("input", ()=>{ state[key]=+el.value; lab.textContent=(state[key]===offVal)?"不限":fmt(state[key]); persist(); render(); });
-  }
-  bindRange("fScore","minScore",v=>v.toFixed(0),0);
-  bindRange("fDist","maxDist",v=>"±"+v+"%",30);
-  bindRange("fRoe","minRoe",v=>v+"%",-10);
-  bindRange("fDd","minDd",v=>v+"%",-80);
+  const RANGE_DEFS=[
+    ["fScore","minScore",v=>v.toFixed(0),0],
+    ["fDist","maxDist",v=>"±"+v+"%",30],
+    ["fRoe","minRoe",v=>v+"%",-10],
+    ["fUp","minUp",v=>v+"%",-80],
+  ];
+  function rangeLabel(key,fmt,off){ return (state[key]===off)? t("unlimited") : fmt(state[key]); }
+  function syncAdvUI(){ RANGE_DEFS.forEach(([id,key,fmt,off])=>{ $("#"+id).value=state[key]; $("#"+id+"V").textContent=rangeLabel(key,fmt,off); }); }
+  RANGE_DEFS.forEach(([id,key,fmt,off])=>{
+    $("#"+id).addEventListener("input", ()=>{ state[key]=+$("#"+id).value; $("#"+id+"V").textContent=rangeLabel(key,fmt,off); persist(); render(); });
+  });
+  syncAdvUI();
 
   // ---------- 导出CSV ----------
   $("#exportBtn").onclick = ()=>{
     const rows = currentRows();
-    const headers = COLS.map(c=>c.label);
+    const headers = COLS.map(c=>colLabel(c));
     const keys = COLS.map(c=>c.key);
     const esc = s => { s = (s==null||s==="")?"—":String(s); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
     let csv = headers.join(",")+"\n";
     rows.forEach(c=>{ csv += keys.map(k=> k==="spark"?"":esc(getVal(c,k))).join(",")+"\n"; });
     const blob = new Blob(["﻿"+csv], {type:"text/csv;charset=utf-8;"});
     const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
-    a.download = "左侧候选_"+(meta.run_date||"export")+".csv"; a.click();
+    a.download = (LANG==="en"?"left_side_candidates_":"左侧候选_")+(meta.run_date||"export")+".csv"; a.click();
   };
 
   // ---------- 个股详情 ----------
   let detailChart=null, roeChart=null;
+  let curC=null, curP=null;                       // 当前打开的候选 + 深度档案
+  const profCharts={};                             // 页签内图表实例
+  function pcInit(sel, key){
+    if(profCharts[key]){ profCharts[key].dispose(); profCharts[key]=null; }
+    const el=$(sel); el.innerHTML="";
+    const ch=echarts.init(el, ec());
+    profCharts[key]=ch; return ch;
+  }
+  function disposeProf(){ Object.keys(profCharts).forEach(k=>{ if(profCharts[k]){ profCharts[k].dispose(); profCharts[k]=null; } }); }
+  function fm(v){ if(!isNum(v)) return dash; const a=Math.abs(v), s=v<0?"-":""; return a>=1000? `${s}$${(a/1000).toFixed(1)}B` : `${s}$${a.toFixed(0)}M`; }
+  const escH = s => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+  // A股行业政策要点 (静态梳理, 定期人工复核) — 中英双语, 按关键词子串匹配
+  const POLICY_ZH={
+    "汽车":["新能源车购置税减免延续 + 以旧换新补贴, 直接拉动终端销量","出口关税(欧盟对华电动车反补贴税)与海外建厂进度影响出海节奏","智能驾驶/城市NOA监管落地节奏决定高阶智驾放量速度"],
+    "半导体":["国产替代 + 大基金三期投向, 设备/材料/EDA国产化是主线","美国对华出口管制(先进制程/HBM/设备)持续收紧, 影响先进产能","下游手机/AI算力需求周期决定晶圆厂稼动率与价格"],
+    "电子":["消费电子(手机/PC)换机周期 + AI终端(AI手机/AIPC)新需求","国产替代与自主可控政策扶持元器件/面板环节","汇率与海外需求波动影响出口占比高的代工/组装企业"],
+    "医药":["医保集采(药品/耗材)常态化, 压制仿制药价格与利润率","创新药审评审批加速 + 医保谈判续约规则决定放量","反腐(医疗领域)短期扰动院内销售, 中长期利好合规龙头"],
+    "生物":["创新药审评审批加速 + 医保谈判续约规则决定放量","集采扩围对生物类似药定价形成压制","BD出海(License-out)成为创新药企估值重估的关键催化"],
+    "白酒":["消费税改革预期(后移征收环节)与提价传导是核心变量","次高端受宏观消费景气影响大, 库存周期与批价是先行指标","禁酒令/三公消费监管边际变化影响政务与商务需求"],
+    "食品饮料":["成本端(包材/原奶/糖)价格波动直接影响毛利率","消费复苏力度与渠道库存决定动销与提价空间","食品安全监管趋严, 龙头合规优势凸显"],
+    "银行":["净息差承压(LPR下调 + 存量房贷利率调整), 关注息差企稳","化债(城投/地方债)推进影响资产质量与拨备计提","房地产风险出清进度决定涉房资产减值压力"],
+    "证券":["资本市场改革(全面注册制/并购重组松绑)提升投行与两融业务","活跃资本市场政策(印花税/降费)提振经纪与自营","行业并购整合(打造一流投行)预期升温"],
+    "非银":["活跃资本市场政策提振券商经纪/自营, 利好保险投资端","保险负债端(预定利率下调)与资产端(权益+长端利率)双重驱动","行业并购整合预期升温"],
+    "光伏":["产能过剩 + 价格战出清, 关注行业自律限产与落后产能退出","出口关税(美国双反/欧盟)与海外建厂影响出海盈利","双碳目标 + 大基地项目支撑国内装机需求"],
+    "新能源":["双碳目标 + 大基地/整县推进支撑装机, 但产能过剩压制价格","储能强制配置与电力市场化改革打开新增长点","出口关税与海外本地化建厂影响出海节奏"],
+    "军工":["国防预算稳定增长 + 十四五装备放量, 订单可见性高","国企改革/资产注入与股权激励提升经营效率","地缘政治紧张提升板块估值弹性"],
+    "国防":["国防预算稳定增长 + 十四五装备放量, 订单可见性高","国企改革/资产注入预期是重要催化","地缘政治紧张提升板块估值弹性"],
+    "房地产":["政策松绑(限购/限贷放开 + 保交楼 + 收储)决定销售修复力度","房企融资(白名单/经营性物业贷)改善现金流与信用风险","人口与城镇化拐点决定行业中长期天花板"],
+    "机械":["制造业投资与设备更新(大规模设备更新政策)拉动需求","出口(工程机械/通用设备)受海外需求与汇率影响大","人形机器人/工业自动化打开新成长曲线"],
+    "设备":["设备更新政策(工业/能源/环保)释放替换需求","国产替代提升高端装备(半导体/工业母机)国产化率","出口占比高的企业受海外需求与汇率波动影响"],
+    "计算机":["信创(党政 + 行业)持续推进, 国产软硬件替换加速","AI大模型 + 算力基建投入带动订单, 关注商业化落地","数据要素市场化(数据确权/交易)政策打开新空间"],
+    "软件":["信创国产替代 + AI应用商业化是双主线","数据要素/数据资产入表政策催化","政府与国企IT支出景气度决定订单节奏"],
+    "传媒":["AI内容生成(游戏/影视/营销)降本增效 + 版号常态化发放","文化出海(游戏/短剧)政策鼓励, 打开海外增量","内容监管与未成年人保护规则影响商业模式"],
+    "有色":["美联储降息路径 + 美元指数决定贵金属/工业金属价格中枢","新能源金属(锂/钴/稀土)供需与产能周期波动大","资源国政策(出口管制/国有化)扰动供给"],
+    "金属":["美联储降息路径 + 美元指数决定金属价格中枢","新能源金属供需与产能周期波动大","资源国政策与地缘政治扰动供给"],
+    "化工":["油价(成本端)与全球需求(出口)决定周期品盈利弹性","环保安监趋严 + 落后产能退出, 利好存量龙头","新材料国产替代(半导体/新能源材料)是成长主线"],
+    "电力":["电力市场化改革(现货/辅助服务)重塑盈利模式","来水/煤价波动影响水电/火电成本, 关注电价传导","绿电 + 特高压 + 虚拟电厂支撑长期投资"],
+    "公用":["价格改革(水/电/气顺价)决定公用事业盈利修复","绿电与碳交易机制打开增量收益","稳定现金流 + 高股息属性在利率下行期受青睐"],
+    "农业":["生猪产能去化周期与猪价决定养殖板块盈利拐点","种业振兴(转基因商业化)政策打开种子行业空间","粮食安全 + 收储政策稳定种植链价格"],
+    "家电":["以旧换新补贴 + 地产竣工链后周期驱动内销","出口(海外补库 + 新兴市场)与汇率影响外销盈利","高端化/智能化 + 出海自主品牌提升盈利质量"],
+    "建筑":["专项债/超长期特别国债发行节奏决定基建实物量","化债背景下地方政府支付能力影响回款与现金流","一带一路 + 海外工程订单提供增量"],
+    "煤炭":["动力煤长协价 + 电煤保供政策稳定盈利中枢","安监趋严限制供给弹性, 支撑价格底部","高股息属性在低利率环境受长线资金青睐"],
+    "钢铁":["粗钢产量调控(限产/超低排放)与地产需求决定价格","成本端(铁矿石/焦炭)价格波动影响吨钢毛利","行业兼并重组与产能置换提升集中度"],
+    "_default":["关注产业补贴/专项债等财政政策对需求端的拉动","关注行业集采/关税/出口管制等监管政策的边际变化","关注双碳/国产替代/化债等长期主线的进展"]};
+  const POLICY_EN={
+    "汽车":["Extended NEV purchase-tax breaks + trade-in subsidies directly lift end sales","EU anti-subsidy tariffs on Chinese EVs and overseas plant progress shape the export ramp","The rollout pace of smart-driving / urban-NOA regulation sets high-end ADAS adoption"],
+    "半导体":["Domestic substitution + Big Fund phase-3: equipment/materials/EDA localization is the main line","Tightening US export controls (advanced nodes/HBM/tools) hit leading-edge capacity","Downstream phone / AI-compute demand cycle drives fab utilization and pricing"],
+    "电子":["Consumer-electronics (phone/PC) replacement cycle + AI devices add demand","Localization policy supports components / panels","FX and overseas demand swings hit export-heavy OEM/ODM names"],
+    "医药":["Normalized centralized procurement (drugs/consumables) pressures generic prices and margins","Faster novel-drug review + NRDL renewal rules drive the ramp","Healthcare anti-corruption disrupts in-hospital sales short-term, favors compliant leaders long-term"],
+    "生物":["Faster novel-drug review + NRDL renewal rules drive the ramp","Procurement expansion pressures biosimilar pricing","License-out BD deals are a key re-rating catalyst for innovators"],
+    "白酒":["Expected consumption-tax reform and price pass-through are the core variables","Sub-premium is macro-sensitive; inventory cycle and wholesale price are leading indicators","Marginal changes in anti-extravagance rules affect government/business demand"],
+    "食品饮料":["Input costs (packaging/raw milk/sugar) directly move gross margins","Consumption-recovery strength and channel inventory set sell-through and pricing room","Tighter food-safety regulation highlights leaders' compliance edge"],
+    "银行":["NIM under pressure (LPR cuts + existing-mortgage-rate resets) — watch for stabilization","Local-debt resolution progress affects asset quality and provisioning","Property-risk clearing pace drives impairment pressure"],
+    "证券":["Capital-market reform (registration system / eased M&A) boosts IB and margin businesses","'Active capital market' policy (stamp duty/fee cuts) lifts brokerage & prop trading","Industry consolidation expectations rising"],
+    "非银":["'Active capital market' policy lifts brokers and insurers' investment side","Insurers driven by liabilities (lower guaranteed rates) and assets (equity + long rates)","Industry consolidation expectations rising"],
+    "光伏":["Overcapacity + price-war shakeout — watch self-discipline output cuts","Export tariffs (US AD/CVD, EU) and overseas plants affect export profitability","Dual-carbon goals + mega-base projects support domestic installs"],
+    "新能源":["Dual-carbon + mega-base rollout support installs, but overcapacity caps prices","Mandatory storage allocation and power-market reform open new growth","Export tariffs and overseas localization shape the export ramp"],
+    "军工":["Steady defense-budget growth + equipment ramp give high order visibility","SOE reform / asset injections + equity incentives lift efficiency","Geopolitical tension raises valuation elasticity"],
+    "国防":["Steady defense-budget growth + equipment ramp give high order visibility","SOE reform / asset-injection expectations are a key catalyst","Geopolitical tension raises valuation elasticity"],
+    "房地产":["Policy easing (lifting purchase/loan limits + project delivery + inventory purchase) sets the sales recovery","Developer financing improves cash flow and credit risk","Population & urbanization inflection sets the long-term ceiling"],
+    "机械":["Manufacturing capex and equipment-renewal policy drive demand","Exports are sensitive to overseas demand and FX","Humanoid robots / industrial automation open a new growth curve"],
+    "设备":["Equipment-renewal policy unlocks replacement demand","Localization lifts high-end equipment self-sufficiency","Export-heavy names exposed to overseas demand and FX swings"],
+    "计算机":["Xinchuang localization of software/hardware accelerates","AI large-models + compute buildout drive orders — watch commercialization","Data-element marketization policy opens new space"],
+    "软件":["Xinchuang localization + AI-application commercialization are the twin lines","Data-element / data-asset-on-balance-sheet policy catalysts","Government & SOE IT spending sets the order cadence"],
+    "传媒":["AI content generation cuts costs + normalized game-license issuance","Cultural export (games/short dramas) is policy-encouraged","Content regulation and minor-protection rules affect business models"],
+    "有色":["Fed rate path + dollar index set precious/industrial-metal price centers","New-energy metals have volatile supply-demand and capacity cycles","Resource-country policy disrupts supply"],
+    "金属":["Fed rate path + dollar index set metal price centers","New-energy metals have volatile supply-demand cycles","Resource-country policy and geopolitics disrupt supply"],
+    "化工":["Oil price and global demand drive cyclical earnings elasticity","Tighter environmental/safety rules + capacity exit favor incumbents","New-materials localization is the growth line"],
+    "电力":["Power-market reform reshapes the profit model","Water inflow / coal price swings hit hydro/thermal costs","Green power + UHV + virtual power plants support long-term investment"],
+    "公用":["Price reform (water/power/gas pass-through) drives earnings recovery","Green power and carbon trading open incremental returns","Stable cash flow + high dividend favored when rates fall"],
+    "农业":["Hog-capacity destocking cycle and pork prices set the earnings inflection","Seed revitalization (GMO commercialization) opens the seed industry","Food security + reserve policy stabilize the planting chain"],
+    "家电":["Trade-in subsidies + property-completion late-cycle drive domestic sales","Exports and FX affect export profits","Premiumization/smart + own-brand exports lift earnings quality"],
+    "建筑":["Special-bond / ultra-long treasury issuance sets infrastructure volume","Local-government payment ability affects collections and cash flow","Belt-and-Road + overseas orders provide upside"],
+    "煤炭":["Long-term contract prices + supply policy stabilize the earnings center","Tighter safety supervision limits supply elasticity","High-dividend traits favored in a low-rate environment"],
+    "钢铁":["Crude-steel output controls and property demand set prices","Input costs drive per-ton margins","M&A and capacity swaps raise industry concentration"],
+    "_default":["Watch fiscal policy (subsidies/special bonds) pulling demand","Watch marginal changes in procurement/tariffs/export controls","Watch progress on long-term themes: dual-carbon, localization, debt-resolution"]};
+  function policyFor(sec){
+    const P = (LANG==="en")?POLICY_EN:POLICY_ZH;
+    if(sec){ for(const k in P){ if(k!=="_default" && sec.indexOf(k)>=0) return P[k]; } }
+    return P._default;
+  }
+
+  // ---- 页签切换 (懒渲染: 切到哪个页签才画哪个的图) ----
+  function switchTab(id){
+    document.querySelectorAll('#dTabs .segbtn').forEach(b=>b.classList.toggle('on', b.dataset.tab===id));
+    document.querySelectorAll('.dtab').forEach(d=>d.classList.toggle('hidden', d.id!==id));
+    if(id==="tabOv"){ if(detailChart) setTimeout(()=>detailChart.resize(),40); return; }
+    if(id==="tabCo") renderCoTab();
+    else if(id==="tabCf") renderCfTab();
+    else if(id==="tabNw") renderNwTab();
+  }
+  document.querySelectorAll('#dTabs .segbtn').forEach(b=>{ b.onclick=()=>switchTab(b.dataset.tab); });
+  function NOPROFhtml(){ return `<div class="p-3 text-slate-500 text-sm">${t("noprof")}</div>`; }
+
+  // ---- ② 公司与业务 ----
+  function renderCoTab(){
+    if(!curC) return;
+    const p=curP;
+    if(!p){ $("#dProfile").innerHTML=NOPROFhtml(); $("#dOfficers").innerHTML="";
+      $("#dPieNotes").innerHTML=""; $("#dPieYear").textContent="";
+      ["#dPieChart","#dRevChart","#dQRevChart"].forEach(sel=>$(sel).innerHTML="");
+      return; }
+    const meta=[];
+    if(p.sector) meta.push(t("pf_sector")+" "+escH(p.sector));
+    if(p.hq) meta.push(t("pf_hq")+" "+escH(p.hq));
+    if(p.legal_rep) meta.push(t("pf_legal")+" "+escH(p.legal_rep));
+    if(p.list_date) meta.push(t("pf_list")+" "+escH(p.list_date));
+    if(p.reg_capital) meta.push(t("pf_regcap")+" "+escH(p.reg_capital));
+    const bodyhtml = (p.summary?escH(p.summary):t("no_summary")) + (p.business?`<div class="mt-2 text-slate-300">${escH(p.business)}</div>`:"");
+    $("#dProfile").innerHTML =
+      `<div class="text-[13px] leading-relaxed text-slate-200 mb-2" style="max-height:150px;overflow-y:auto">${bodyhtml}</div>`+
+      `<div class="text-xs text-slate-400">${meta.join(" · ")}${p.website?` · <a class="text-sky-300 hover:underline" target="_blank" rel="noopener" href="${escH(p.website)}">${t("pf_web")} ↗</a>`:""}</div>`;
+    const mc=p.mgmt_changes||[];
+    if(mc.length){
+      $("#dOfficers").innerHTML =
+        `<table class="w-full"><thead><tr>`+
+        `<th class="text-left">${t("mg_date")}</th><th class="text-left">${t("mg_person")}</th><th class="text-left">${t("mg_relation")}</th>`+
+        `<th class="text-right">${t("mg_change")}</th><th class="text-right">${t("mg_price")}</th><th class="text-left">${t("mg_way")}</th></tr></thead><tbody>`+
+        mc.map(o=>`<tr>`+
+          `<td class="text-slate-300">${escH(o.date)}</td><td class="text-white">${escH(o.person)}</td><td class="text-slate-300">${escH(o.relation)}</td>`+
+          `<td class="num ${isNum(o.change)?(o.change>0?'pos':'neg'):''}">${isNum(o.change)?(o.change>0?"+":"")+o.change.toLocaleString():escH(o.change)}</td>`+
+          `<td class="num">${isNum(o.price)?o.price.toFixed(2):dash}</td><td class="text-slate-400">${escH(o.way)}</td></tr>`).join("")+
+        `</tbody></table>`;
+    } else { $("#dOfficers").innerHTML=`<div class="p-3 text-slate-500 text-sm">${t("no_officer")}</div>`; }
+    drawPie(p); drawRevCharts(p);
+  }
+
+  function drawPie(p){
+    const seg=p.segments, C=tc(), yi=t("yi_u");
+    $("#dPieNotes").innerHTML=""; $("#dPieYear").textContent="";
+    if(!hasECharts || !seg || !seg.items || !seg.items.length){
+      $("#dPieChart").innerHTML=`<div class="text-slate-500 text-sm p-3">${t("no_seg")}</div>`; return; }
+    $("#dPieYear").textContent = `${seg.date||""}${seg.by?" · "+seg.by:""} · ${t("seg_total")} ${isNum(seg.total)?seg.total.toFixed(1):dash}${yi}`;
+    const PAL=["#38bdf8","#c084fc","#f59e0b","#34d399","#f472b6","#94a3b8","#fbbf24","#60a5fa"];
+    const items=seg.items.filter(x=>isNum(x.value)&&x.value>0);
+    const tot=items.reduce((a,x)=>a+x.value,0)||1;
+    const data=items.map((x,i)=>({name:escH(x.name), value:x.value, _pct:x.pct, _margin:x.margin, _yoy:x.yoy, itemStyle:{color:PAL[i%PAL.length]}}));
+    const ch=pcInit("#dPieChart","pie");
+    ch.setOption({backgroundColor:"transparent",
+      tooltip:{formatter:pr=>{ const d=pr.data;
+        return `<b>${pr.name}</b><br/>${isNum(d.value)?d.value.toFixed(1)+yi:dash} · ${t("of_rev")} ${isNum(d._pct)?d._pct.toFixed(1):(d.value/tot*100).toFixed(1)}%`+
+          (isNum(d._margin)?`<br/>${t("gm_l")} ${d._margin.toFixed(1)}%`:"")+
+          (isNum(d._yoy)?`<br/>${t("yoy_l")} ${d._yoy>0?"+":""}${d._yoy.toFixed(1)}%`:""); }},
+      legend:{bottom:0,textStyle:{color:C.label,fontSize:11},type:"scroll"},
+      series:[{type:"pie",radius:["38%","66%"],center:["50%","44%"],
+        label:{color:C.label,fontSize:11,formatter:pr=>`${pr.name}\n${isNum(pr.data._pct)?pr.data._pct.toFixed(0):(pr.value/tot*100).toFixed(0)}%`},
+        itemStyle:{borderColor:(document.body.classList.contains("light")?"#fff":"#111a2e"),borderWidth:2}, data}]});
+    const en=(LANG==="en"), notes=[];
+    seg.items.forEach(x=>{
+      const nm=escH(x.name);
+      if(isNum(x.yoy) && x.yoy>30) notes.push(`<span style="color:#4ade80">✦ ${nm} ${en?`revenue +${x.yoy.toFixed(0)}% YoY — a standout growth driver`:`营收同比 +${x.yoy.toFixed(0)}% —— 高增长看点`}</span>`);
+      else if(isNum(x.yoy) && x.yoy<-15) notes.push(`<span style="color:#f87171">⚠ ${nm} ${en?`revenue ${x.yoy.toFixed(0)}% YoY — shrinking`:`营收同比 ${x.yoy.toFixed(0)}% —— 明显下滑`}</span>`);
+      if(isNum(x.margin) && x.margin>=50) notes.push(`<span style="color:#38bdf8">✦ ${nm} ${en?`gross margin ${x.margin.toFixed(0)}% — high-margin business`:`毛利率 ${x.margin.toFixed(0)}% —— 高毛利业务`}</span>`);
+      else if(isNum(x.margin) && x.margin<10) notes.push(`<span class="text-slate-400">ℹ ${nm} ${en?`gross margin ${x.margin.toFixed(0)}% — thin margin`:`毛利率 ${x.margin.toFixed(0)}% —— 低毛利`}</span>`);
+    });
+    $("#dPieNotes").innerHTML=notes.join("<br/>");
+  }
+
+  function drawRevCharts(p){
+    const r=p.revenue, C=tc(), yi=t("yi_u");
+    if(!hasECharts || !r || !r.years || !r.years.length){
+      $("#dRevChart").innerHTML=`<div class="text-slate-500 text-sm p-3">${t("no_rev")}</div>`; $("#dQRevChart").innerHTML=""; return; }
+    const yfmt=v=>v+yi;
+    const ch=pcInit("#dRevChart","rev");
+    ch.setOption({backgroundColor:"transparent", grid:{left:52,right:46,top:22,bottom:20},
+      tooltip:{trigger:"axis"},
+      legend:{top:0,textStyle:{color:C.label,fontSize:11},data:[t("rev_annual"),t("rev_net"),t("rev_yoy")]},
+      xAxis:{type:"category",data:r.years,axisLabel:{color:C.axis,fontSize:10}},
+      yAxis:[{type:"value",axisLabel:{color:C.axis,fontSize:10,formatter:yfmt},splitLine:{lineStyle:{color:C.grid}}},
+             {type:"value",axisLabel:{color:C.axis,fontSize:10,formatter:"{value}%"},splitLine:{show:false}}],
+      series:[{name:t("rev_annual"),type:"bar",data:r.revenue,barWidth:"38%",itemStyle:{color:"#38bdf8",borderRadius:[3,3,0,0]}},
+              (r.net?{name:t("rev_net"),type:"bar",data:r.net,barWidth:"38%",itemStyle:{color:"#34d399",borderRadius:[3,3,0,0]}}:{name:t("rev_net"),type:"bar",data:[]}),
+              {name:t("rev_yoy"),type:"line",yAxisIndex:1,data:r.rev_yoy,connectNulls:true,
+               lineStyle:{color:"#fbbf24",width:2},itemStyle:{color:"#fbbf24"},
+               label:{show:true,color:"#fbbf24",fontSize:10,formatter:pr=>isNum(pr.value)?(pr.value>0?"+":"")+pr.value+"%":""}}]});
+    if(r.quarters && r.quarters.length){
+      const qc=pcInit("#dQRevChart","qrev");
+      qc.setOption({backgroundColor:"transparent", grid:{left:52,right:20,top:8,bottom:20},
+        tooltip:{trigger:"axis",valueFormatter:v=>isNum(v)?v+yi:dash},
+        xAxis:{type:"category",data:r.quarters,axisLabel:{color:C.axis,fontSize:9}},
+        yAxis:{type:"value",axisLabel:{color:C.axis,fontSize:9,formatter:yfmt},splitLine:{lineStyle:{color:C.grid}}},
+        series:[{name:t("rev_qtr"),type:"bar",data:r.q_revenue,barWidth:"55%",itemStyle:{color:"#c084fc",borderRadius:[2,2,0,0]}}]});
+    } else { $("#dQRevChart").innerHTML=""; }
+  }
+
+  // ---- ③ 现金流与风险 ----
+  function renderCfTab(){
+    if(!curC) return;
+    const p=curP, C=tc(), yi=t("yi_u");
+    if(!hasECharts){
+      $("#dCashChart").innerHTML=`<div class="text-amber-400 text-sm p-3">${t("no_echarts")}</div>`;
+      $("#dCashNotes").innerHTML=""; renderRiskPanel(); renderPolicy(); return; }
+    if(!p || !p.cashflow || !p.cashflow.years){
+      $("#dCashChart").innerHTML=`<div class="text-slate-500 text-sm p-3">${t("no_cash")}</div>`;
+      $("#dCashNotes").innerHTML=""; renderRiskPanel(); renderPolicy(); return; }
+    const cf=p.cashflow;
+    const A=arr=>(arr||[]).map(v=>v==null?null:Math.abs(v));
+    const ch=pcInit("#dCashChart","cash");
+    ch.setOption({backgroundColor:"transparent", grid:{left:56,right:20,top:44,bottom:22},
+      tooltip:{trigger:"axis", valueFormatter:v=>isNum(v)?v.toFixed(1)+yi:dash},
+      legend:{top:0,textStyle:{color:C.label,fontSize:11}},
+      xAxis:{type:"category",data:cf.years,axisLabel:{color:C.axis}},
+      yAxis:{type:"value",axisLabel:{color:C.axis,fontSize:10,formatter:v=>v+yi},splitLine:{lineStyle:{color:C.grid}}},
+      series:[
+        {name:t("cf_ocf"),type:"bar",data:cf.ocf,itemStyle:{color:"#38bdf8"}},
+        {name:t("cf_fcf"),type:"bar",data:cf.fcf,itemStyle:{color:"#34d399"}},
+        {name:t("cf_capex"),type:"bar",data:A(cf.capex),itemStyle:{color:"#94a3b8"}},
+        {name:t("cf_acq"),type:"bar",data:A(cf.acq),itemStyle:{color:"#f59e0b"}},
+        {name:t("cf_div"),type:"bar",data:A(cf.dividend),itemStyle:{color:"#f472b6"}},
+        {name:t("cf_ni"),type:"line",data:cf.net_income,lineStyle:{color:"#fbbf24",width:2,type:"dashed"},itemStyle:{color:"#fbbf24"}},
+      ]});
+    const notesArr=(p.cash_notes||[]).map(n=>{ const txt=(LANG==="en" && n.text_en)?n.text_en:n.text;
+      return `<div class="note-${n.level||'info'} p-2 rounded text-[13px] text-slate-200">${escH(txt)}</div>`; });
+    $("#dCashNotes").innerHTML = notesArr.join("") || `<div class="text-slate-500 text-sm">${t("no_notes")}</div>`;
+    renderRiskPanel(); renderPolicy();
+  }
+
+  function renderRiskPanel(){
+    const p=curP, rk=(p||{}).risk;
+    const kv=(lab,val)=>`<div class="kv"><span class="text-slate-400">${lab}</span><span class="text-slate-100">${val}</span></div>`;
+    if(!rk){ $("#dRiskPanel").innerHTML=`<div class="card p-4 text-slate-500 text-sm">${t("no_risk")}</div>`; return; }
+    const warns=[];
+    if(isNum(rk.debt_ratio)&&rk.debt_ratio>70) warns.push("⚠ "+t("warn_debt")+rk.debt_ratio.toFixed(1)+t("warn_debt2"));
+    if(isNum(rk.current_ratio)&&rk.current_ratio<1) warns.push("⚠ "+t("warn_curr")+rk.current_ratio.toFixed(2)+t("warn_curr2"));
+    if(isNum(rk.quick_ratio)&&rk.quick_ratio<1) warns.push("⚠ "+t("warn_quick")+rk.quick_ratio.toFixed(2)+t("warn_quick2"));
+    if(isNum(rk.gross_margin)&&rk.gross_margin<10) warns.push("⚠ "+t("warn_gm")+rk.gross_margin.toFixed(1)+t("warn_gm2"));
+    $("#dRiskPanel").innerHTML=
+      `<div class="card p-4"><div class="text-sm text-slate-300 mb-2">${t("risk_ratios")}</div>`+
+        kv(t("rk_debt"), isNum(rk.debt_ratio)?rk.debt_ratio.toFixed(1)+"%":dash)+
+        kv(t("rk_curr"), isNum(rk.current_ratio)?rk.current_ratio.toFixed(2):dash)+
+        kv(t("rk_quick"), isNum(rk.quick_ratio)?rk.quick_ratio.toFixed(2):dash)+
+        kv(t("rk_gm"), isNum(rk.gross_margin)?rk.gross_margin.toFixed(1)+"%":dash)+
+        kv(t("rk_roe"), isNum(rk.roe)?rk.roe.toFixed(1)+"%":dash)+
+        kv(t("rk_audit"), rk.audit?escH(rk.audit):dash)+`</div>`+
+      `<div class="card p-4">${warns.length?`<div class="space-y-1">${warns.map(w=>`<div class="note-warn p-2 rounded text-xs text-slate-200">${w}</div>`).join("")}</div>`
+        :`<div class="note-good p-2 rounded text-xs text-slate-200">${LANG==="en"?"No obvious solvency/leverage red flags among the ratios above.":"上述比率未见明显偿债/杠杆预警。"}</div>`}</div>`;
+  }
+
+  function renderPolicy(){
+    const sec=(curP&&curP.sector)||(curC&&curC.industry);
+    const items=policyFor(sec);
+    const head = (sec? escH(sec)+t("policy_note_a") : t("policy_generic")) + t("policy_note_b");
+    $("#dPolicy").innerHTML=
+      `<div class="text-xs text-slate-400 mb-2">${head}</div>`+
+      `<ul class="space-y-1.5">${items.map(x=>`<li class="text-[13px] text-slate-200 flex gap-2"><span class="text-sky-400 flex-none">▸</span><span>${escH(x)}</span></li>`).join("")}</ul>`;
+  }
+
+  // ---- ④ 消息与博弈 ----
+  function renderNwTab(){
+    if(!curC) return;
+    const p=curP, yi=t("yi_u");
+    if(!p){ $("#dNewsList").innerHTML=NOPROFhtml(); $("#dNewsSum").innerHTML="";
+      $("#dMargin").innerHTML=""; $("#dMarginNote").textContent=""; $("#dMarginDate").textContent="";
+      $("#dLhb").innerHTML=NOPROFhtml(); $("#dBlock").innerHTML=NOPROFhtml(); $("#dBlockSum").textContent=""; return; }
+    const news=p.news||[];
+    const nPos=news.filter(n=>n.tone==="利好").length, nNeg=news.filter(n=>n.tone==="利空").length;
+    $("#dNewsSum").innerHTML=`<span class="badge tag-strong">${t("tone_pos")} ${nPos}</span> <span class="badge tag-warn">${t("tone_neg")} ${nNeg}</span> <span class="badge tag-watch">${t("tone_neutral")} ${news.length-nPos-nNeg}</span>`;
+    const toneCls={"利好":"tag-strong","利空":"tag-warn","中性":"tag-watch"};
+    $("#dNewsList").innerHTML = news.length? news.map(n=>
+      `<div class="newsrow"><span class="badge ${toneCls[n.tone]||'tag-watch'} flex-none">${toneText(n.tone)}</span>`+
+        `<div class="min-w-0"><a href="${escH(n.url)}" target="_blank" rel="noopener" class="text-[13px] text-slate-100 hover:text-sky-300 hover:underline">${escH(n.title)}</a>`+
+        `<div class="text-xs text-slate-500 mt-0.5">${escH(n.publisher)} · ${escH(n.time)}</div></div></div>`).join("")
+      : `<div class="p-3 text-slate-500 text-sm">${t("nw_none")}</div>`;
+    const m=p.margin;
+    const mc=(lab,val,col)=>`<div class="card p-2.5"><div class="text-[11px] text-slate-400">${lab}</div><div class="text-base font-semibold mt-0.5" style="color:${col||'var(--text)'}">${val}</div></div>`;
+    if(m){
+      $("#dMarginDate").textContent = (m.date&&m.date.length>=8)? (m.date.slice(0,4)+"-"+m.date.slice(4,6)+"-"+m.date.slice(6,8)) : "";
+      $("#dMargin").innerHTML =
+        mc(t("mg_fin_bal"), isNum(m.fin_bal)?m.fin_bal.toFixed(1)+yi:dash, "#f87171")+
+        mc(t("mg_fin_buy"), isNum(m.fin_buy)?m.fin_buy.toFixed(1)+yi:dash)+
+        mc(t("mg_short_bal"), isNum(m.short_bal)?m.short_bal.toFixed(2)+yi:dash, "#4ade80")+
+        mc(t("mg_short_vol"), isNum(m.short_vol)?m.short_vol.toFixed(0)+t("margin_wan"):dash)+
+        mc(t("mg_total"), isNum(m.total_bal)?m.total_bal.toFixed(1)+yi:dash, "#38bdf8");
+      let read=t("margin_r_bal");
+      if(isNum(m.fin_bal)&&isNum(m.short_bal)&&m.short_bal>0){
+        const ratio=m.fin_bal/m.short_bal;
+        read = ratio>50? t("margin_r_bull") : (ratio<10? t("margin_r_bear") : t("margin_r_bal"));
+      }
+      $("#dMarginNote").textContent = t("margin_read")+read+"。";
+    } else {
+      $("#dMarginDate").textContent="";
+      $("#dMargin").innerHTML=`<div class="col-span-full text-slate-500 text-sm p-1">${t("margin_none")}</div>`;
+      $("#dMarginNote").textContent="";
+    }
+    const lhb=p.lhb;
+    if(lhb && (lhb.count||0)>0){
+      const kv=(lab,val)=>`<div class="kv"><span class="text-slate-400">${lab}</span><span class="text-slate-100">${val}</span></div>`;
+      $("#dLhb").innerHTML =
+        kv(t("lhb_count"), (lhb.count||0)+"")+
+        kv(t("lhb_last"), escH(lhb.last_date)||dash)+
+        kv(t("lhb_net"), isNum(lhb.net_buy)?((lhb.net_buy>0?"+":"")+lhb.net_buy.toFixed(2)+yi):dash)+
+        (lhb.reason?`<div class="text-xs text-slate-400 mt-1">${escH(lhb.reason)}</div>`:"");
+    } else { $("#dLhb").innerHTML=`<div class="text-slate-500 text-sm">${t("lhb_none")}</div>`; }
+    const b=p.block;
+    if(b && ((b.count||0)>0 || (b.recent&&b.recent.length))){
+      $("#dBlockSum").textContent="";
+      const kv=(lab,val)=>`<div class="kv"><span class="text-slate-400">${lab}</span><span class="text-slate-100">${val}</span></div>`;
+      const premCol=isNum(b.premium_rate)?(b.premium_rate<0?"#4ade80":"#f87171"):"";
+      let html = `<div class="grid grid-cols-2 md:grid-cols-3 gap-x-4">`+
+        kv(t("block_cnt"), (b.count||0)+"")+
+        `<div class="kv"><span class="text-slate-400">${t("block_prem")}</span><span style="color:${premCol}">${isNum(b.premium_rate)?(b.premium_rate>0?"+":"")+b.premium_rate.toFixed(2)+"%":dash}</span></div>`+
+        kv(t("block_amt"), isNum(b.amt_total)?b.amt_total.toFixed(2)+yi:dash)+
+        kv(t("block_over"), isNum(b.amt_over_float)?b.amt_over_float.toFixed(2)+"%":dash)+
+        kv(t("block_inst"), (b.inst_buy||0)+"")+`</div>`;
+      if(b.recent&&b.recent.length){
+        html += `<div class="text-sm text-slate-300 mt-3 mb-1">${t("block_recent")}</div>`+
+          `<div class="overflow-x-auto"><table class="w-full"><thead><tr>`+
+          `<th class="text-left">${t("blk_date")}</th><th class="text-right">${t("blk_price")}</th><th class="text-right">${t("blk_prem")}</th><th class="text-right">${t("blk_amt")}</th><th class="text-left">${t("blk_buyer")}</th><th class="text-left">${t("blk_seller")}</th></tr></thead><tbody>`+
+          b.recent.map(r=>`<tr><td class="text-slate-300">${escH(r.date)}</td><td class="num">${isNum(r.price)?r.price.toFixed(2):dash}</td>`+
+            `<td class="num" style="color:${isNum(r.premium)?(r.premium<0?'#4ade80':'#f87171'):''}">${isNum(r.premium)?(r.premium>0?"+":"")+r.premium.toFixed(2)+"%":dash}</td>`+
+            `<td class="num">${isNum(r.amt)?r.amt.toFixed(0):dash}</td><td class="text-slate-400 text-xs">${escH(r.buyer)}</td><td class="text-slate-400 text-xs">${escH(r.seller)}</td></tr>`).join("")+
+          `</tbody></table></div>`;
+      }
+      html += `<div class="text-xs text-slate-500 mt-2 leading-relaxed">${t("block_note")}</div>`;
+      $("#dBlock").innerHTML = html;
+    } else { $("#dBlock").innerHTML=`<div class="text-slate-500 text-sm">${t("block_none")}</div>`; $("#dBlockSum").textContent=""; }
+  }
+
+  // ---- 实时行情 (客户端经公共CORS代理拉 Yahoo chart 端点; 仅价格类实时数据可得) ----
+  const CORS_PROXIES = [
+    u => "https://corsproxy.io/?url="+encodeURIComponent(u),
+    u => "https://api.codetabs.com/v1/proxy/?quest="+encodeURIComponent(u),
+  ];
+  async function fetchLiveQuote(code){
+    if(!code) return;
+    const body=$("#dLiveBody"), btn=$("#liveBtn");
+    const ysym = String(code).replace(/\./g,"-");   // BRK.B -> BRK-B (Yahoo)
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ysym)}?range=1d&interval=1d`;
+    btn.disabled=true; const old=btn.textContent; btn.textContent=t("live_loading");
+    body.innerHTML=`<span class="text-slate-400">${t("live_loading")}</span>`;
+    let meta=null;
+    for(const mk of CORS_PROXIES){
+      try{
+        const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),9000);
+        const r=await fetch(mk(url),{signal:ctrl.signal}); clearTimeout(to);
+        if(!r.ok) continue;
+        const j=await r.json();
+        meta=j && j.chart && j.chart.result && j.chart.result[0] && j.chart.result[0].meta;
+        if(meta) break;
+      }catch(e){ /* try next proxy */ }
+    }
+    btn.disabled=false; btn.textContent=old;
+    if(!meta){ body.innerHTML=`<span class="text-amber-400">${t("live_fail")}</span>`; return; }
+    const price=meta.regularMarketPrice, prev=meta.chartPreviousClose||meta.previousClose;
+    const chg=(isNum(price)&&isNum(prev)&&prev)?(price/prev-1)*100:null;
+    const cur=meta.currency==="USD"?"$":(meta.currency||"");
+    const tm=meta.regularMarketTime?new Date(meta.regularMarketTime*1000).toLocaleString():"";
+    const chgCol=isNum(chg)?(chg>=0?"#ef4444":"#16a34a"):"";   // 涨红跌绿
+    const item=(lab,val)=>`<span class="mr-4 whitespace-nowrap"><span class="text-slate-400">${lab}</span> <b class="text-slate-100">${val}</b></span>`;
+    body.innerHTML=
+      `<div class="text-sm flex flex-wrap items-center gap-y-1">`+
+        `<span class="mr-4 whitespace-nowrap"><span class="badge tag-strong">${t("live_tag")}</span> `+
+          `<b class="text-lg text-slate-100">${cur}${isNum(price)?price.toFixed(2):dash}</b> `+
+          (isNum(chg)?`<b style="color:${chgCol}">${chg>0?"+":""}${chg.toFixed(2)}%</b>`:"")+`</span>`+
+        item(t("live_high"), cur+(isNum(meta.regularMarketDayHigh)?meta.regularMarketDayHigh.toFixed(2):dash))+
+        item(t("live_low"), cur+(isNum(meta.regularMarketDayLow)?meta.regularMarketDayLow.toFixed(2):dash))+
+        item(t("live_52w"), cur+(isNum(meta.fiftyTwoWeekLow)?meta.fiftyTwoWeekLow.toFixed(2):dash)+" ~ "+cur+(isNum(meta.fiftyTwoWeekHigh)?meta.fiftyTwoWeekHigh.toFixed(2):dash))+
+        item(t("live_vol"), isNum(meta.regularMarketVolume)?meta.regularMarketVolume.toLocaleString():dash)+
+        `<span class="text-xs text-slate-500 w-full mt-1">${t("live_src")}${tm}</span>`+
+      `</div>`;
+  }
+
   function mountTV(code){
     const theme = document.body.classList.contains("light")?"light":"dark";
     const sym = encodeURIComponent(tvEmbedSym(code));
@@ -578,55 +1234,63 @@
     $("#tvLink").href = `https://www.tradingview.com/symbols/${encodeURIComponent(tvSym(code))}/`;
   }
   function openDetail(c){
-    $("#dTitle").innerHTML = `${c.name||""} <a href="https://www.tradingview.com/symbols/${encodeURIComponent(tvSym(c.code))}/" target="_blank" rel="noopener" class="text-sky-300 font-mono text-base hover:underline" title="在 TradingView 打开概览页">${c.code||""} ↗</a> <span class="badge ${tagClass(c.tag)} ml-2">${c.tag||""}</span>`;
-    $("#dSub").textContent = `${c.industry||"—"} · 现价 ${CUR}${f(c.price)} · 综合分 ${f(getVal(c,"final_score"),1)}（技术 ${f(c.tech_score,2)} / 基本面 ${f(c.fund_score,0)} / 景气 ${f(c.prosperity_score,0)}）`;
-    $("#dConclusion").textContent = c.conclusion || "—";
+    curC = c; curP = (DATA.profiles||{})[c.code] || null;
+    disposeProf();
+    switchTab("tabOv");
+    $("#drawer").scrollTop = 0;
+    $("#dTitle").innerHTML = `${escH(c.name||"")} <a href="https://www.tradingview.com/symbols/${encodeURIComponent(tvSym(c.code))}/" target="_blank" rel="noopener" class="text-sky-300 font-mono text-base hover:underline" title="${t("tv_link")}">${escH(c.code||"")} ↗</a> <span class="badge ${tagClass(c.tag)} ml-2">${escH(tagText(c.tag))}</span>`;
+    const sep1=(LANG==="en")?" / ":" / ", pOpen=(LANG==="en")?" (":"（", pClose=(LANG==="en")?")":"）";
+    $("#dSub").textContent = `${c.industry||"—"} · ${t("cur_price")} ${CUR}${f(c.price)} · ${t("composite")} ${f(getVal(c,"final_score"),1)}${pOpen}${t("of_tech")} ${f(c.tech_score,2)}${sep1}${t("of_fund")} ${f(c.fund_score,0)}${sep1}${t("of_prosp")} ${f(c.prosperity_score,0)}${pClose}`;
+    $("#dConclusion").textContent = ((LANG==="en"&&c.conclusion_en)?c.conclusion_en:c.conclusion) || "—";
 
     const chips=[];
-    if(c.sig_channel) chips.push(["贴近上升通道下轨","tag-strong"]);
-    if(c.sig_pivot) chips.push(["接近前期低点","tag-strong"]);
-    if(c.sig_ma) chips.push(["回踩"+c.sig_ma,"tag-strong"]);
-    if(c.sig_osc) chips.push([c.sig_osc,"tag-warn"]);
-    if(c.sig_vol) chips.push([c.sig_vol,"tag-watch"]);
-    if(isNum(c.support_price)) chips.push([`关键支撑 ${c.support_disp||c.support_price}`,"tag-watch"]);
-    if(isNum(c.dist_support_pct)) chips.push([`距支撑 ${c.dist_support_pct.toFixed(2)}%`,"tag-watch"]);
-    if(isNum(c.breakdown_price)) chips.push([`破位参考 ${c.breakdown_price}`,"tag-warn"]);
-    $("#dChips").innerHTML = chips.map(([t,k])=>`<span class="badge ${k}">${t}</span>`).join("");
+    if(c.sig_channel) chips.push([t("sig_channel"),"tag-strong"]);
+    if(c.sig_pivot) chips.push([t("sig_pivot"),"tag-strong"]);
+    if(c.sig_ma) chips.push([t("sig_ma_prefix")+c.sig_ma,"tag-strong"]);
+    if(c.sig_osc) chips.push([oscText(c.sig_osc),"tag-warn"]);
+    if(c.sig_vol) chips.push([volText(c.sig_vol),"tag-watch"]);
+    if(isNum(c.support_price)) chips.push([`${t("c_support")} ${c.support_disp!=null?supportDispText(c.support_disp):c.support_price}`,"tag-watch"]);
+    if(isNum(c.dist_support_pct)) chips.push([`${t("c_dist")} ${c.dist_support_pct.toFixed(2)}%`,"tag-watch"]);
+    if(isNum(c.breakdown_price)) chips.push([`${t("c_break")} ${c.breakdown_price}`,"tag-warn"]);
+    $("#dChips").innerHTML = chips.map(([txt,k])=>`<span class="badge ${k}">${escH(txt)}</span>`).join("");
 
-    // 风控卡片 (A股无券商目标价, 展示波动/回撤/量能类)
+    // 风控 / 分析师 卡片
     const rcell=(lab,val,col)=>`<div class="card p-2"><div class="text-[11px] text-slate-400">${lab}</div><div class="text-sm font-semibold mt-0.5" style="${col?`color:${col}`:'color:var(--text)'}">${val}</div></div>`;
     const ddCol = isNum(c.max_dd_pct)? (c.max_dd_pct<=-40?"#f87171":"#fbbf24") : "";
+    const ppl = c.analyst_count!=null ? (LANG==="en"?` (${c.analyst_count.toFixed(0)})`:` (${c.analyst_count.toFixed(0)}人)`) : "";
     $("#dRisk").innerHTML = [
-      rcell("Beta(沪深300,120日)", f(c.beta,2), "#c084fc"),
-      rcell("日均波动ATR%", isNum(c.atr_pct)?c.atr_pct.toFixed(2)+"%":dash),
-      rcell("最大回撤(1年)", isNum(c.max_dd_pct)?c.max_dd_pct.toFixed(1)+"%":dash, ddCol),
-      rcell("量能状态", c.sig_vol||dash, "#38bdf8"),
-      rcell("布林下轨", isNum(c.boll_low)?`${CUR}${c.boll_low.toFixed(2)}`:dash),
+      rcell(t("r_beta"), f(c.beta,2), "#c084fc"),
+      rcell(t("r_vol"), isNum(c.atr_pct)?c.atr_pct.toFixed(2)+"%":dash),
+      rcell(t("r_maxdd"), isNum(c.max_dd_pct)?c.max_dd_pct.toFixed(1)+"%":dash, ddCol),
+      rcell(t("r_volstate"), volText(c.sig_vol)||dash, "#38bdf8"),
+      rcell(t("r_boll"), isNum(c.boll_low)?`${CUR}${c.boll_low.toFixed(2)}`:dash),
     ].join("");
     const fibs=[["38.2%",c.fib_382],["50%",c.fib_500],["61.8%",c.fib_618]].filter(x=>isNum(x[1]));
-    $("#dFib").innerHTML = fibs.length? "斐波那契回撤支撑参考： "+fibs.map(([n,v])=>`${n} ≈ <b class="text-slate-200">${CUR}${v.toFixed(2)}</b>`).join("　·　") : "";
+    $("#dFib").innerHTML = fibs.length? (LANG==="en"?"Fibonacci retracement support: ":"斐波那契回撤支撑参考： ")+fibs.map(([n,v])=>`${n} ≈ <b class="text-slate-200">${CUR}${v.toFixed(2)}</b>`).join("　·　") : "";
 
+    // 基本面速览卡
     const cell=(lab,val)=>`<div class="card p-3"><div class="text-xs text-slate-400">${lab}</div><div class="text-base font-semibold text-slate-100 mt-1">${val}</div></div>`;
+    const pctileZ = (LANG==="en")?"pctile":"分位", yoyw=(LANG==="en")?"YoY ":"同比";
     $("#dFund").innerHTML = [
-      cell("市盈率TTM", c.pe_disp || f(c.pe_ttm,1)),
-      cell("行业PE中位", f(c.pe_industry_median,1)),
-      cell("市净率PB"+(isNum(c.pb_pct)?`（${c.pb_pct.toFixed(0)}%分位）`:""), f(c.pb,2)),
-      cell("EPS"+(isNum(c.eps_yoy)?`（同比${c.eps_yoy>0?'+':''}${c.eps_yoy.toFixed(1)}%）`:""), f(c.eps,2)),
-      cell("ROE", isNum(c.roe)?c.roe.toFixed(1)+"%":dash),
-      cell("营收同比", isNum(c.revenue_yoy)?(c.revenue_yoy>0?'+':'')+c.revenue_yoy.toFixed(1)+"%":dash),
-      cell("净利同比", isNum(c.netprofit_yoy)?(c.netprofit_yoy>0?'+':'')+c.netprofit_yoy.toFixed(1)+"%":dash),
-      cell("毛利率", isNum(c.gross_margin)?c.gross_margin.toFixed(1)+"%":dash),
-      cell("资产负债率", isNum(c.debt_ratio)?c.debt_ratio.toFixed(1)+"%":dash),
-      cell("股息率", isNum(c.dividend_yield)?c.dividend_yield.toFixed(2)+"%":dash),
-      cell("52周区间", `${CUR}${f(c.low_52w)} ~ ${CUR}${f(c.high_52w)}`),
-      cell("52周位置", pct(c.pos_52w_pct,1)),
+      cell(t("fc_pe"), c.pe_disp || f(c.pe_ttm,1)),
+      cell(t("fc_pe_med"), f(c.pe_industry_median,1)),
+      cell(t("fc_pb")+(isNum(c.pb_pct)?(LANG==="en"?` (${c.pb_pct.toFixed(0)}% ${pctileZ})`:`（${c.pb_pct.toFixed(0)}%分位）`):""), f(c.pb,2)),
+      cell("EPS"+(isNum(c.eps_yoy)?(LANG==="en"?` (${yoyw}${c.eps_yoy>0?'+':''}${c.eps_yoy.toFixed(1)}%)`:`（同比${c.eps_yoy>0?'+':''}${c.eps_yoy.toFixed(1)}%）`):""), f(c.eps,2)),
+      cell(t("fc_roe"), isNum(c.roe)?c.roe.toFixed(1)+"%":dash),
+      cell(t("fc_rev"), isNum(c.revenue_yoy)?(c.revenue_yoy>0?'+':'')+c.revenue_yoy.toFixed(1)+"%":dash),
+      cell(t("fc_np"), isNum(c.netprofit_yoy)?(c.netprofit_yoy>0?'+':'')+c.netprofit_yoy.toFixed(1)+"%":dash),
+      cell(t("fc_gm"), isNum(c.gross_margin)?c.gross_margin.toFixed(1)+"%":dash),
+      cell(t("fc_debt"), isNum(c.debt_ratio)?c.debt_ratio.toFixed(1)+"%":dash),
+      cell(t("fc_div"), isNum(c.dividend_yield)?c.dividend_yield.toFixed(2)+"%":dash),
+      cell(t("fc_52r"), `${CUR}${f(c.low_52w)} ~ ${CUR}${f(c.high_52w)}`),
+      cell(t("fc_52p"), pct(c.pos_52w_pct,1)),
     ].join("");
 
     const bar=(lab,p,inv)=>{ if(!isNum(p)) return `<div class="text-xs text-slate-400 mb-2">${lab}：—</div>`;
       const color = (inv? (p<=30?'#4ade80':p>=80?'#f87171':'#60a5fa') : '#60a5fa');
-      const note = inv? (p<=30?'偏低':p>=80?'偏高':'中等'):'';
-      return `<div class="mb-3"><div class="flex justify-between text-xs text-slate-300 mb-1"><span>${lab} ${note}</span><span>${p.toFixed(0)}% 分位</span></div><div class="barbg"><div class="barfill" style="width:${Math.max(2,Math.min(100,p))}%;background:${color}"></div></div></div>`; };
-    $("#dVal").innerHTML = bar("市盈率 历史分位", c.pe_pct, true) + bar("市净率PB 分位", c.pb_pct, true);
+      const note = inv? (p<=30?t("v_low"):p>=80?t("v_high"):t("v_mid")):'';
+      return `<div class="mb-3"><div class="flex justify-between text-xs text-slate-300 mb-1"><span>${lab} ${note}</span><span>${p.toFixed(0)}% ${t("pct_suffix")}</span></div><div class="barbg"><div class="barfill" style="width:${Math.max(2,Math.min(100,p))}%;background:${color}"></div></div></div>`; };
+    $("#dVal").innerHTML = bar(t("val_pe_l"), c.pe_pct, true) + bar(t("val_pb_l"), c.pb_pct, true);
 
     $("#overlay").classList.remove("hidden");
     $("#drawer").classList.remove("translate-x-full");
@@ -639,24 +1303,27 @@
 
   function drawDetailChart(det, c){
     const el = $("#detailChart");
-    if(!hasECharts){ el.innerHTML='<div class="text-amber-400 text-sm p-4">未能加载 ECharts（需联网），无法绘制K线图。</div>'; return; }
-    if(!det || !det.dates){ el.innerHTML='<div class="text-slate-500 text-sm p-4">暂无该标的的逐日明细数据。</div>'; return; }
-    if(detailChart){ detailChart.dispose(); }
-    const C=tc();
+    if(detailChart){ detailChart.dispose(); detailChart=null; }   // 先清旧实例, 防止跨股票残留
+    el.innerHTML="";
+    if(!hasECharts){ el.innerHTML=`<div class="text-amber-400 text-sm p-4">${t("no_echarts")}</div>`; return; }
+    if(!det || !det.dates){ el.innerHTML=`<div class="text-slate-500 text-sm p-4">${t("no_kline")}</div>`; return; }
+    const C=tc(), en=(LANG==="en");
     detailChart = echarts.init(el, ec());
     const dates = det.dates;
+    const L={kline:en?"K-line":"K线", chdn:en?"Channel lower":"通道下轨", plow:en?"Prior low ":"前低 ",
+      ktitle:en?"K-line · MAs · rising-channel lower band · prior lows":"K线 · 均线 · 上升通道下轨 · 前低"};
     const pivots = (det.pivot_lows||[]).map(p=>({yAxis:p, lineStyle:{color:"#f59e0b",type:"dashed"},
-      label:{formatter:"前低 "+p, color:"#fbbf24", position:"insideEndTop"}}));
+      label:{formatter:L.plow+p, color:"#fbbf24", position:"insideEndTop"}}));
     const histColor = (v)=> v>=0 ? "#ef4444" : "#22c55e";
 
     detailChart.setOption({
       backgroundColor:"transparent",
       animation:false,
-      legend:{top:0, textStyle:{color:C.label}, data:["K线","MA60","MA120","MA250","通道下轨"]},
+      legend:{top:0, textStyle:{color:C.label}, data:[L.kline,"MA60","MA120","MA250",L.chdn]},
       axisPointer:{link:[{xAxisIndex:"all"}], label:{backgroundColor:"#26344f"}},
       tooltip:{trigger:"axis", axisPointer:{type:"cross"}},
       title:[
-        {text:"K线 · 均线 · 上升通道下轨 · 前低", left:"center", top:22, textStyle:{color:C.label,fontSize:12}},
+        {text:L.ktitle, left:"center", top:22, textStyle:{color:C.label,fontSize:12}},
         {text:"MACD", left:6, top:"50%", textStyle:{color:C.label,fontSize:12}},
         {text:"KDJ", left:6, top:"67%", textStyle:{color:C.label,fontSize:12}},
         {text:"RSI", left:6, top:"84%", textStyle:{color:C.label,fontSize:12}},
@@ -685,13 +1352,13 @@
           textStyle:{color:C.axis},borderColor:"#26344f"},
       ],
       series:[
-        {name:"K线",type:"candlestick",data:det.ohlc,xAxisIndex:0,yAxisIndex:0,
+        {name:L.kline,type:"candlestick",data:det.ohlc,xAxisIndex:0,yAxisIndex:0,
           itemStyle:{color:"#ef4444",color0:"#22c55e",borderColor:"#ef4444",borderColor0:"#22c55e"},
           markLine:{symbol:"none",silent:true,data:pivots}},
         {name:"MA60",type:"line",data:det.ma60,xAxisIndex:0,yAxisIndex:0,smooth:true,showSymbol:false,lineStyle:{width:1,color:"#fbbf24"}},
         {name:"MA120",type:"line",data:det.ma120,xAxisIndex:0,yAxisIndex:0,smooth:true,showSymbol:false,lineStyle:{width:1,color:"#60a5fa"}},
         {name:"MA250",type:"line",data:det.ma250,xAxisIndex:0,yAxisIndex:0,smooth:true,showSymbol:false,lineStyle:{width:1,color:"#c084fc"}},
-        {name:"通道下轨",type:"line",data:det.lower_band,xAxisIndex:0,yAxisIndex:0,showSymbol:false,connectNulls:true,lineStyle:{width:1.6,color:"#34d399",type:"dashed"}},
+        {name:L.chdn,type:"line",data:det.lower_band,xAxisIndex:0,yAxisIndex:0,showSymbol:false,connectNulls:true,lineStyle:{width:1.6,color:"#34d399",type:"dashed"}},
         {name:"MACD",type:"bar",data:(det.macd_hist||[]).map(v=>({value:v,itemStyle:{color:histColor(v||0)}})),xAxisIndex:1,yAxisIndex:1},
         {name:"DIF",type:"line",data:det.macd_dif,xAxisIndex:1,yAxisIndex:1,showSymbol:false,lineStyle:{width:1,color:"#fbbf24"}},
         {name:"DEA",type:"line",data:det.macd_dea,xAxisIndex:1,yAxisIndex:1,showSymbol:false,lineStyle:{width:1,color:"#60a5fa"}},
@@ -707,9 +1374,10 @@
 
   function drawRoe(trend){
     const el=$("#dRoe");
-    if(!hasECharts){ el.innerHTML=""; return; }
-    if(roeChart){ roeChart.dispose(); }
-    if(!trend || !trend.length){ el.innerHTML='<div class="text-slate-500 text-sm">暂无ROE趋势数据</div>'; return; }
+    if(roeChart){ roeChart.dispose(); roeChart=null; }   // 先清旧实例, 防止跨股票残留
+    el.innerHTML="";
+    if(!hasECharts){ return; }
+    if(!trend || !trend.length){ el.innerHTML=`<div class="text-slate-500 text-sm">${t("no_roe")}</div>`; return; }
     const C=tc();
     roeChart=echarts.init(el, ec());
     roeChart.setOption({
@@ -726,17 +1394,24 @@
   function closeDrawer(){
     $("#overlay").classList.add("hidden");
     $("#drawer").classList.add("translate-x-full");
-    $("#tvWrap").innerHTML="";
+    $("#tvWrap").innerHTML="";   // 停止 TradingView iframe
     if(detailChart){ detailChart.dispose(); detailChart=null; }
     if(roeChart){ roeChart.dispose(); roeChart=null; }
+    disposeProf();
   }
   $("#closeDrawer").onclick=closeDrawer;
   $("#overlay").onclick=closeDrawer;
   document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDrawer(); });
 
+  // ---------- 语言切换 ----------
+  $("#langBtn").onclick = ()=>{ LANG = (LANG==="en")?"zh":"en";
+    try{ localStorage.setItem(LANG_KEY, LANG); }catch(e){}
+    applyLang(); };
+
   // ---------- 启动 ----------
   if(!DATA.candidates.length){ $("#emptyHint").classList.remove("hidden"); }
   syncWeightUI(); recomputeScores();
+  applyStaticI18n();       // 应用初始语言到静态文字
   renderIndustryChart();
   updateStrip();
   render();
