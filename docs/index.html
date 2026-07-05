@@ -213,7 +213,7 @@
       <div id="dFund" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 mb-2">
         <div class="card p-3"><div class="text-sm text-slate-300 mb-2" data-i18n="val_pct">估值分位</div><div id="dVal"></div></div>
-        <div class="card p-3"><div class="text-sm text-slate-300 mb-2" data-i18n="roe_trend">ROE 多年趋势</div><div id="dRoe" style="height:130px;"></div></div>
+        <div class="card p-3"><div class="flex items-center justify-between mb-2"><div class="text-sm text-slate-300" data-i18n="roe_trend">ROE 多年趋势</div><span class="granTgl inline-flex gap-1" data-tgt="roe"><button class="segbtn on" style="padding:2px 8px;font-size:11px" data-g="y" data-i18n="gran_year">年度</button><button class="segbtn" style="padding:2px 8px;font-size:11px" data-g="q" data-i18n="gran_qtr">季度</button></span></div><div id="dRoe" style="height:130px;"></div></div>
       </div>
     </div>
 
@@ -242,7 +242,7 @@
 
     <!-- ③ 现金流与风险 -->
     <div id="tabCf" class="dtab hidden">
-      <h4 class="sec-title mb-1" data-i18n="cf_title">现金流分析 — 钱流向哪了</h4>
+      <div class="flex items-center justify-between mb-1"><h4 class="sec-title" data-i18n="cf_title">现金流分析 — 钱流向哪了</h4><span class="granTgl inline-flex gap-1" data-tgt="cash"><button class="segbtn on" style="padding:2px 8px;font-size:11px" data-g="y" data-i18n="gran_year">年度</button><button class="segbtn" style="padding:2px 8px;font-size:11px" data-g="q" data-i18n="gran_qtr">季度</button></span></div>
       <div class="text-xs text-slate-500 mb-2" data-i18n="cf_note">单位: 百万美元；收购/回购/分红/资本开支为流出(取绝对值展示)；虚线为净利润 —— 与经营现金流对比可判断盈利质量。</div>
       <div class="card p-4 mb-3"><div id="dCashChart" style="height:300px"></div></div>
       <div id="dCashNotes" class="space-y-2 mb-4"></div>
@@ -367,6 +367,7 @@
       block_recent:"近期大宗明细", blk_date:"日期", blk_price:"成交价", blk_prem:"折溢率", blk_amt:"成交额(万)", blk_buyer:"买方", blk_seller:"卖方",
       block_note:"大宗交易是A股公开数据中最接近“暗池”的口径（场外协议成交、盘后披露）。折价成交常见于减持/出货，机构专用席位买入是产业资本/机构承接信号；单笔仅供参考。",
       rows_of:"共", rows_of2:"只",
+      gran_year:"年度", gran_qtr:"季度", no_qtr:"暂无季度数据",
     },
     en:{
       title:"A-Shares · Left-Side Support Screener",
@@ -438,6 +439,7 @@
       block_recent:"Recent block trades", blk_date:"Date", blk_price:"Px", blk_prem:"Prem/Disc", blk_amt:"Turnover(0k)", blk_buyer:"Buyer", blk_seller:"Seller",
       block_note:"Block trades are the closest public A-share proxy for a 'dark pool' (off-exchange negotiated trades, disclosed after close). Discounts often signal selling/exit; institutional-seat buys signal industrial/institutional absorption; single trades are only indicative.",
       rows_of:"", rows_of2:" names",
+      gran_year:"Annual", gran_qtr:"Quarterly", no_qtr:"No quarterly data",
     }
   };
   function t(k){ const d=T[LANG]; return (d && d[k]!=null) ? d[k] : (T.zh[k]!=null?T.zh[k]:k); }
@@ -485,7 +487,7 @@
   function applyLang(){
     applyStaticI18n();
     syncWeightUI(); syncAdvUI(); renderIndustryChart(); render(); updateStrip();
-    if(curC && !$("#drawer").classList.contains("translate-x-full")) openDetail(curC);
+    if(curC && !$("#drawer").classList.contains("translate-x-full")) openDetail(curC, true);
   }
   // ========================================================================
 
@@ -956,6 +958,18 @@
     else if(id==="tabNw") renderNwTab();
   }
   document.querySelectorAll('#dTabs .segbtn').forEach(b=>{ b.onclick=()=>switchTab(b.dataset.tab); });
+  let roeGran="y", cashGran="y";
+  document.querySelectorAll('.granTgl').forEach(gt=>{
+    const tgt=gt.dataset.tgt;
+    gt.querySelectorAll('button').forEach(btn=>{ btn.onclick=()=>{
+      const gv=btn.dataset.g;
+      if(tgt==="roe"){ if(roeGran===gv) return; roeGran=gv; } else { if(cashGran===gv) return; cashGran=gv; }
+      gt.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.g===gv));
+      if(tgt==="roe") drawRoe(); else renderCfTab();
+    };});
+  });
+  function resetGran(){ roeGran="y"; cashGran="y";
+    document.querySelectorAll('.granTgl button').forEach(b=>b.classList.toggle('on', b.dataset.g==="y")); }
   function NOPROFhtml(){ return `<div class="p-3 text-slate-500 text-sm">${t("noprof")}</div>`; }
 
   // ---- ② 公司与业务 ----
@@ -1061,19 +1075,25 @@
       $("#dCashNotes").innerHTML=""; renderRiskPanel(); renderPolicy(); return; }
     const cf=p.cashflow;
     const A=arr=>(arr||[]).map(v=>v==null?null:Math.abs(v));
+    const useQ = (cashGran==="q") && cf.q_years && cf.q_years.length;
+    if(cashGran==="q" && !(cf.q_years&&cf.q_years.length)){
+      $("#dCashChart").innerHTML=`<div class="text-slate-500 text-sm p-3">${t("no_qtr")}</div>`;
+      $("#dCashNotes").innerHTML=""; renderRiskPanel(); renderPolicy(); return; }
+    const xs = useQ ? cf.q_years : cf.years;
+    const G = k => useQ ? (cf["q_"+k]||[]) : (cf[k]||[]);
     const ch=pcInit("#dCashChart","cash");
     ch.setOption({backgroundColor:"transparent", grid:{left:56,right:20,top:44,bottom:22},
       tooltip:{trigger:"axis", valueFormatter:v=>isNum(v)?v.toFixed(1)+yi:dash},
       legend:{top:0,textStyle:{color:C.label,fontSize:11}},
-      xAxis:{type:"category",data:cf.years,axisLabel:{color:C.axis}},
+      xAxis:{type:"category",data:xs,axisLabel:{color:C.axis,fontSize:useQ?9:12}},
       yAxis:{type:"value",axisLabel:{color:C.axis,fontSize:10,formatter:v=>v+yi},splitLine:{lineStyle:{color:C.grid}}},
       series:[
-        {name:t("cf_ocf"),type:"bar",data:cf.ocf,itemStyle:{color:"#38bdf8"}},
-        {name:t("cf_fcf"),type:"bar",data:cf.fcf,itemStyle:{color:"#34d399"}},
-        {name:t("cf_capex"),type:"bar",data:A(cf.capex),itemStyle:{color:"#94a3b8"}},
-        {name:t("cf_acq"),type:"bar",data:A(cf.acq),itemStyle:{color:"#f59e0b"}},
-        {name:t("cf_div"),type:"bar",data:A(cf.dividend),itemStyle:{color:"#f472b6"}},
-        {name:t("cf_ni"),type:"line",data:cf.net_income,lineStyle:{color:"#fbbf24",width:2,type:"dashed"},itemStyle:{color:"#fbbf24"}},
+        {name:t("cf_ocf"),type:"bar",data:G("ocf"),itemStyle:{color:"#38bdf8"}},
+        {name:t("cf_fcf"),type:"bar",data:G("fcf"),itemStyle:{color:"#34d399"}},
+        {name:t("cf_capex"),type:"bar",data:A(G("capex")),itemStyle:{color:"#94a3b8"}},
+        {name:t("cf_acq"),type:"bar",data:A(G("acq")),itemStyle:{color:"#f59e0b"}},
+        {name:t("cf_div"),type:"bar",data:A(G("dividend")),itemStyle:{color:"#f472b6"}},
+        {name:t("cf_ni"),type:"line",data:G("net_income"),lineStyle:{color:"#fbbf24",width:2,type:"dashed"},itemStyle:{color:"#fbbf24"}},
       ]});
     const notesArr=(p.cash_notes||[]).map(n=>{ const txt=(LANG==="en" && n.text_en)?n.text_en:n.text;
       return `<div class="note-${n.level||'info'} p-2 rounded text-[13px] text-slate-200">${escH(txt)}</div>`; });
@@ -1233,8 +1253,8 @@
     $("#tvWrap").innerHTML = `<iframe src="${src}" style="width:100%;height:100%;border:0" allowtransparency="true" scrolling="no" loading="lazy"></iframe>`;
     $("#tvLink").href = `https://www.tradingview.com/symbols/${encodeURIComponent(tvSym(code))}/`;
   }
-  function openDetail(c){
-    curC = c; curP = (DATA.profiles||{})[c.code] || null;
+  function openDetail(c, keepGran){
+    curC = c; if(!keepGran) resetGran(); curP = (DATA.profiles||{})[c.code] || null;
     disposeProf();
     switchTab("tabOv");
     $("#drawer").scrollTop = 0;
@@ -1297,7 +1317,7 @@
 
     const det = (DATA.details||{})[c.code];
     drawDetailChart(det, c);
-    drawRoe(c.roe_trend);
+    drawRoe();
     mountTV(c.code);
   }
 
@@ -1372,12 +1392,13 @@
     setTimeout(()=>detailChart.resize(), 60);
   }
 
-  function drawRoe(trend){
+  function drawRoe(){
     const el=$("#dRoe");
     if(roeChart){ roeChart.dispose(); roeChart=null; }   // 先清旧实例, 防止跨股票残留
     el.innerHTML="";
-    if(!hasECharts){ return; }
-    if(!trend || !trend.length){ el.innerHTML=`<div class="text-slate-500 text-sm">${t("no_roe")}</div>`; return; }
+    if(!hasECharts || !curC){ return; }
+    const trend = (roeGran==="q") ? (curC.roe_trend_q||[]) : (curC.roe_trend||[]);
+    if(!trend.length){ el.innerHTML=`<div class="text-slate-500 text-sm">${roeGran==="q"?t("no_qtr"):t("no_roe")}</div>`; return; }
     const C=tc();
     roeChart=echarts.init(el, ec());
     roeChart.setOption({
