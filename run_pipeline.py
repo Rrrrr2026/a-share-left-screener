@@ -25,6 +25,7 @@ from ashare import module1_industry as m1
 from ashare import module2_tech as m2
 from ashare import module3_fundamentals as m3
 from ashare import module4_crossscore as m4
+from ashare import module6_profile as m6
 from ashare import export_data as ex
 
 # Windows 控制台默认 GBK, 输出中文/emoji 会报 UnicodeEncodeError; 统一切到 UTF-8
@@ -206,6 +207,18 @@ def run(full_market: bool, use_cache: bool):
         final_records.append(fr)
         if idx < detail_n and detail:
             db.save_detail(run_date, rec["code"], detail)
+
+    # ---------------- 模块6: 个股深度档案 (阶段C) ----------------
+    # 仅对最终展示的候选生成: 简介/主营构成/营收增速/现金流+漏洞/风险/新闻/两融/龙虎榜/大宗
+    # 注: akshare 部分东财接口用 py_mini_racer(V8) 解密, 多线程会崩 -> 单线程串行。
+    prof_targets = final_records[:CONFIG["output"].get("final_top_n") or len(final_records)]
+    log.info("阶段C 深度档案: %d 只 (主营/现金流/新闻/两融/大宗) 单线程 ...", len(prof_targets))
+    for fr in tqdm(prof_targets):
+        try:
+            p = m6.pull_profile(fr["code"], sector=fr.get("industry"))
+            db.save_profile(run_date, fr["code"], p)
+        except Exception as e:
+            log.debug("深度档案失败 %s: %s", fr["code"], e)
 
     finished = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     db.log_run(run_date, started, finished, n_scanned, len(final_records),

@@ -50,11 +50,15 @@ CREATE TABLE IF NOT EXISTS fundamental(
 CREATE TABLE IF NOT EXISTS final_rank(
     run_date TEXT, code TEXT, name TEXT, industry TEXT, tag TEXT,
     final_score REAL, tech_score REAL, tech_norm REAL, fund_score REAL,
-    prosperity_score REAL, conclusion TEXT,
+    prosperity_score REAL, conclusion TEXT, conclusion_en TEXT,
     PRIMARY KEY(run_date, code)
 );
 CREATE TABLE IF NOT EXISTS stock_detail(
     run_date TEXT, code TEXT, detail_json TEXT,
+    PRIMARY KEY(run_date, code)
+);
+CREATE TABLE IF NOT EXISTS profile(
+    run_date TEXT, code TEXT, profile_json TEXT,
     PRIMARY KEY(run_date, code)
 );
 CREATE TABLE IF NOT EXISTS run_log(
@@ -92,6 +96,7 @@ def _migrate(conn):
                       ("fib_500", "REAL"), ("fib_618", "REAL")],
         "fundamental": [("target_price", "REAL"), ("analyst_rating", "TEXT"),
                         ("analyst_count", "REAL"), ("upside_pct", "REAL")],
+        "final_rank": [("conclusion_en", "TEXT")],
     }
     for table, cols in want.items():
         have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -104,7 +109,7 @@ def _migrate(conn):
 
 
 _RUN_TABLES = ("industry_score", "tech_scan", "fundamental",
-               "final_rank", "stock_detail", "run_log")
+               "final_rank", "stock_detail", "profile", "run_log")
 
 
 def clear_run(run_date: str):
@@ -189,6 +194,13 @@ def save_detail(run_date: str, code: str, detail: dict):
     _upsert("stock_detail", [{
         "run_date": run_date, "code": code,
         "detail_json": json.dumps(detail, ensure_ascii=False),
+    }])
+
+
+def save_profile(run_date: str, code: str, profile: dict):
+    _upsert("profile", [{
+        "run_date": run_date, "code": code,
+        "profile_json": json.dumps(profile, ensure_ascii=False),
     }])
 
 

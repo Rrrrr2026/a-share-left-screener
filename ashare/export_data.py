@@ -124,6 +124,10 @@ def build_payload(run_date: str | None = None) -> dict:
     for dr in details_rows:
         details[dr["code"]] = _loads(dr["detail_json"], default={})
 
+    profiles = {}
+    for pr in db.fetch_table("profile", run_date):
+        profiles[pr["code"]] = _loads(pr["profile_json"], default={})
+
     payload = {
         "meta": {
             "run_date": run_date,
@@ -136,6 +140,7 @@ def build_payload(run_date: str | None = None) -> dict:
         "industries": industries_sorted,
         "candidates": candidates,
         "details": details,
+        "profiles": profiles,
         "columns": [{"key": k, "label": lab} for k, lab in MAIN_COLUMNS],
     }
     return payload

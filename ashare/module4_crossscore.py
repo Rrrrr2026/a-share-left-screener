@@ -68,6 +68,58 @@ def _tag(tech_score: float, fund_score: float, prosperity: float) -> str:
     return "🔎 观察"
 
 
+_TAG_EN = {"✅ 强左侧": "✅ Strong Left",
+           "⚠️ 技术好但基本面弱": "⚠️ Tech-strong, Weak Fundamentals",
+           "🔎 观察": "🔎 Watch"}
+_OSC_EN = {"超卖": "oversold", "缩柱": "shrinking MACD histogram", "底背离": "bullish divergence"}
+_SUPP_EN = {"通道下轨": "channel lower band", "前低": "prior low", "布林下轨": "Bollinger lower band"}
+_FLAG_EN = {"高ROE": "high ROE", "⚠️亏损/负ROE": "⚠️ loss / negative ROE",
+            "估值偏低分位": "low valuation percentile", "⚠️PE为负(亏损)": "⚠️ negative P/E (loss-making)",
+            "净利正增长": "positive net-profit growth", "⚠️净利下滑": "⚠️ net-profit decline",
+            "⚠️高负债": "⚠️ high debt",
+            # 兼容美股口径
+            "盈利正增长": "positive earnings growth", "⚠️盈利下滑": "⚠️ earnings decline",
+            "高毛利": "high gross margin", "⚠️高杠杆": "⚠️ high leverage"}
+
+
+def _osc_en(s):
+    parts = [v for k, v in _OSC_EN.items() if k in (s or "")]
+    return ", ".join(parts) if parts else (s or "")
+
+
+def _supp_en(label):
+    for k, v in _SUPP_EN.items():
+        if label and label.startswith(k):
+            return v
+    return label or "support"
+
+
+def _conclusion_text_en(tech_rec: dict, f: dict, tag: str) -> str:
+    """英文一句话结论 (与中文版结构对应)。"""
+    sigs = []
+    if tech_rec.get("sig_channel"):
+        sigs.append("near the rising-channel lower band")
+    if tech_rec.get("sig_pivot"):
+        sigs.append("near a prior low")
+    if tech_rec.get("sig_ma"):
+        sigs.append(f"pullback to {tech_rec['sig_ma']}")
+    if tech_rec.get("sig_osc"):
+        sigs.append(_osc_en(tech_rec["sig_osc"]))
+    sig_txt = ", ".join(sigs) if sigs else "no strong support signal"
+
+    parts = [f"{_TAG_EN.get(tag, tag)}: technically {sig_txt}"]
+    if tech_rec.get("support_price") is not None:
+        parts.append(f"watch support ≈ {tech_rec['support_price']} ({_supp_en(tech_rec.get('support_label'))})")
+    if tech_rec.get("dist_support_pct") is not None:
+        parts.append(f"~{tech_rec['dist_support_pct']}% from support")
+    if tech_rec.get("breakdown_price") is not None:
+        parts.append(f"breakdown ref {tech_rec['breakdown_price']} (a break below = failed pattern / stop)")
+    flags = f.get("fund_flags") or []
+    if flags:
+        parts.append("fundamentals: " + ", ".join(_FLAG_EN.get(x, x) for x in flags))
+    return "; ".join(parts) + "."
+
+
 def _conclusion_text(tech_rec: dict, f: dict, tag: str) -> str:
     """一句话中文结论: 哪些信号命中 + 关键支撑 + 破位参考 + 基本面亮点/瑕疵。"""
     sigs = []
@@ -111,6 +163,7 @@ def cross_score(tech_rec: dict, fund: dict, prosperity_score: float | None) -> d
 
     tag = _tag(tech_score, fund_score, prosperity_score)
     text = _conclusion_text(tech_rec, fund, tag)
+    text_en = _conclusion_text_en(tech_rec, fund, tag)
 
     return {
         "code": tech_rec["code"],
@@ -124,4 +177,5 @@ def cross_score(tech_rec: dict, fund: dict, prosperity_score: float | None) -> d
         # 展示真实景气分: 未知则为 None -> 前端显示 "—" (不再伪造 50)
         "prosperity_score": (round(prosperity_score, 2) if prosperity_score is not None else None),
         "conclusion": text,
+        "conclusion_en": text_en,
     }
