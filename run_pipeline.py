@@ -13,10 +13,15 @@ from __future__ import annotations
 import os
 import sys
 import time
+import socket
 import argparse
 import logging
 import datetime as dt
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# 防卡死: 给所有网络请求设默认超时。akshare/requests 若不显式传 timeout, 单个卡住的
+# 连接会让阶段C(单线程)无限期挂起(历史上曾卡在 12/200)。30s 足够正常返回, 卡住则抛错被 _safe 捕获。
+socket.setdefaulttimeout(30)
 
 from ashare.config import CONFIG
 from ashare import db
