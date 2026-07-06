@@ -20,7 +20,7 @@ copy /Y "dashboard\dashboard_data.js" "docs\dashboard_data.js" >nul
 echo [3/3] Publish to GitHub Pages ...
 git add docs >> "%LOG%" 2>&1
 git commit -m "auto update data" >> "%LOG%" 2>&1
-git pull --rebase origin main >> "%LOG%" 2>&1
+git pull --rebase --autostash origin main >> "%LOG%" 2>&1
 git push >> "%LOG%" 2>&1
 
 echo ==== DONE ==== >> "%LOG%"
