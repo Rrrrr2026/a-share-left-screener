@@ -30,6 +30,8 @@
   body:not(.light) .tag-warn { color:#fbbf24; }
   .tag-watch  { background:rgba(148,163,184,.18); color:#64748b; border:1px solid rgba(148,163,184,.35); }
   body:not(.light) .tag-watch { color:#cbd5e1; }
+  .tag-dip    { background:rgba(244,114,182,.15); color:#be185d; border:1px solid rgba(244,114,182,.45); }
+  body:not(.light) .tag-dip { color:#f9a8d4; }
   .num { font-variant-numeric: tabular-nums; text-align:right; }
   .pos { color:#ef4444; } .neg { color:#16a34a; }   /* A股习惯: 涨红跌绿 */
   body:not(.light) .pos { color:#f87171; } body:not(.light) .neg { color:#4ade80; }
@@ -148,6 +150,7 @@
           <option value="">全部标签</option>
           <option value="✅ 强左侧">✅ 强左侧</option>
           <option value="⚠️ 技术好但基本面弱">⚠️ 技术好但基本面弱</option>
+          <option value="🪸 深跌抄底">🪸 深跌抄底</option>
           <option value="🔎 观察">🔎 观察</option>
         </select>
         <button id="advBtn" class="segbtn" data-i18n="adv_btn">高级筛选 ▾</button>
@@ -326,7 +329,7 @@
       th_sort:"点击排序 · 按住拖动可调整列的位置", star_col:"自选",
       p_trend:"趋势", p_momentum:"动量", p_breadth:"广度", p_capital:"资金", p_fund:"基本面",
       prosperity_total:"景气总分", selected_paren:"(入选)",
-      tag_strong:"✅ 强左侧", tag_weak:"⚠️ 技术好但基本面弱", tag_watch:"🔎 观察",
+      tag_strong:"✅ 强左侧", tag_weak:"⚠️ 技术好但基本面弱", tag_watch:"🔎 观察", tag_dip:"🪸 深跌抄底",
       kdj_gold:"金叉", kdj_dead:"死叉", kdj_ob:"超买", kdj_os:"超卖", kdj_neutral:"中性",
       tone_pos:"利好", tone_neg:"利空", tone_neutral:"中性",
       sig_channel:"贴近上升通道下轨", sig_pivot:"接近前期低点", sig_ma_prefix:"回踩",
@@ -406,7 +409,7 @@
       th_sort:"Click to sort · drag to reorder columns", star_col:"Watchlist",
       p_trend:"Trend", p_momentum:"Momentum", p_breadth:"Breadth", p_capital:"Capital", p_fund:"Fund.",
       prosperity_total:"Prosperity", selected_paren:"(selected)",
-      tag_strong:"✅ Strong Left", tag_weak:"⚠️ Tech-strong, Weak Fund.", tag_watch:"🔎 Watch",
+      tag_strong:"✅ Strong Left", tag_weak:"⚠️ Tech-strong, Weak Fund.", tag_watch:"🔎 Watch", tag_dip:"🪸 Deep-Dip",
       kdj_gold:"Golden X", kdj_dead:"Dead X", kdj_ob:"Overbought", kdj_os:"Oversold", kdj_neutral:"Neutral",
       tone_pos:"Bullish", tone_neg:"Bearish", tone_neutral:"Neutral",
       sig_channel:"Near rising-channel lower band", sig_pivot:"Near prior low", sig_ma_prefix:"Pullback to ",
@@ -450,6 +453,7 @@
   function tagText(tag){ if(!tag) return dash;
     if(tag.indexOf("强左侧")>=0) return t("tag_strong");
     if(tag.indexOf("基本面弱")>=0) return t("tag_weak");
+    if(tag.indexOf("深跌抄底")>=0) return t("tag_dip");
     if(tag.indexOf("观察")>=0) return t("tag_watch"); return tag; }
   const KDJ_MAP={ "金叉":"kdj_gold","死叉":"kdj_dead","超买":"kdj_ob","超卖":"kdj_os","中性":"kdj_neutral" };
   function kdjText(s){ if(!s||s==="—") return s; if(LANG==="zh") return s;
@@ -517,6 +521,7 @@
     if(!tag) return "tag-watch";
     if(tag.indexOf("强左侧")>=0) return "tag-strong";
     if(tag.indexOf("基本面弱")>=0) return "tag-warn";
+    if(tag.indexOf("深跌抄底")>=0) return "tag-dip";
     return "tag-watch";
   }
   function supportCell(v){

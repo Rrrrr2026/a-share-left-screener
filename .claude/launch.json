@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ashare-dashboard",
+      "runtimeExecutable": "C:/Users/roger.DESKTOP-7Q2P0JS/AppData/Local/Python/pythoncore-3.14-64/python.exe",
+      "runtimeArgs": ["-m", "http.server", "8972", "--directory", "dashboard"],
+      "port": 8972
+    }
+  ]
+}

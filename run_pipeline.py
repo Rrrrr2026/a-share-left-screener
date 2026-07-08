@@ -217,22 +217,25 @@ def run(full_market: bool, use_cache: bool):
     # 按综合分排序后落库(同分按代码升序, 结果确定); 详情(K线)只存前 N 只以控制 JS 体积
     results.sort(key=lambda x: (-(x[3].get("final_score") or -1), x[0]["code"]))
     detail_n = CONFIG["output"]["dashboard_detail_top_n"]
-    final_records = []
+    show_n = CONFIG["output"].get("final_top_n") or len(results)
+    final_records = [x[3] for x in results]
+    # export 浮现集合 = 前 show_n 名 + (排名>show_n 的 dip 按 dip_score 取前 dip_top_n)。
+    # detail 与 profile 都对齐这个集合: 既保证浮现的 dip 股点开有 K线/档案, 又不为不展示的股白存(控 JS 体积)。
+    dip_tail = sorted([fr for fr in final_records[show_n:] if fr.get("dip")],
+                      key=lambda fr: -(fr.get("dip_score") or 0.0))[:CONFIG["output"].get("dip_top_n", 40)]
+    # 所有"会展示"的 dip 股(主榜内的 + 补进来的)都存 K线: 🪸 股点开有图不空;
+    # 非展示的 dip 不存, 控 JS 体积。(前 detail_n 名照常存, 与支撑股一致)
+    shown_dip = {fr["code"] for fr in final_records[:show_n] if fr.get("dip")} | {fr["code"] for fr in dip_tail}
     for idx, (rec, detail, f, fr) in enumerate(results):
         db.save_tech(run_date, [rec])
         db.save_fundamental(run_date, rec["code"], f)
         db.save_final(run_date, [fr])
-        final_records.append(fr)
-        # 深跌抄底股 final_score 低会沉到 detail_n 之后, 但会在主表浮现; 不存 detail 点进去K线是空的 -> dip 股无论排名都存。
-        if (idx < detail_n or fr.get("dip")) and detail:
+        if (idx < detail_n or rec["code"] in shown_dip) and detail:
             db.save_detail(run_date, rec["code"], detail)
 
     # ---------------- 模块6: 个股深度档案 (阶段C) ----------------
     # 仅对最终展示的候选生成: 简介/主营构成/营收增速/现金流+漏洞/风险/新闻/两融/龙虎榜/大宗
     # 注: akshare 部分东财接口用 py_mini_racer(V8) 解密, 多线程会崩 -> 单线程串行。
-    show_n = CONFIG["output"].get("final_top_n") or len(final_records)
-    # 同理: export 会把排名 >show_n 的 dip 股(上限 dip_top_n)补进主表, 这里也给它们做深度档案, 否则点开 🪸 股档案是空的。
-    dip_tail = [fr for fr in final_records[show_n:] if fr.get("dip")][:CONFIG["output"].get("dip_top_n", 40)]
     prof_targets = final_records[:show_n] + dip_tail
     log.info("阶段C 深度档案: %d 只 (主营/现金流/新闻/两融/大宗) 单线程 ...", len(prof_targets))
     for fr in tqdm(prof_targets):
