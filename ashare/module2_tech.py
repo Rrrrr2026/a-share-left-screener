@@ -221,6 +221,35 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         turnover = _nz(spot_row.get("turnover"))
         amount_today = _nz(spot_row.get("amount"))
 
+    # ---- 独立"深跌超卖抄底"桶 (与支撑型 tech_score 完全解耦, 不改动 score) ----
+    # 硬门槛: 深跌(回撤>=阈值) + 超卖(RSI<=阈值) + 逼近52周低点. 三者全中才进桶。
+    dcfg = c.get("dip") or {}
+    dip_ok, dip_score = False, 0.0
+    dip_confirm = ""
+    _dd = drawdown if not np.isnan(drawdown) else None
+    _rsi = rsi_now if not np.isnan(rsi_now) else None
+    _pos = pos_52w if not np.isnan(pos_52w) else None
+    if dcfg and _dd is not None and _rsi is not None and _pos is not None:
+        deep = _dd >= dcfg["drawdown_min"]
+        oversold_d = _rsi <= dcfg["rsi_max"]
+        nearlow = _pos <= dcfg["pos_52w_max"]
+        if deep and oversold_d and nearlow:
+            dip_ok = True
+            confirms = []
+            if bull_div: confirms.append("底背离")
+            if green_shrink: confirms.append("缩柱")
+            if kdj_tag and "金叉" in kdj_tag: confirms.append("金叉")   # kdj_tag 可能是"金叉/超卖", 用子串匹配
+            if vol_ratio_calc is not None and vol_ratio_calc >= dcfg.get("vol_spike", 1.8):
+                confirms.append("放量")
+            dip_confirm = "".join(confirms)
+            dw = dcfg["weights"]
+            f_depth = min(1.0, _dd / 0.60)
+            f_os = max(0.0, min(1.0, (40.0 - _rsi) / 40.0))
+            f_near = max(0.0, min(1.0, 1.0 - _pos / max(1e-6, dcfg["pos_52w_max"])))
+            f_conf = len(confirms) / 4.0
+            dip_score = round(dw["depth"] * f_depth + dw["oversold"] * f_os
+                              + dw["nearlow"] * f_near + dw["confirm"] * f_conf, 3)
+
     record = {
         "code": code, "name": name,
         "price": round(px, 2),
@@ -258,6 +287,10 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         "sig_vol": signals.get("vol", ""),
         "boll_low": _nz(boll_low_val),
         "fib_382": fib["f382"], "fib_500": fib["f500"], "fib_618": fib["f618"],
+        # 深跌抄底桶 (独立于 tech_score)
+        "dip": bool(dip_ok),
+        "dip_score": float(dip_score),
+        "dip_confirm": dip_confirm,
     }
 
     # ---- 详情图表逐日序列 ----

@@ -70,7 +70,10 @@ def _tag(tech_score: float, fund_score: float, prosperity: float) -> str:
 
 _TAG_EN = {"✅ 强左侧": "✅ Strong Left",
            "⚠️ 技术好但基本面弱": "⚠️ Tech-strong, Weak Fundamentals",
-           "🔎 观察": "🔎 Watch"}
+           "🔎 观察": "🔎 Watch",
+           "🪸 深跌抄底": "🪸 Deep-Dip Bottom-Fish"}
+_DIP_CONFIRM_EN = {"底背离": "bullish divergence", "缩柱": "shrinking MACD histogram",
+                   "金叉": "KDJ golden cross", "放量": "volume spike"}
 _OSC_EN = {"超卖": "oversold", "缩柱": "shrinking MACD histogram", "底背离": "bullish divergence"}
 _SUPP_EN = {"通道下轨": "channel lower band", "前低": "prior low", "布林下轨": "Bollinger lower band"}
 _FLAG_EN = {"高ROE": "high ROE", "⚠️亏损/负ROE": "⚠️ loss / negative ROE",
@@ -94,8 +97,52 @@ def _supp_en(label):
     return label or "support"
 
 
+def _dip_conclusion(tech_rec: dict, f: dict, tag: str) -> str:
+    """深跌抄底桶的中文一句话结论: 深跌幅度 + 超卖 + 位置 + 见底确认 + 破位参考。"""
+    parts = [tag + "："]
+    seg = []
+    if tech_rec.get("drawdown_pct") is not None:
+        seg.append(f"自高点回撤{tech_rec['drawdown_pct']:.0f}%")
+    if tech_rec.get("rsi") is not None:
+        seg.append(f"RSI {tech_rec['rsi']:.0f}(超卖)")
+    if tech_rec.get("pos_52w_pct") is not None:
+        seg.append(f"处52周区间底部{tech_rec['pos_52w_pct']:.0f}%")
+    parts[0] += "、".join(seg) if seg else "深跌超卖"
+    conf = tech_rec.get("dip_confirm")
+    parts.append("见底确认：" + conf if conf else "尚无见底确认(接刀需谨慎)")
+    if tech_rec.get("breakdown_price") is not None:
+        parts.append(f"破位参考{tech_rec['breakdown_price']}(跌破继续走弱)")
+    flags = f.get("fund_flags") or []
+    if flags:
+        parts.append("基本面：" + "、".join(flags))
+    return "；".join(parts) + "。"
+
+
+def _dip_conclusion_en(tech_rec: dict, f: dict, tag: str) -> str:
+    parts = [_TAG_EN.get(tag, tag) + ": "]
+    seg = []
+    if tech_rec.get("drawdown_pct") is not None:
+        seg.append(f"{tech_rec['drawdown_pct']:.0f}% off the high")
+    if tech_rec.get("rsi") is not None:
+        seg.append(f"RSI {tech_rec['rsi']:.0f} (oversold)")
+    if tech_rec.get("pos_52w_pct") is not None:
+        seg.append(f"bottom {tech_rec['pos_52w_pct']:.0f}% of 52w range")
+    parts[0] += ", ".join(seg) if seg else "deeply oversold"
+    conf = tech_rec.get("dip_confirm") or ""
+    conf_en = ", ".join(_DIP_CONFIRM_EN.get(k, k) for k in ("底背离", "缩柱", "金叉", "放量") if k in conf)
+    parts.append("bottoming signals: " + conf_en if conf_en else "no bottoming signal yet (catching a falling knife — caution)")
+    if tech_rec.get("breakdown_price") is not None:
+        parts.append(f"breakdown ref {tech_rec['breakdown_price']} (a break lower = further weakness)")
+    flags = f.get("fund_flags") or []
+    if flags:
+        parts.append("fundamentals: " + ", ".join(_FLAG_EN.get(x, x) for x in flags))
+    return "; ".join(parts) + "."
+
+
 def _conclusion_text_en(tech_rec: dict, f: dict, tag: str) -> str:
     """英文一句话结论 (与中文版结构对应)。"""
+    if tag.startswith("🪸"):
+        return _dip_conclusion_en(tech_rec, f, tag)
     sigs = []
     if tech_rec.get("sig_channel"):
         sigs.append("near the rising-channel lower band")
@@ -122,6 +169,8 @@ def _conclusion_text_en(tech_rec: dict, f: dict, tag: str) -> str:
 
 def _conclusion_text(tech_rec: dict, f: dict, tag: str) -> str:
     """一句话中文结论: 哪些信号命中 + 关键支撑 + 破位参考 + 基本面亮点/瑕疵。"""
+    if tag.startswith("🪸"):
+        return _dip_conclusion(tech_rec, f, tag)
     sigs = []
     if tech_rec.get("sig_channel"):
         sigs.append("贴近上升通道下轨")
@@ -162,6 +211,10 @@ def cross_score(tech_rec: dict, fund: dict, prosperity_score: float | None) -> d
     final = round(final, 2)
 
     tag = _tag(tech_score, fund_score, prosperity_score)
+    # 深跌抄底: 仅当支撑模型只把它当"观察"(没有真支撑信号)时才改挂 🪸 标签,
+    # 已是 ✅强左侧 / ⚠️技术好但基本面弱 的(确有支撑结构)保留原标签, 不抢标。
+    if tech_rec.get("dip") and tag == "🔎 观察":
+        tag = "🪸 深跌抄底"
     text = _conclusion_text(tech_rec, fund, tag)
     text_en = _conclusion_text_en(tech_rec, fund, tag)
 
@@ -171,6 +224,9 @@ def cross_score(tech_rec: dict, fund: dict, prosperity_score: float | None) -> d
         "industry": tech_rec.get("industry"),
         "tag": tag,
         "final_score": final,
+        "dip": bool(tech_rec.get("dip")),
+        "dip_score": round(float(tech_rec.get("dip_score") or 0.0), 3),
+        "dip_confirm": tech_rec.get("dip_confirm") or "",
         "tech_score": round(tech_score, 3),
         "tech_norm": round(tech_norm, 1),
         "fund_score": fund_score,

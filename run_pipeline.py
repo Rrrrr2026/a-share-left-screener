@@ -154,7 +154,10 @@ def run(full_market: bool, use_cache: bool):
         if h is None:
             return None
         rec, detail = m2.scan_one(code, name, h, spot_map.get(code), bench_close=bench_close)
-        if rec is None or rec["tech_score"] < CONFIG["tech"]["min_tech_score"]:
+        if rec is None:
+            return None
+        # 支撑分达标 OR 深跌抄底桶达标, 二者其一即保留 (dip 桶专捞结构已破的深跌超卖股)
+        if rec["tech_score"] < CONFIG["tech"]["min_tech_score"] and not rec.get("dip"):
             return None
         rec["industry"] = industry
         return (rec, detail)
@@ -179,7 +182,17 @@ def run(full_market: bool, use_cache: bool):
     # 技术分降序; 同分时按代码升序, 保证跨次运行结果确定(否则受线程完成顺序影响)
     hits.sort(key=lambda rd: (-rd[0]["tech_score"], rd[0]["code"]))
     top_hits = hits[:CONFIG["output"]["fund_top_n"]]
-    log.info("阶段B 基本面+交叉打分: 取技术分最高的 %d 只 ...", len(top_hits))
+    # 并入"深跌抄底"桶: 支撑分排不进 top_hits、但深跌达标的, 按 dip_score 取前 dip_top_n 只补进来。
+    # 先剔除已在 top_hits 的再切片(与 export 过滤顺序一致), 让深跌超卖股也能进 final_rank(带 🪸 标签)。
+    _seen = {rd[0]["code"] for rd in top_hits}
+    dip_pool = sorted([rd for rd in hits if rd[0].get("dip")],
+                      key=lambda rd: -rd[0].get("dip_score", 0.0))
+    dip_new = [rd for rd in dip_pool if rd[0]["code"] not in _seen][:CONFIG["output"].get("dip_top_n", 40)]
+    for rd in dip_new:
+        top_hits.append(rd)
+        _seen.add(rd[0]["code"])
+    log.info("深跌抄底桶: 命中 %d 只, 并入候选 %d 只", len(dip_pool), len(dip_new))
+    log.info("阶段B 基本面+交叉打分: 取技术分最高的 %d 只(含深跌抄底) ...", len(top_hits))
 
     def _fund_stock(rd):
         rec, detail = rd
@@ -210,13 +223,17 @@ def run(full_market: bool, use_cache: bool):
         db.save_fundamental(run_date, rec["code"], f)
         db.save_final(run_date, [fr])
         final_records.append(fr)
-        if idx < detail_n and detail:
+        # 深跌抄底股 final_score 低会沉到 detail_n 之后, 但会在主表浮现; 不存 detail 点进去K线是空的 -> dip 股无论排名都存。
+        if (idx < detail_n or fr.get("dip")) and detail:
             db.save_detail(run_date, rec["code"], detail)
 
     # ---------------- 模块6: 个股深度档案 (阶段C) ----------------
     # 仅对最终展示的候选生成: 简介/主营构成/营收增速/现金流+漏洞/风险/新闻/两融/龙虎榜/大宗
     # 注: akshare 部分东财接口用 py_mini_racer(V8) 解密, 多线程会崩 -> 单线程串行。
-    prof_targets = final_records[:CONFIG["output"].get("final_top_n") or len(final_records)]
+    show_n = CONFIG["output"].get("final_top_n") or len(final_records)
+    # 同理: export 会把排名 >show_n 的 dip 股(上限 dip_top_n)补进主表, 这里也给它们做深度档案, 否则点开 🪸 股档案是空的。
+    dip_tail = [fr for fr in final_records[show_n:] if fr.get("dip")][:CONFIG["output"].get("dip_top_n", 40)]
+    prof_targets = final_records[:show_n] + dip_tail
     log.info("阶段C 深度档案: %d 只 (主营/现金流/新闻/两融/大宗) 单线程 ...", len(prof_targets))
     for fr in tqdm(prof_targets):
         try:

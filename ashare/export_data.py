@@ -119,7 +119,14 @@ def build_payload(run_date: str | None = None) -> dict:
         candidates.append(row)
 
     candidates.sort(key=lambda r: (-(r.get("final_score") or -1), r.get("code") or ""))
-    candidates = candidates[:CONFIG["output"]["final_top_n"]]   # 展示上限
+    top_n = CONFIG["output"]["final_top_n"]
+    head = candidates[:top_n]                                   # 支撑型主榜(展示上限)
+    # 深跌抄底桶: 支撑分低会被 final_top_n 截掉, 这里把落榜的 dip 候选按 dip_score 补回来
+    # (上限 dip_top_n), 保证深跌超卖股作为独立标签组浮现, 不挤占支撑型名额。
+    seen = {r.get("code") for r in head}
+    dip_extra = sorted((r for r in candidates[top_n:] if r.get("dip")),
+                       key=lambda r: -(r.get("dip_score") or 0.0))[:CONFIG["output"].get("dip_top_n", 40)]
+    candidates = head + [r for r in dip_extra if r.get("code") not in seen]
 
     details = {}
     for dr in details_rows:
