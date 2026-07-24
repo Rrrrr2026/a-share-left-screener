@@ -197,6 +197,11 @@ def run(full_market: bool, use_cache: bool):
     def _fund_stock(rd):
         rec, detail = rd
         industry = rec.get("industry")
+        if not industry:
+            # 全市场回退时个股无行业归属 -> 雪球补全(走443可达), 让"所属行业"列不再空。
+            # 名称与同花顺景气榜口径不完全一致, 完全一致时顺带吃到"景气加成"。
+            industry = ds.fetch_stock_industry(rec["code"])
+            rec["industry"] = industry
         f = m3.pull_fundamentals(
             rec["code"], industry=industry,
             industry_pe_median=industry_pe_median.get(industry) if industry else None,

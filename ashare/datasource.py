@@ -724,6 +724,60 @@ def fetch_basic_info(code: str) -> dict | None:
 
 
 # ===========================================================================
+#  7b) 个股所属行业 (全市场回退时补全 '所属行业' 列)
+#      东财个股信息(stock_individual_info_em)在本机被墙 -> 用雪球个股基础信息,
+#      其 affiliate_industry.ind_name 走 HTTPS(443) 可达; 东财兜底(多不可用)。
+# ===========================================================================
+def _xq_symbol(code: str) -> str:
+    code = str(code).zfill(6)
+    if code.startswith("920") or code.startswith(("8", "4")):   # 北交所
+        return "BJ" + code
+    if code.startswith(("6", "9")):                             # 沪市
+        return "SH" + code
+    return "SZ" + code                                          # 深市 00/30/2
+
+
+def _stock_industry_from_xq(code: str) -> str | None:
+    try:
+        raw = call_with_retry(_ak().stock_individual_basic_info_xq, symbol=_xq_symbol(code))
+    except Exception as e:
+        log.debug("雪球个股信息 %s 失败: %s", code, e)
+        return None
+    if raw is None or len(raw) == 0:
+        return None
+    try:
+        d = dict(zip(raw.iloc[:, 0].astype(str), raw.iloc[:, 1]))
+    except Exception:
+        return None
+    ind = d.get("affiliate_industry")
+    if isinstance(ind, str):
+        import ast
+        try:
+            ind = ast.literal_eval(ind)
+        except Exception:
+            ind = None
+    if isinstance(ind, dict):
+        name = ind.get("ind_name")
+        return str(name) if name else None
+    return None
+
+
+def fetch_stock_industry(code: str) -> str | None:
+    """个股所属行业名。优先雪球(走443可达), 东财兜底。结果缓存;
+    查过但无结果的存空串, 避免同轮反复空查。"""
+    key = _cache_key("stk_ind", code, dt.date.today().isoformat())
+    c = _cache_load(key)
+    if c is not None:            # 命中缓存(含 "" 表示查过没有)
+        return c or None
+    name = _stock_industry_from_xq(code)
+    if not name:
+        info = fetch_basic_info(code)       # 东财兜底(本机多不可用)
+        name = (info or {}).get("industry")
+    _cache_save(key, name or "")
+    return name or None
+
+
+# ===========================================================================
 #  8) 行业资金流 (主力净流入, 近5日)  ——  stock_sector_fund_flow_rank
 #     (可选数据源; 拿不到则上层把"资金"支柱权重并入趋势+动量)
 # ===========================================================================

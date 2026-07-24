@@ -33,6 +33,7 @@ MAIN_COLUMNS = [
     ("pos_52w_pct", "52周位置%"), ("ret_1m_pct", "近一月涨%"), ("ret_half_year_pct", "近半年涨跌%"),
     ("turnover", "换手率"), ("volume_ratio", "量比"), ("kdj_tag", "KDJ"),
     ("pe_disp", "市盈率TTM(分位)"), ("pb", "市净率"), ("eps", "EPS"), ("roe", "ROE"),
+    ("revenue_yoy", "营收同比%"), ("netprofit_yoy", "归母净利同比%"),
 ]
 
 
