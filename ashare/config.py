@@ -152,6 +152,22 @@ CONFIG = {
         "dashboard_detail_top_n": 150,  # 详情(K线)数据为前多少只生成 (控制 JS 体积)
         "dip_top_n": 40,                # 深跌抄底桶最多并入/展示的只数 (上限, 防止灌进一堆刀)
     },
+
+    # =====================================================================
+    #  邮件推送 (Email) —— 刷新完把摘要发到邮箱, 与"涨停复盘"同一套 Gmail SMTP
+    # =====================================================================
+    "email": {
+        "enabled": True,
+        "smtp_host": "smtp.gmail.com",
+        "smtp_port": 465,               # SSL
+        "sender": "klkailai.luo@gmail.com",
+        "recipients": ["klkailai.luo@gmail.com"],
+        # 应用专用密码只从环境变量读, 不写进代码/配置 (与涨停系统同一变量名)
+        "app_password_env": "GMAIL_APP_PASSWORD",
+        "live_url": "https://rrrrr2026.github.io/a-share-left-screener/",
+        "summary_top_n": 12,            # 正文里综合评分榜展示多少只
+        "attach_csv": True,             # 附上 candidates_<date>.csv (Excel 可读)
+    },
 }
 
 
