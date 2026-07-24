@@ -326,6 +326,7 @@
       col_dist:"距支撑%", col_support:"关键支撑位", col_break:"破位位", col_pos52:"52周位置%",
       col_ret1m:"近一月涨%", col_rethy:"近半年涨跌%", col_turnover:"换手率", col_volratio:"量比", col_kdj:"KDJ",
       col_pe:"市盈率TTM(分位)", col_pb:"市净率", col_eps:"EPS", col_roe:"ROE",
+      col_rev_yoy:"营收同比%", col_np_yoy:"归母净利同比%",
       th_sort:"点击排序 · 按住拖动可调整列的位置", star_col:"自选",
       p_trend:"趋势", p_momentum:"动量", p_breadth:"广度", p_capital:"资金", p_fund:"基本面",
       prosperity_total:"景气总分", selected_paren:"(入选)",
@@ -406,6 +407,7 @@
       col_dist:"Dist Supp%", col_support:"Key Support", col_break:"Breakdown", col_pos52:"52w Pos%",
       col_ret1m:"1M Ret%", col_rethy:"6M Ret%", col_turnover:"Turnover", col_volratio:"Vol Ratio", col_kdj:"KDJ",
       col_pe:"P/E TTM (pctile)", col_pb:"P/B", col_eps:"EPS", col_roe:"ROE",
+      col_rev_yoy:"Rev YoY%", col_np_yoy:"Net Profit YoY%",
       th_sort:"Click to sort · drag to reorder columns", star_col:"Watchlist",
       p_trend:"Trend", p_momentum:"Momentum", p_breadth:"Breadth", p_capital:"Capital", p_fund:"Fund.",
       prosperity_total:"Prosperity", selected_paren:"(selected)",
@@ -477,7 +479,8 @@
     final_score:"col_final",tech_score:"col_tech",fund_score:"col_fund",price:"col_price",spark:"col_spark",
     dist_support_pct:"col_dist",support_disp:"col_support",breakdown_price:"col_break",pos_52w_pct:"col_pos52",
     ret_1m_pct:"col_ret1m",ret_half_year_pct:"col_rethy",turnover:"col_turnover",volume_ratio:"col_volratio",
-    kdj_tag:"col_kdj",pe_disp:"col_pe",pb:"col_pb",eps:"col_eps",roe:"col_roe" };
+    kdj_tag:"col_kdj",pe_disp:"col_pe",pb:"col_pb",eps:"col_eps",roe:"col_roe",
+    revenue_yoy:"col_rev_yoy",netprofit_yoy:"col_np_yoy" };
   function colLabel(c){ const k=COL_I18N[c.key]; return (k? t(k) : c.label); }
   function applyStaticI18n(){
     document.documentElement.lang = (LANG==="en")?"en":"zh-CN";
@@ -662,7 +665,8 @@
   ];
   const NUMERIC = new Set(["final_score","tech_score","fund_score","tech_norm","prosperity_score","price","dist_support_pct",
     "breakdown_price","pos_52w_pct","ret_1m_pct","ret_half_year_pct","avg_amt20_yi","dividend_yield","pb","eps","roe",
-    "streak","upside_pct","target_price","analyst_count","atr_pct","max_dd_pct","beta","boll_low","volume_ratio","turnover"]);
+    "streak","upside_pct","target_price","analyst_count","atr_pct","max_dd_pct","beta","boll_low","volume_ratio","turnover",
+    "revenue_yoy","netprofit_yoy"]);
   try{ const saved=JSON.parse(localStorage.getItem(COLORDER_KEY)||"null");
     if(Array.isArray(saved)&&saved.length){ COLS.sort((a,b)=>{ let ia=saved.indexOf(a.key), ib=saved.indexOf(b.key); return (ia<0?999:ia)-(ib<0?999:ib); }); } }catch(e){}
 
@@ -760,6 +764,7 @@
       case "dist_support_pct": return supportCell(v);
       case "upside_pct": return upsideCell(v);
       case "ret_1m_pct": case "ret_half_year_pct": return signPctCell(v);
+      case "revenue_yoy": case "netprofit_yoy": return signPctCell(v);
       case "pos_52w_pct": return `<span class="num">${pct(v,1)}</span>`;
       case "avg_amt20_yi": return `<span class="num">${isNum(v)?(v>=1000?(v/1000).toFixed(1)+"B":v.toFixed(0)+"M"):dash}</span>`;
       case "dividend_yield": return `<span class="num">${isNum(v)?v.toFixed(2)+"%":dash}</span>`;
