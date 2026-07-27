@@ -9,17 +9,25 @@
 <script src="dashboard_data.js"></script>
 <style>
   :root{
-    --bg:#0b1220; --card:#111a2e; --border:#1e2a44; --text:#e5e7eb; --dim:#9fb4d6; --muted:#7e93b8;
-    --head:#0e1830; --rowhover:#16223c; --input:#0e1830; --inputborder:#26344f; --gridline:#1b2640;
-    --drawer:#0b1220;
+    /* 深色: 底最暗 -> 卡片抬升 -> 表头再抬升, 形成清晰的三层高度关系 */
+    --bg:#070b14; --card:#0f1626; --border:#1d2840; --text:#e8edf7; --dim:#93a6c6; --muted:#6f83a5;
+    --head:#141d31; --rowhover:#18233c; --input:#111a2c; --inputborder:#26344f; --gridline:#1a2337;
+    --drawer:#0b111d; --accent:#38bdf8; --zebra:rgba(255,255,255,.016);
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
   }
   body.light{
-    --bg:#eef2f8; --card:#ffffff; --border:#d7e0ee; --text:#0f172a; --dim:#334155; --muted:#64748b;
-    --head:#eaf0f8; --rowhover:#eaf1fb; --input:#ffffff; --inputborder:#cbd5e1; --gridline:#e6ecf5;
-    --drawer:#f6f8fc;
+    --bg:#f4f7fb; --card:#ffffff; --border:#e2e8f2; --text:#0f172a; --dim:#475569; --muted:#7c8ba3;
+    --head:#f7fafd; --rowhover:#f0f6ff; --input:#ffffff; --inputborder:#d5dfec; --gridline:#eaf0f7;
+    --drawer:#f8fafd; --accent:#0284c7; --zebra:rgba(15,23,42,.014);
+    --shadow:0 1px 2px rgba(15,23,42,.05), 0 8px 24px -14px rgba(15,23,42,.18);
   }
-  body { background:var(--bg); color:var(--text); font-family: -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; transition:background .25s,color .25s; }
-  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; }
+  body { background:var(--bg); color:var(--text); font-family: -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+         transition:background .25s,color .25s; -webkit-font-smoothing:antialiased; }
+  /* 卡片: 轻边框 + 柔和投影, 让每块内容"浮"起来而不是糊成一片 */
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); }
+  /* 区块标题: 统一用左侧竖条 + 加粗, 建立层级 */
+  .blk-title{ font-size:15px; font-weight:700; letter-spacing:.01em; display:flex; align-items:center; gap:9px; }
+  .blk-title::before{ content:""; width:3px; height:15px; border-radius:2px; background:var(--accent); flex:none; }
   th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
   th.sortable:hover { color:#93c5fd; }
   tbody tr:hover { background:var(--rowhover) !important; cursor:pointer; }
@@ -44,9 +52,16 @@
   ::-webkit-scrollbar{height:9px;width:9px} ::-webkit-scrollbar-thumb{background:#8496b5;border-radius:6px}
   select,input { background:var(--input); border:1px solid var(--inputborder); color:var(--text); border-radius:8px; padding:6px 10px; }
   input[type=range]{ padding:0; height:6px; accent-color:#38bdf8; cursor:pointer; }
-  table { border-collapse: collapse; width:100%; }
-  th,td { padding:7px 9px; border-bottom:1px solid var(--border); font-size:13px; }
-  thead th { position:sticky; top:0; background:var(--head); z-index:2; color:var(--dim); }
+  table { border-collapse: separate; border-spacing:0; width:100%; }
+  th,td { padding:10px 11px; border-bottom:1px solid var(--border); font-size:13px; }
+  /* 表头: 小字号+字距+大写感, 与数据行拉开层级; 不再和正文一个重量 */
+  thead th { position:sticky; top:0; background:var(--head); z-index:2; color:var(--muted);
+             font-size:11.5px; font-weight:600; letter-spacing:.06em; text-transform:none;
+             padding-top:11px; padding-bottom:11px; border-bottom:1px solid var(--border);
+             backdrop-filter:saturate(1.2) blur(2px); }
+  tbody tr:nth-child(even){ background:var(--zebra); }   /* 斑马纹: 极淡, 只帮眼睛横向跟行 */
+  tbody td{ vertical-align:middle; }
+  tbody tr{ transition:background .12s; }
   .star{ cursor:pointer; font-size:16px; line-height:1; color:#64748b; }
   .star.on{ color:#facc15; }
   /* 明色主题下把深色 Tailwind 文本改为可读色 */
@@ -55,9 +70,21 @@
   body.light .text-slate-300,body.light .text-slate-200,body.light .text-slate-100{color:#1e293b!important}
   body.light .text-slate-500{color:#94a3b8!important}
   body.light .text-sky-300{color:#0369a1!important}
-  .miniStat{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:6px 12px; font-size:13px; }
-  .segbtn{ padding:4px 12px; border-radius:8px; border:1px solid var(--inputborder); background:var(--input); color:var(--dim); font-size:13px; cursor:pointer; }
-  .segbtn.on{ background:#0ea5e9; color:#fff; border-color:#0ea5e9; }
+  .miniStat{ background:var(--card); border:1px solid var(--border); border-radius:999px; padding:5px 13px; font-size:12.5px;
+             box-shadow:var(--shadow); white-space:nowrap; }
+  .segbtn{ padding:5px 13px; border-radius:9px; border:1px solid var(--inputborder); background:var(--input); color:var(--dim);
+           font-size:12.5px; cursor:pointer; transition:all .15s; }
+  .segbtn:hover{ color:var(--text); border-color:var(--accent); }
+  .segbtn.on{ background:var(--accent); color:#04121d; border-color:var(--accent); font-weight:600; }
+  body.light .segbtn.on{ color:#fff; }
+  /* 概览大数字: 等宽数字 + 更紧的行高, 让 4 张卡读起来像仪表而不像段落 */
+  .ovnum{ font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.1; }
+  .ovlabel{ font-size:11.5px; letter-spacing:.04em; color:var(--muted); }
+  /* 免责声明: 低视觉重量但两种主题下都清晰可读 */
+  .disclaimer{ border-color:rgba(245,158,11,.30); background:rgba(245,158,11,.05);
+               color:#c99a4e; box-shadow:none; }
+  body:not(.light) .disclaimer{ color:#d9b271; }
+  body.light .disclaimer{ color:#8a6218; background:rgba(245,158,11,.09); border-color:rgba(245,158,11,.35); }
   /* ---- 详情抽屉 分页签 & 版式 ---- */
   .sec-title{ font-size:15px; font-weight:600; color:var(--text); display:flex; align-items:center; gap:8px; }
   .sec-title::before{ content:""; width:3px; height:14px; border-radius:2px; background:#38bdf8; flex:none; }
@@ -82,8 +109,8 @@
   <!-- 标题 -->
   <header class="flex items-center justify-between flex-wrap gap-3 mb-4">
     <div>
-      <h1 class="text-2xl font-bold text-white" data-i18n="title">美股 · 「左侧支撑位」筛选与监控台</h1>
-      <p class="text-sm text-slate-400 mt-1" data-i18n="subtitle">全美股(市值≥$1B) · 高景气板块内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分</p>
+      <h1 class="text-[26px] font-bold text-white tracking-tight" data-i18n="title">美股 · 「左侧支撑位」筛选与监控台</h1>
+      <p class="text-[13px] mt-1.5" style="color:var(--muted)" data-i18n="subtitle">全美股(市值≥$1B) · 高景气板块内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分</p>
     </div>
     <div class="text-right text-sm text-slate-400">
       <div class="flex items-center justify-end gap-3">
@@ -97,7 +124,7 @@
   </header>
 
   <!-- 免责声明 -->
-  <div class="card border-amber-500/40 bg-amber-500/5 px-4 py-3 mb-4 text-[13px] leading-relaxed text-amber-200/90" data-i18n-html="disclaimer">
+  <div class="card disclaimer px-4 py-2.5 mb-4 text-[12px] leading-relaxed" data-i18n-html="disclaimer">
     ⚠️ <b>免责声明</b>：本系统仅对美股做技术/基本面数据的自动化整理与形态筛选，<b>不构成任何投资建议</b>。
     "左侧买入"是在下跌中、支撑确认前进场，风险天然更高（可能继续下跌或破位）。价格单位为美元(USD)。
     所有标的需<b>人工复核</b>，使用者自负盈亏与风控。
@@ -105,10 +132,10 @@
 
   <!-- 概览卡 -->
   <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_scanned">今日扫描数</div><div id="ovScanned" class="text-2xl font-bold text-white mt-1">—</div></div>
-    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_hit">命中候选数</div><div id="ovHit" class="text-2xl font-bold text-sky-300 mt-1">—</div></div>
-    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_inds">入选景气板块</div><div id="ovInds" class="text-2xl font-bold text-emerald-300 mt-1">—</div></div>
-    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_date">数据日期</div><div id="ovDate" class="text-2xl font-bold text-white mt-1">—</div></div>
+    <div class="card p-4"><div class="ovlabel" data-i18n="ov_scanned">今日扫描数</div><div id="ovScanned" class="ovnum text-[28px] font-bold text-white mt-1.5">—</div></div>
+    <div class="card p-4"><div class="ovlabel" data-i18n="ov_hit">命中候选数</div><div id="ovHit" class="ovnum text-[28px] font-bold text-sky-300 mt-1.5">—</div></div>
+    <div class="card p-4"><div class="ovlabel" data-i18n="ov_inds">入选景气板块</div><div id="ovInds" class="ovnum text-[28px] font-bold text-emerald-300 mt-1.5">—</div></div>
+    <div class="card p-4"><div class="ovlabel" data-i18n="ov_date">数据日期</div><div id="ovDate" class="ovnum text-[28px] font-bold text-white mt-1.5">—</div></div>
   </section>
   <!-- 派生统计条 -->
   <section id="ovStrip" class="flex flex-wrap gap-2 mb-5"></section>
@@ -116,20 +143,20 @@
   <!-- 行业景气榜 -->
   <section class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-      <h2 class="text-lg font-semibold text-white" data-i18n="sec_board">板块景气榜</h2>
+      <h2 class="blk-title" data-i18n="sec_board">板块景气榜</h2>
       <div class="flex items-center gap-2">
         <span class="text-xs text-slate-400 mr-1" data-i18n="sec_hint">点击板块可筛选主表 · 绿色=入选</span>
         <button class="segbtn on" id="segBar" data-i18n="seg_bar">条形图</button>
         <button class="segbtn" id="segTree" data-i18n="seg_tree">矩形树图</button>
       </div>
     </div>
-    <div id="industryChart" style="width:100%;height:380px;"></div>
+    <div id="industryChart" style="width:100%;height:300px;"></div>
   </section>
 
   <!-- 权重实验室 -->
   <section class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-      <h2 class="text-lg font-semibold text-white" data-i18n="wlab_title">综合分权重实验室</h2>
+      <h2 class="blk-title" data-i18n="wlab_title">综合分权重实验室</h2>
       <div class="flex items-center gap-3">
         <span class="text-xs text-slate-400" data-i18n="wlab_hint">拖动滑块即时重算「综合分」并重新排序（不改变原始命中）</span>
         <button id="wReset" class="segbtn" data-i18n="wlab_reset">恢复默认 50/30/20</button>
@@ -145,7 +172,7 @@
   <!-- 候选股主表 -->
   <section class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
-      <h2 class="text-lg font-semibold text-white"><span data-i18n="tbl_title">候选股主表</span> <span id="rowCount" class="text-sm text-slate-400 font-normal"></span></h2>
+      <h2 class="blk-title"><span data-i18n="tbl_title">候选股主表</span> <span id="rowCount" class="text-[12px] font-normal" style="color:var(--muted)"></span></h2>
       <div class="flex items-center gap-2 flex-wrap text-sm">
         <input id="search" placeholder="搜索 代码 / 名称" data-i18n-ph="search_ph" class="w-40" />
         <select id="filterInd"><option value="">全部板块</option></select>
@@ -663,13 +690,16 @@
           itemStyle:{borderColor:(document.body.classList.contains("light")?"#eef2f8":"#0b1220"),borderWidth:2,gapWidth:2}, data }]
       });
     } else {
-      const arr = inds.slice(0,15).slice().reverse();
+      const arr = inds.slice(0,12).slice().reverse();
       const names = arr.map(d=>d.industry);
       const scores = arr.map(d=> isNum(d.prosperity_score)? +d.prosperity_score.toFixed(1) : 0);
       const colors = arr.map(d=> d.selected? "#16a34a" : C.base);
+      // 轴下沿: 取最低分再留 6 分余量(向下取整到5的倍数), 但不低于0
+      const _lo = Math.min(...scores.filter(v=>isNum(v)&&v>0));
+      const xMin = Math.max(0, Math.floor((_lo-6)/5)*5);
       indChart.setOption({
         backgroundColor:"transparent",
-        grid:{left:100,right:44,top:10,bottom:20},
+        grid:{left:92,right:52,top:6,bottom:6,containLabel:false},
         tooltip:{trigger:"axis", axisPointer:{type:"shadow"},
           formatter:(p)=>{ const i=arr[p[0].dataIndex];
             const row=(lab,v)=>`${lab}：<b>${isNum(v)?v.toFixed(0):"—"}</b>`;
@@ -677,10 +707,26 @@
               `${t("prosperity_total")}：<b>${isNum(i.prosperity_score)?i.prosperity_score.toFixed(1):"—"}</b><br/>`+
               [row(t("p_trend"),i.trend),row(t("p_momentum"),i.momentum),row(t("p_breadth"),i.breadth),row(t("p_capital"),i.capital),row(t("p_fund"),i.fundamental)].join("　");
           }},
-        xAxis:{type:"value", max:100, axisLabel:{color:C.axis}, splitLine:{lineStyle:{color:C.grid}}},
-        yAxis:{type:"category", data:names, axisLabel:{color:C.label}},
-        series:[{type:"bar", data:scores.map((v,i)=>({value:v,itemStyle:{color:colors[i]}})),
-          barWidth:"62%", label:{show:true,position:"right",color:C.label,formatter:"{c}"}}]
+        // 景气分是"横截面百分位", 前12名几乎都挤在 70~100 —— 从0起画满宽条的话
+        // 97 和 76 看起来一样长, 整个视觉区被浪费。改用点图(棒棒糖):
+        // 点不靠长度编码大小, 所以坐标轴可以从数据下沿起, 差异一眼可见, 且不误导。
+        xAxis:{type:"value", min:xMin, max:100, interval:(100-xMin)/4,
+               axisLabel:{color:C.axis,fontSize:11}, axisLine:{show:false}, axisTick:{show:false},
+               splitLine:{lineStyle:{color:C.grid,type:"dashed"}}},
+        yAxis:{type:"category", data:names, axisLabel:{color:C.label,fontSize:12},
+               axisLine:{show:false}, axisTick:{show:false}},
+        series:[
+          // 连接线(细): 从轴起点到该行业分数, 只做引导, 视觉上退到后面
+          {type:"bar", barWidth:2, silent:true, z:1,
+           itemStyle:{color:C.grid, borderRadius:2},
+           data:scores.map(v=>v)},
+          // 数据点: 大小一致的圆点, 入选=绿, 其余=中性蓝
+          {type:"scatter", symbolSize:11, z:3,
+           data:scores.map((v,i)=>({value:v, itemStyle:{color:colors[i],
+             borderColor:(document.body.classList.contains("light")?"#fff":"#0f1626"), borderWidth:2}})),
+           label:{show:true,position:"right",color:C.label,fontSize:11.5,distance:8,
+                  formatter:p=>p.value}}
+        ]
       });
     }
     indChart.off("click");
