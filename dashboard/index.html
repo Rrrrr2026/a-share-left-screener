@@ -178,6 +178,21 @@
           <option value="🟡">🟡 待观察</option><option value="🔴">🔴 一次性</option>
         </select></div>
     </div>
+    <!-- 精细区间筛选: 每个数值指标都能设 最小–最大, 多条件同时生效
+         (例: 市盈率 20–40 且 营收同比 30–50 且 标签=强左侧) -->
+    <div id="rangePanel" class="hidden mb-3">
+      <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div class="text-xs text-slate-400" data-i18n="f_rng_hint">
+          每个指标可设最小/最大值，留空 = 不限；多个条件同时生效（“与”关系）。缺该数据的股票在启用条件时会被排除。</div>
+        <div class="flex items-center gap-2">
+          <span id="rngCount" class="text-xs" style="color:#7dd3fc"></span>
+          <button id="rngClear" class="px-2 py-1 rounded text-xs"
+                  style="background:rgba(148,163,184,.15);border:1px solid rgba(148,163,184,.3)"
+                  data-i18n="f_rng_clear">清空条件</button>
+        </div>
+      </div>
+      <div id="rangeGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2"></div>
+    </div>
     <div class="overflow-x-auto" style="max-height:64vh;">
       <table id="mainTable">
         <thead><tr id="headRow"></tr></thead>
@@ -514,7 +529,7 @@
   }
   function applyLang(){
     applyStaticI18n();
-    syncWeightUI(); syncAdvUI(); renderIndustryChart(); render(); updateStrip();
+    syncWeightUI(); syncAdvUI(); if(typeof buildRanges==="function") buildRanges(); renderIndustryChart(); render(); updateStrip();
     if(curC && !$("#drawer").classList.contains("translate-x-full")) openDetail(curC, true);
   }
   // ========================================================================
@@ -710,9 +725,11 @@
   let state = {search:"", ind:"", tag:"", sortKey:"final_score", sortDir:"desc",
               weights:{t:50,f:30,p:20}, favOnly:false,
               minScore:0, maxDist:30, minRoe:-10, minUp:-80,
-              minRev:-50, minNp:-50, maxPe:150, gq:""};
+              minRev:-50, minNp:-50, maxPe:150, gq:"",
+              rng:{}};   // 精细区间筛选 {字段: {min, max}}, 见 buildRanges()
   try{ Object.assign(state, JSON.parse(localStorage.getItem(LS_KEY)||"{}")); }catch(e){}
   if(!state.weights) state.weights={t:50,f:30,p:20};
+  if(!state.rng || typeof state.rng!=="object") state.rng={};
 
   // ---------- 自选 ----------
   const FAV_KEY="ashare_favs_v1";
@@ -845,6 +862,19 @@
     if(state.minNp>-50)  rows = rows.filter(c=> isNum(c.netprofit_yoy) && c.netprofit_yoy>=state.minNp);
     if(state.maxPe<150)  rows = rows.filter(c=> isNum(c.pe_ttm) && c.pe_ttm>0 && c.pe_ttm<=state.maxPe);
     if(state.gq)         rows = rows.filter(c=> (c.growth_quality||"").indexOf(state.gq)>=0);
+    // 精细区间筛选: 逐个字段做 min/max 夹逼 ("与"关系)。缺数据(—)在该条件启用时排除,
+    // 否则"PE 20-40"会把没有PE的股票也留下, 结果不可信。
+    Object.keys(state.rng||{}).forEach(k=>{
+      const r = state.rng[k] || {};
+      if(r.min==null && r.max==null) return;
+      rows = rows.filter(c=>{
+        const v = getVal(c,k);
+        if(!isNum(v)) return false;
+        if(r.min!=null && v < r.min) return false;
+        if(r.max!=null && v > r.max) return false;
+        return true;
+      });
+    });
     const k=state.sortKey, dir=state.sortDir==="asc"?1:-1;
     rows.sort((a,b)=>{
       let x=getVal(a,k), y=getVal(b,k);
@@ -903,7 +933,8 @@
   $("#filterInd").onchange = e=>{ state.ind=e.target.value; persist(); render(); };
   $("#filterTag").onchange = e=>{ state.tag=e.target.value; persist(); render(); };
   $("#favOnly").onchange = e=>{ state.favOnly=e.target.checked; persist(); render(); };
-  $("#advBtn").onclick = ()=> $("#advPanel").classList.toggle("hidden");
+  $("#advBtn").onclick = ()=>{ $("#advPanel").classList.toggle("hidden");
+                               $("#rangePanel").classList.toggle("hidden"); };
   $("#fGq").onchange = e=>{ state.gq=e.target.value; persist(); render(); };
   const RANGE_DEFS=[
     ["fScore","minScore",v=>v.toFixed(0),0],
@@ -921,6 +952,65 @@
     $("#"+id).addEventListener("input", ()=>{ state[key]=+$("#"+id).value; $("#"+id+"V").textContent=rangeLabel(key,fmt,off); persist(); render(); });
   });
   syncAdvUI();
+
+  // ---------- 精细区间筛选 (每个数值指标 min–max) ----------
+  // 主表里能排序的数值列 + 几个不在主表但有用的分数, 都给一对 min/max 输入框。
+  const RNG_EXTRA=[
+    {key:"pe_ttm",              i18n:null,         label:"市盈率TTM"},
+    {key:"growth_quality_score",i18n:null,         label:"增速质量分"},
+    {key:"consol_score",        i18n:null,         label:"横盘吸筹分"},
+    {key:"dip_score",           i18n:null,         label:"深跌分"},
+    {key:"max_dd_pct",          i18n:null,         label:"最大回撤%"},
+    {key:"prosperity_score",    i18n:null,         label:"行业景气分"},
+  ];
+  function rngFields(){
+    const out=[], seen=new Set();
+    COLS.forEach(c=>{                       // 主表里的数值列, 用户看到什么就能筛什么
+      if(!NUMERIC.has(c.key) || seen.has(c.key)) return;
+      seen.add(c.key); out.push({key:c.key, label:colLabel(c)});
+    });
+    RNG_EXTRA.forEach(e=>{ if(seen.has(e.key)) return;
+      seen.add(e.key); out.push({key:e.key, label:(e.i18n? t(e.i18n): e.label)}); });
+    return out;
+  }
+  function rngActive(){ return Object.keys(state.rng||{})
+      .filter(k=>{ const r=state.rng[k]||{}; return r.min!=null || r.max!=null; }); }
+  function syncRngCount(){
+    const n=rngActive().length, el=$("#rngCount");
+    if(el) el.textContent = n? (LANG==="en"? `${n} active` : `${n} 个条件生效`) : "";
+  }
+  function buildRanges(){
+    const wrap=$("#rangeGrid"); if(!wrap) return;
+    // 本地转义: escH 定义在本函数之后(const, 有暂时性死区), 这里不能用它
+    const esc = s => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+                       .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    const inp="width:4.5rem;padding:2px 4px;font-size:12px;border-radius:4px;"
+             +"background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.3);color:inherit";
+    wrap.innerHTML = rngFields().map(f=>{
+      const r=state.rng[f.key]||{};
+      const v=x=>(x==null?"":x);
+      return `<div class="flex items-center gap-1">`
+        +`<span class="text-xs text-slate-400 flex-1 truncate" title="${esc(f.label)}">${esc(f.label)}</span>`
+        +`<input class="rng" data-k="${f.key}" data-b="min" type="number" step="any" `
+        +`placeholder="${LANG==="en"?"min":"最小"}" value="${v(r.min)}" style="${inp}"/>`
+        +`<span class="text-xs text-slate-500">–</span>`
+        +`<input class="rng" data-k="${f.key}" data-b="max" type="number" step="any" `
+        +`placeholder="${LANG==="en"?"max":"最大"}" value="${v(r.max)}" style="${inp}"/></div>`;
+    }).join("");
+    wrap.querySelectorAll("input.rng").forEach(el=>{
+      el.addEventListener("input", ()=>{
+        const k=el.dataset.k, b=el.dataset.b;
+        const raw=el.value.trim(), num=raw===""?null:parseFloat(raw);
+        state.rng[k]=state.rng[k]||{};
+        state.rng[k][b]=(num==null||isNaN(num))?null:num;
+        if(state.rng[k].min==null && state.rng[k].max==null) delete state.rng[k];
+        persist(); syncRngCount(); render();
+      });
+    });
+    syncRngCount();
+  }
+  $("#rngClear").onclick = ()=>{ state.rng={}; persist(); buildRanges(); render(); };
+  buildRanges();
 
   // ---------- 导出CSV ----------
   $("#exportBtn").onclick = ()=>{

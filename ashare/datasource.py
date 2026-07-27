@@ -792,6 +792,37 @@ def _stock_industry_from_xq(code: str) -> str | None:
     return None
 
 
+def fetch_hist_long(code: str, years: int = 10) -> pd.DataFrame | None:
+    """个股**长历史**日线(前复权), 供模块5做"历次深跌后表现"的历史类比统计。
+
+    与 fetch_hist 分开: 主扫描只需 500 天, 这里要 ~10 年才够找到多次深跌事件。
+    走新浪 stock_zh_a_daily(本机可达且线程安全; 东财日线在本机被限)。按日缓存。
+    """
+    key = _cache_key("hist_long", code, years, dt.date.today().isoformat())
+    c = _cache_load(key)
+    if c is not None:
+        return c
+    end = dt.date.today()
+    start = end - dt.timedelta(days=int(years * 365.25))
+    try:
+        raw = call_with_retry(
+            _ak().stock_zh_a_daily, symbol=_sina_symbol(code), adjust="qfq",
+            start_date=start.strftime("%Y%m%d"), end_date=end.strftime("%Y%m%d"))
+    except Exception as e:
+        log.debug("长历史日线 %s 失败: %s", code, e)
+        return None
+    if raw is None or len(raw) == 0:
+        return None
+    df = _finalize_hist(rename_normalize(raw, {
+        "date": ["date", "日期"], "open": ["open", "开盘"], "high": ["high", "最高"],
+        "low": ["low", "最低"], "close": ["close", "收盘"], "volume": ["volume", "成交量"],
+    }))
+    if df is None or df.empty:
+        return None
+    _cache_save(key, df)
+    return df
+
+
 _ind_map = None
 _ind_map_lock = threading.Lock()
 
@@ -816,37 +847,54 @@ def fetch_industry_map() -> dict:
             _ind_map = c
             return _ind_map
         m = {}
-        try:
-            import requests
-            sess = requests.Session()
-            sess.headers.update({"User-Agent": _BROWSER_UA})
-            url = "https://push2delay.eastmoney.com/api/qt/clist/get"
-            page, total, PZ = 1, None, 100      # 服务端每页上限 100, 必须分页
-            while page <= 80:                   # 上限兜底, 正常 ~56 页
-                r = sess.get(url, params={
-                    "pn": page, "pz": PZ, "po": 0, "np": 1, "fltt": 2, "invt": 2,
-                    "fid": "f12", "fs": "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23",
-                    "fields": "f12,f14,f100"},
-                    timeout=CONFIG["fetch"]["timeout_sec"])
-                d = ((r.json() or {}).get("data") or {})
-                rows = d.get("diff") or []
-                if total is None:
-                    total = d.get("total") or 0
-                if not rows:
-                    break
-                for it in rows:
-                    code = str(it.get("f12") or "").zfill(6)
-                    ind = str(it.get("f100") or "").strip()
-                    if code and ind and ind not in ("-", "—"):
-                        m[code] = ind
-                if total and page * PZ >= total:
-                    break
-                page += 1
-        except Exception as e:  # noqa: BLE001
-            log.warning("批量行业映射获取失败(push2delay): %s", e)
+        used_host = None
+        # 主机故障转移: 本机对各 push2 主机的可达性会变(代理时好时坏), 逐个试。
+        # 2026-07-27 实测 push2.eastmoney.com 可达而 push2delay SSL 报错 —— 反过来的
+        # 情况以前也出现过, 所以这里不写死, 谁通用谁。
+        HOSTS = ("push2.eastmoney.com", "82.push2.eastmoney.com",
+                 "push2delay.eastmoney.com", "push2his.eastmoney.com")
+        for host in HOSTS:
+            m = {}
+            try:
+                import requests
+                sess = requests.Session()
+                sess.headers.update({"User-Agent": _BROWSER_UA,
+                                     "Referer": "https://quote.eastmoney.com/"})
+                url = f"https://{host}/api/qt/clist/get"
+                page, total, PZ = 1, None, 100      # 服务端每页上限 100, 必须分页
+                while page <= 80:                   # 上限兜底, 正常 ~59 页
+                    r = sess.get(url, params={
+                        "pn": page, "pz": PZ, "po": 0, "np": 1, "fltt": 2, "invt": 2,
+                        "fid": "f12", "fs": "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23",
+                        "fields": "f12,f14,f100"},
+                        timeout=CONFIG["fetch"]["timeout_sec"])
+                    d = ((r.json() or {}).get("data") or {})
+                    rows = d.get("diff") or []
+                    if isinstance(rows, dict):      # 某些主机返回 {"0":{...}} 形式
+                        rows = list(rows.values())
+                    if total is None:
+                        total = d.get("total") or 0
+                    if not rows:
+                        break
+                    for it in rows:
+                        code = str(it.get("f12") or "").zfill(6)
+                        ind = str(it.get("f100") or "").strip()
+                        if code and ind and ind not in ("-", "—"):
+                            m[code] = ind
+                    if total and page * PZ >= total:
+                        break
+                    page += 1
+            except Exception as e:  # noqa: BLE001
+                log.debug("批量行业映射失败(%s): %s", host, e)
+                continue
+            if m:
+                used_host = host
+                break
         if m:
-            log.info("批量行业映射: %d 只 (东财 push2delay)", len(m))
+            log.info("批量行业映射: %d 只 (东财 %s)", len(m), used_host)
             _cache_save(key, m)
+        else:
+            log.warning("批量行业映射获取失败(所有东财主机不可达), 将逐只降级")
         _ind_map = m
         return _ind_map
 
