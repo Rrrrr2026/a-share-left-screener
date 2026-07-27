@@ -96,12 +96,16 @@ def _migrate(conn):
                       ("max_dd_pct", "REAL"), ("beta", "REAL"), ("vol_ratio_calc", "REAL"),
                       ("sig_vol", "TEXT"), ("boll_low", "REAL"), ("fib_382", "REAL"),
                       ("fib_500", "REAL"), ("fib_618", "REAL"),
-                      ("dip", "INTEGER"), ("dip_score", "REAL"), ("dip_confirm", "TEXT")],
+                      ("dip", "INTEGER"), ("dip_score", "REAL"), ("dip_confirm", "TEXT"),
+                      ("consol", "INTEGER"), ("consol_score", "REAL"), ("consol_note", "TEXT")],
         "fundamental": [("target_price", "REAL"), ("analyst_rating", "TEXT"),
                         ("analyst_count", "REAL"), ("upside_pct", "REAL"),
-                        ("roe_trend_q_json", "TEXT")],
+                        ("roe_trend_q_json", "TEXT"),
+                        ("growth_quality", "TEXT"), ("growth_quality_score", "REAL"),
+                        ("growth_quality_note", "TEXT")],
         "final_rank": [("conclusion_en", "TEXT"),
-                       ("dip", "INTEGER"), ("dip_score", "REAL"), ("dip_confirm", "TEXT")],
+                       ("dip", "INTEGER"), ("dip_score", "REAL"), ("dip_confirm", "TEXT"),
+                       ("consol", "INTEGER"), ("consol_score", "REAL"), ("consol_note", "TEXT")],
     }
     for table, cols in want.items():
         have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -182,6 +186,7 @@ def save_fundamental(run_date: str, code: str, f: dict):
         "pe_ttm", "pe_pct", "pe_industry_median", "pe_vs_industry", "pb", "pb_pct",
         "dividend_yield", "eps", "eps_yoy", "roe", "revenue_yoy", "netprofit_yoy",
         "gross_margin", "debt_ratio",
+        "growth_quality", "growth_quality_score", "growth_quality_note",
         "target_price", "analyst_rating", "analyst_count", "upside_pct")}
     row.update({
         "run_date": run_date, "code": code,

@@ -34,6 +34,7 @@ MAIN_COLUMNS = [
     ("turnover", "换手率"), ("volume_ratio", "量比"), ("kdj_tag", "KDJ"),
     ("pe_disp", "市盈率TTM(分位)"), ("pb", "市净率"), ("eps", "EPS"), ("roe", "ROE"),
     ("revenue_yoy", "营收同比%"), ("netprofit_yoy", "归母净利同比%"),
+    ("growth_quality", "增速质量"),
 ]
 
 
@@ -103,6 +104,12 @@ def build_payload(run_date: str | None = None) -> dict:
             "dividend_yield": f.get("dividend_yield"),
             "eps": f.get("eps"), "eps_yoy": f.get("eps_yoy"), "roe": f.get("roe"),
             "revenue_yoy": f.get("revenue_yoy"), "netprofit_yoy": f.get("netprofit_yoy"),
+            "consol": bool(t.get("consol")),
+            "consol_score": t.get("consol_score"),
+            "consol_note": t.get("consol_note"),
+            "growth_quality": f.get("growth_quality"),
+            "growth_quality_score": f.get("growth_quality_score"),
+            "growth_quality_note": f.get("growth_quality_note"),
             "gross_margin": f.get("gross_margin"), "debt_ratio": f.get("debt_ratio"),
             "roe_trend": _loads(f.get("roe_trend_json")),
             "roe_trend_q": _loads(f.get("roe_trend_q_json")),

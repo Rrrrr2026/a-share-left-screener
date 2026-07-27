@@ -737,9 +737,39 @@ def _xq_symbol(code: str) -> str:
     return "SZ" + code                                          # 深市 00/30/2
 
 
+# akshare 内置的 xq_a_token 是硬编码的, 会过期 (过期后接口返回的 JSON 里没有 'data',
+# 表现为每只都查不到行业)。这里进程内自取一枚新鲜 token (访问雪球首页拿 cookie), 失败
+# 则回落到 akshare 内置值。只取一次, 多线程共用。
+_xq_token = None
+_xq_token_lock = threading.Lock()
+
+
+def _get_xq_token() -> str | None:
+    global _xq_token
+    if _xq_token is not None:
+        return _xq_token or None
+    with _xq_token_lock:
+        if _xq_token is not None:
+            return _xq_token or None
+        tok = ""
+        try:
+            import requests
+            s = requests.Session()
+            s.headers.update({"User-Agent": _BROWSER_UA})
+            s.get("https://xueqiu.com/", timeout=CONFIG["fetch"]["timeout_sec"])
+            tok = s.cookies.get("xq_a_token") or ""
+            if tok:
+                log.info("雪球 token 已自动刷新")
+        except Exception as e:
+            log.debug("雪球 token 获取失败, 用 akshare 内置值: %s", e)
+        _xq_token = tok
+        return tok or None
+
+
 def _stock_industry_from_xq(code: str) -> str | None:
     try:
-        raw = call_with_retry(_ak().stock_individual_basic_info_xq, symbol=_xq_symbol(code))
+        raw = call_with_retry(_ak().stock_individual_basic_info_xq,
+                              symbol=_xq_symbol(code), token=_get_xq_token())
     except Exception as e:
         log.debug("雪球个股信息 %s 失败: %s", code, e)
         return None
@@ -762,18 +792,123 @@ def _stock_industry_from_xq(code: str) -> str | None:
     return None
 
 
+_ind_map = None
+_ind_map_lock = threading.Lock()
+
+
+def fetch_industry_map() -> dict:
+    """全市场 {code: 所属行业} —— 一次批量请求拿完 (东财口径, 如 '半导体'/'银行Ⅱ')。
+
+    关键: 走 **push2delay** 主机。本机 push2/push2his 被墙(见项目笔记), 只有 delay 可达;
+    它的 clist 接口带 f100(所属行业) 字段, 5500+ 只一次返回, ~2s, 纯 JSON 线程安全
+    —— 远优于逐只查(雪球有WAF; 巨潮 stock_profile_cninfo 用 py_mini_racer, 多线程会
+    让进程硬崩)。拿不到则返回空 dict, 上层再逐只降级。
+    """
+    global _ind_map
+    if _ind_map is not None:
+        return _ind_map
+    with _ind_map_lock:
+        if _ind_map is not None:
+            return _ind_map
+        key = _cache_key("ind_map", dt.date.today().isoformat())
+        c = _cache_load(key)
+        if c:
+            _ind_map = c
+            return _ind_map
+        m = {}
+        try:
+            import requests
+            sess = requests.Session()
+            sess.headers.update({"User-Agent": _BROWSER_UA})
+            url = "https://push2delay.eastmoney.com/api/qt/clist/get"
+            page, total, PZ = 1, None, 100      # 服务端每页上限 100, 必须分页
+            while page <= 80:                   # 上限兜底, 正常 ~56 页
+                r = sess.get(url, params={
+                    "pn": page, "pz": PZ, "po": 0, "np": 1, "fltt": 2, "invt": 2,
+                    "fid": "f12", "fs": "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23",
+                    "fields": "f12,f14,f100"},
+                    timeout=CONFIG["fetch"]["timeout_sec"])
+                d = ((r.json() or {}).get("data") or {})
+                rows = d.get("diff") or []
+                if total is None:
+                    total = d.get("total") or 0
+                if not rows:
+                    break
+                for it in rows:
+                    code = str(it.get("f12") or "").zfill(6)
+                    ind = str(it.get("f100") or "").strip()
+                    if code and ind and ind not in ("-", "—"):
+                        m[code] = ind
+                if total and page * PZ >= total:
+                    break
+                page += 1
+        except Exception as e:  # noqa: BLE001
+            log.warning("批量行业映射获取失败(push2delay): %s", e)
+        if m:
+            log.info("批量行业映射: %d 只 (东财 push2delay)", len(m))
+            _cache_save(key, m)
+        _ind_map = m
+        return _ind_map
+
+
+# 巨潮 stock_profile_cninfo 内部走 py_mini_racer(V8) 解密, **多线程并发会让进程直接
+# abort**(libmini_racer address_pool_manager Check failed) —— 与阶段C同源的坑。
+# 用全局锁把它串行化; 它只作为批量映射之外的兜底, 调用量很小。
+_cninfo_lock = threading.Lock()
+
+
+def _stock_industry_from_cninfo(code: str) -> str | None:
+    """巨潮个股概况的『所属行业』(证监会口径, 如 '酒、饮料和精制茶制造业')。
+    全A覆盖、在本机可达, 作为雪球(有WAF)与东财(被墙)之外的主力兜底。"""
+    try:
+        with _cninfo_lock:                     # 串行, 防 V8 并发崩进程
+            raw = call_with_retry(_ak().stock_profile_cninfo, symbol=str(code).zfill(6))
+    except Exception as e:
+        log.debug("巨潮个股概况 %s 失败: %s", code, e)
+        return None
+    if raw is None or len(raw) == 0 or "所属行业" not in raw.columns:
+        return None
+    try:
+        v = raw.iloc[0]["所属行业"]
+    except Exception:
+        return None
+    v = None if v is None else str(v).strip()
+    return v or None
+
+
+_stk_ind_miss = set()          # 本轮已查且没结果的代码 (只在进程内, 不落盘)
+_stk_ind_miss_lock = threading.Lock()
+
+
 def fetch_stock_industry(code: str) -> str | None:
-    """个股所属行业名。优先雪球(走443可达), 东财兜底。结果缓存;
-    查过但无结果的存空串, 避免同轮反复空查。"""
+    """个股所属行业名。优先雪球(走443可达), 东财兜底。
+
+    只把"查到的结果"写进磁盘缓存。查不到的仅记在进程内集合里(同轮不重复空查),
+    **不落盘** —— 否则数据源临时挂掉(如雪球 token 过期)会把空结果缓存一整天,
+    当天即便修好了也全是 '—'(2026-07-27 踩过这个坑)。
+    """
+    code = str(code).zfill(6)
+    m = fetch_industry_map()                      # 0) 批量映射: 一次请求覆盖全市场, 最优先
+    if m.get(code):
+        return m[code]
     key = _cache_key("stk_ind", code, dt.date.today().isoformat())
     c = _cache_load(key)
-    if c is not None:            # 命中缓存(含 "" 表示查过没有)
-        return c or None
-    name = _stock_industry_from_xq(code)
+    if c:                        # 只认非空的缓存
+        return c
+    with _stk_ind_miss_lock:
+        if code in _stk_ind_miss:
+            return None
+    name = _stock_industry_from_xq(code)          # 1) 雪球(名称贴近THS口径, 但有WAF)
     if not name:
-        info = fetch_basic_info(code)       # 东财兜底(本机多不可用)
+        name = _stock_industry_from_cninfo(code)  # 2) 巨潮(证监会口径, 串行)
+    if not name:
+        info = fetch_basic_info(code)             # 3) 东财兜底(本机多不可用)
         name = (info or {}).get("industry")
-    _cache_save(key, name or "")
+    if name:
+        _cache_save(key, name)
+    else:
+        with _stk_ind_miss_lock:
+            _stk_ind_miss.add(code)
     return name or None
 
 

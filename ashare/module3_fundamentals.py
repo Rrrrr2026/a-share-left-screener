@@ -41,7 +41,8 @@ def compute_industry_pe_median(spot: pd.DataFrame, ind_to_codes: dict) -> dict:
 
 def pull_fundamentals(code: str, industry: str | None = None,
                       industry_pe_median: float | None = None,
-                      spot_row: dict | None = None) -> dict:
+                      spot_row: dict | None = None,
+                      prosperity: float | None = None) -> dict:
     """返回基本面字典 (英文键)。任何字段拉取失败均降级为 None。"""
     res = {
         "pe_ttm": None, "pe_pct": None, "pe_industry_median": None, "pe_vs_industry": None,
@@ -50,6 +51,8 @@ def pull_fundamentals(code: str, industry: str | None = None,
         "roe": None, "roe_trend": [],
         "revenue_yoy": None, "netprofit_yoy": None,
         "gross_margin": None, "debt_ratio": None,
+        "growth_quality": None, "growth_quality_score": None,
+        "growth_quality_note": None,
         "fund_flags": [],
     }
 
@@ -118,9 +121,116 @@ def pull_fundamentals(code: str, industry: str | None = None,
             res["gross_margin"] = _last(fin["gross_margin"])
         if "debt_ratio" in fin.columns:
             res["debt_ratio"] = _last(fin["debt_ratio"])
+        # 增速质量: 最新增速是一次性还是可持续 (用整条序列判断, 不额外打接口)
+        try:
+            res.update(analyze_growth_quality(fin, prosperity))
+        except Exception as e:  # noqa: BLE001
+            log.debug("增速质量分析失败 %s: %s", code, e)
 
     res["fund_flags"] = _flags(res)
     return res
+
+
+def _series(fin, col, n=8):
+    if fin is None or col not in fin.columns:
+        return []
+    s = pd.to_numeric(fin[col], errors="coerce").dropna()
+    return [float(x) for x in s.tail(n)]
+
+
+def analyze_growth_quality(fin, prosperity: float | None = None) -> dict:
+    """判断最新增速是「一次性」还是「可持续」。
+
+    核心问题: 利润的增长有没有 *收入* 和 *毛利* 撑着?
+      · 净利暴增而营收几乎不动  -> 多半来自卖资产/补助/投资收益/汇兑, 或去年低基数,
+        这类增长明年大概率不复现 (one-time);
+      · 营收与净利同向增长 + 毛利率不塌 + 连续多期 -> 经营驱动, 可持续性高。
+
+    只用已有的财务指标序列(不额外打接口), 输出 0-100 分 + 标签 + 中文理由。
+    数据不足(少于2期)时返回 None 标签, 前端显示 '—', 不猜。
+    """
+    rev = _series(fin, "revenue_yoy")
+    npf = _series(fin, "netprofit_yoy")
+    gm = _series(fin, "gross_margin")
+    if len(rev) < 2 and len(npf) < 2:
+        return {"growth_quality": None, "growth_quality_score": None,
+                "growth_quality_note": None}
+
+    r0 = rev[-1] if rev else None          # 最新营收同比
+    n0 = npf[-1] if npf else None          # 最新归母净利同比
+    score = 50.0
+    pros, cons = [], []                     # 正面/负面理由
+
+    # ---- 1) 收入与利润的匹配度 (最关键) ----
+    if n0 is not None and r0 is not None:
+        if n0 > 50 and r0 < 10:
+            score -= 28
+            cons.append(f"净利+{n0:.0f}%但营收仅{r0:+.0f}%(疑非经营性)")
+        elif n0 > 0 and r0 <= 0:
+            score -= 12
+            cons.append("利润增长但营收未增(靠降本/非经常)")
+        elif n0 > 0 and r0 > 0:
+            score += 16
+            pros.append("营收与净利同向增长")
+            if 0.5 <= (n0 / r0 if r0 else 9) <= 3.0:
+                score += 6
+                pros.append("利润增速与收入匹配")
+        elif n0 < 0 and r0 > 0:
+            score -= 8
+            cons.append("增收不增利(成本/费用侵蚀)")
+
+    # ---- 2) 连续性: 近4期有几期正增长 ----
+    def _pos_ratio(xs):
+        w = xs[-4:]
+        return (sum(1 for x in w if x > 0) / len(w)) if w else None
+    pr, pn = _pos_ratio(rev), _pos_ratio(npf)
+    if pr is not None and len(rev) >= 3:
+        if pr >= 0.75:
+            score += 12; pros.append("营收连续多期正增长")
+        elif pr <= 0.25:
+            score -= 10; cons.append("营收多期负增长")
+    if pn is not None and len(npf) >= 3 and pn <= 0.25 and (n0 or 0) > 50:
+        score -= 12
+        cons.append("此前多期利润下滑, 本期突然暴增(基数效应)")
+
+    # ---- 3) 稳定性: 营收增速波动越小越可信 ----
+    if len(rev) >= 4:
+        w = rev[-6:]
+        sd = float(np.std(w))
+        if sd < 15:
+            score += 8; pros.append("增速平稳")
+        elif sd > 60:
+            score -= 8; cons.append("增速大起大落")
+
+    # ---- 4) 毛利率趋势: 利润暴增却毛利下滑 = 更可疑 ----
+    if len(gm) >= 3:
+        base = float(np.mean(gm[-4:-1])) if len(gm) >= 4 else float(np.mean(gm[:-1]))
+        d = gm[-1] - base
+        if d >= 1.5:
+            score += 8; pros.append(f"毛利率走高({d:+.1f}pct)")
+        elif d <= -3.0:
+            score -= 10; cons.append(f"毛利率下滑({d:+.1f}pct)")
+            if (n0 or 0) > 50:
+                score -= 6; cons.append("毛利下滑却利润暴增(存疑)")
+
+    # ---- 5) 行业景气加成 (口径能对上时才有; 对不上不惩罚) ----
+    if prosperity is not None:
+        if prosperity >= 70:
+            score += 6; pros.append("所处行业景气居前")
+        elif prosperity <= 30:
+            score -= 6; cons.append("所处行业景气靠后")
+
+    score = float(max(0.0, min(100.0, score)))
+    if score >= 66:
+        tag = "🟢 可持续"
+    elif score >= 40:
+        tag = "🟡 待观察"
+    else:
+        tag = "🔴 一次性"
+    note = "；".join((pros[:3] + cons[:3])) or "信号不明显"
+    return {"growth_quality": tag,
+            "growth_quality_score": round(score, 1),
+            "growth_quality_note": note}
 
 
 def _flags(r: dict) -> list:

@@ -205,7 +205,8 @@ def run(full_market: bool, use_cache: bool):
         f = m3.pull_fundamentals(
             rec["code"], industry=industry,
             industry_pe_median=industry_pe_median.get(industry) if industry else None,
-            spot_row=spot_map.get(rec["code"]))
+            spot_row=spot_map.get(rec["code"]),
+            prosperity=prosperity_map.get(industry) if industry else None)
         fr = m4.cross_score(rec, f, prosperity_map.get(industry) if industry else None)
         return (rec, detail, f, fr)
 

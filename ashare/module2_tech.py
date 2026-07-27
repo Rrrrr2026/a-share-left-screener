@@ -250,6 +250,58 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
             dip_score = round(dw["depth"] * f_depth + dw["oversold"] * f_os
                               + dw["nearlow"] * f_near + dw["confirm"] * f_conf, 3)
 
+    # ---- "大跌后横盘吸筹" 形态 (独立于 tech_score, 只做形态标注) ----
+    # 目标: A杀之后不再创新低、低位窄幅震荡、波动与成交同步收敛 —— 典型的磨底/吸筹区。
+    # 与"深跌抄底(dip)"的区别: dip 抓的是**正在跌、刚超卖**; 这里抓的是**跌完了、在横**。
+    ccfg = c.get("consolidation") or {}
+    consol_ok, consol_score, consol_note = False, 0.0, ""
+    if ccfg and len(close) >= ccfg["window"] + 40:
+        W = int(ccfg["window"])
+        win = close.tail(W)
+        wmax, wmin, wmean = float(win.max()), float(win.min()), float(win.mean())
+        rng_pct = (wmax - wmin) / wmean * 100.0 if wmean else np.nan
+        slope = ind.reg_slope_norm(close, W)
+        # 波动收敛: 近半窗 ATR% vs 前半窗 ATR%
+        atr_recent = ind.atr_pct(high.tail(W // 2), low.tail(W // 2), close.tail(W // 2))
+        atr_prior = ind.atr_pct(high.tail(W).head(W // 2), low.tail(W).head(W // 2),
+                                close.tail(W).head(W // 2))
+        # 量能: 近20日均量 / 前40日均量
+        vol_dry = np.nan
+        if "volume" in df.columns:
+            _v = pd.to_numeric(df["volume"], errors="coerce").dropna()
+            if len(_v) >= 60:
+                v20 = float(_v.tail(20).mean())
+                v_prior = float(_v.tail(60).head(40).mean())
+                vol_dry = (v20 / v_prior) if v_prior else np.nan
+
+        deep_enough = (not np.isnan(drawdown)) and drawdown >= ccfg["drawdown_min"]
+        if deep_enough and not np.isnan(rng_pct):
+            parts, cw = [], ccfg["weights"]
+            num = den = 0.0
+            # a) 走平: 斜率越接近0越好
+            if not np.isnan(slope):
+                f = max(0.0, 1.0 - abs(slope) / max(1e-6, ccfg["slope_max"]))
+                num += cw["flat"] * f; den += cw["flat"]
+                if f > 0.5: parts.append("股价走平")
+            # b) 窄幅: 区间越窄越好
+            f = max(0.0, 1.0 - rng_pct / max(1e-6, ccfg["range_max_pct"]))
+            num += cw["narrow"] * f; den += cw["narrow"]
+            if f > 0.4: parts.append(f"{W}日振幅仅{rng_pct:.0f}%")
+            # c) 波动收敛
+            if not np.isnan(atr_recent) and not np.isnan(atr_prior) and atr_prior > 0:
+                ratio = atr_recent / atr_prior
+                f = max(0.0, min(1.0, (ccfg["atr_contract"] * 1.3 - ratio) / (ccfg["atr_contract"] * 1.3)))
+                num += cw["contract"] * f; den += cw["contract"]
+                if ratio <= ccfg["atr_contract"]: parts.append("波动收敛")
+            # d) 缩量(地量) —— 吸筹常见: 无人问津、成交萎缩
+            if not np.isnan(vol_dry):
+                f = max(0.0, min(1.0, (1.15 - vol_dry) / 0.45))
+                num += cw["volume"] * f; den += cw["volume"]
+                if vol_dry <= ccfg["vol_dry_max"]: parts.append(f"缩量至前期{vol_dry*100:.0f}%")
+            consol_score = round(num / den, 3) if den else 0.0
+            consol_ok = consol_score >= ccfg["min_score"]
+            consol_note = "、".join(parts)
+
     record = {
         "code": code, "name": name,
         "price": round(px, 2),
@@ -291,6 +343,10 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         "dip": bool(dip_ok),
         "dip_score": float(dip_score),
         "dip_confirm": dip_confirm,
+        # 大跌后横盘吸筹形态
+        "consol": bool(consol_ok),
+        "consol_score": float(consol_score),
+        "consol_note": consol_note,
     }
 
     # ---- 详情图表逐日序列 ----

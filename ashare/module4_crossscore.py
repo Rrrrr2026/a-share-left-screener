@@ -71,7 +71,8 @@ def _tag(tech_score: float, fund_score: float, prosperity: float) -> str:
 _TAG_EN = {"✅ 强左侧": "✅ Strong Left",
            "⚠️ 技术好但基本面弱": "⚠️ Tech-strong, Weak Fundamentals",
            "🔎 观察": "🔎 Watch",
-           "🪸 深跌抄底": "🪸 Deep-Dip Bottom-Fish"}
+           "🪸 深跌抄底": "🪸 Deep-Dip Bottom-Fish",
+           "🧊 强左侧·横盘吸筹": "🧊 Strong Left · Basing/Accumulation"}
 _DIP_CONFIRM_EN = {"底背离": "bullish divergence", "缩柱": "shrinking MACD histogram",
                    "金叉": "KDJ golden cross", "放量": "volume spike"}
 _OSC_EN = {"超卖": "oversold", "缩柱": "shrinking MACD histogram", "底背离": "bullish divergence"}
@@ -172,6 +173,8 @@ def _conclusion_text(tech_rec: dict, f: dict, tag: str) -> str:
     if tag.startswith("🪸"):
         return _dip_conclusion(tech_rec, f, tag)
     sigs = []
+    if tag.startswith("🧊") and tech_rec.get("consol_note"):
+        sigs.append("大跌后横盘吸筹(" + tech_rec["consol_note"] + ")")
     if tech_rec.get("sig_channel"):
         sigs.append("贴近上升通道下轨")
     if tech_rec.get("sig_pivot"):
@@ -215,6 +218,10 @@ def cross_score(tech_rec: dict, fund: dict, prosperity_score: float | None) -> d
     # 已是 ✅强左侧 / ⚠️技术好但基本面弱 的(确有支撑结构)保留原标签, 不抢标。
     if tech_rec.get("dip") and tag == "🔎 观察":
         tag = "🪸 深跌抄底"
+    # 大跌后横盘吸筹: 用户重点关注的形态 —— **以"强左侧"为前提**再升级挂 🧊,
+    # 所以 🧊 一定同时满足强左侧的技术+基本面(+景气)门槛, 只是形态更进一步(已跌透在磨底)。
+    if tech_rec.get("consol") and tag == "✅ 强左侧":
+        tag = "🧊 强左侧·横盘吸筹"
     text = _conclusion_text(tech_rec, fund, tag)
     text_en = _conclusion_text_en(tech_rec, fund, tag)
 
@@ -227,6 +234,9 @@ def cross_score(tech_rec: dict, fund: dict, prosperity_score: float | None) -> d
         "dip": bool(tech_rec.get("dip")),
         "dip_score": round(float(tech_rec.get("dip_score") or 0.0), 3),
         "dip_confirm": tech_rec.get("dip_confirm") or "",
+        "consol": bool(tech_rec.get("consol")),
+        "consol_score": round(float(tech_rec.get("consol_score") or 0.0), 3),
+        "consol_note": tech_rec.get("consol_note") or "",
         "tech_score": round(tech_score, 3),
         "tech_norm": round(tech_norm, 1),
         "fund_score": fund_score,
