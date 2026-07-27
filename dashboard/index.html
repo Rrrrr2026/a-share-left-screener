@@ -356,6 +356,7 @@
       col_ret1m:"近一月涨%", col_rethy:"近半年涨跌%", col_turnover:"换手率", col_volratio:"量比", col_kdj:"KDJ",
       col_pe:"市盈率TTM(分位)", col_pb:"市净率", col_eps:"EPS", col_roe:"ROE",
       col_rev_yoy:"营收同比%", col_np_yoy:"归母净利同比%", col_growth_q:"增速质量",
+      col_buy_zone:"参考买入位", col_guid:"盈利指引(历史频率)",
       th_sort:"点击排序 · 按住拖动可调整列的位置", star_col:"自选",
       p_trend:"趋势", p_momentum:"动量", p_breadth:"广度", p_capital:"资金", p_fund:"基本面",
       prosperity_total:"景气总分", selected_paren:"(入选)",
@@ -439,6 +440,7 @@
       col_ret1m:"1M Ret%", col_rethy:"6M Ret%", col_turnover:"Turnover", col_volratio:"Vol Ratio", col_kdj:"KDJ",
       col_pe:"P/E TTM (pctile)", col_pb:"P/B", col_eps:"EPS", col_roe:"ROE",
       col_rev_yoy:"Rev YoY%", col_np_yoy:"Net Profit YoY%", col_growth_q:"Growth Quality",
+      col_buy_zone:"Ref. Buy Level", col_guid:"Odds (historical)",
       th_sort:"Click to sort · drag to reorder columns", star_col:"Watchlist",
       p_trend:"Trend", p_momentum:"Momentum", p_breadth:"Breadth", p_capital:"Capital", p_fund:"Fund.",
       prosperity_total:"Prosperity", selected_paren:"(selected)",
@@ -513,7 +515,8 @@
     dist_support_pct:"col_dist",support_disp:"col_support",breakdown_price:"col_break",pos_52w_pct:"col_pos52",
     ret_1m_pct:"col_ret1m",ret_half_year_pct:"col_rethy",turnover:"col_turnover",volume_ratio:"col_volratio",
     kdj_tag:"col_kdj",pe_disp:"col_pe",pb:"col_pb",eps:"col_eps",roe:"col_roe",
-    revenue_yoy:"col_rev_yoy",netprofit_yoy:"col_np_yoy",growth_quality:"col_growth_q" };
+    revenue_yoy:"col_rev_yoy",netprofit_yoy:"col_np_yoy",growth_quality:"col_growth_q",
+    guid_buy_high:"col_buy_zone",guid_disp:"col_guid" };
   function colLabel(c){ const k=COL_I18N[c.key]; return (k? t(k) : c.label); }
   function applyStaticI18n(){
     document.documentElement.lang = (LANG==="en")?"en":"zh-CN";
@@ -819,6 +822,19 @@
       case "upside_pct": return upsideCell(v);
       case "ret_1m_pct": case "ret_half_year_pct": return signPctCell(v);
       case "revenue_yoy": case "netprofit_yoy": return signPctCell(v);
+      case "guid_buy_high": {
+        if(!isNum(v)) return dash;
+        const lo=c.guid_buy_low;
+        const txt = (isNum(lo)&&lo<v) ? `${lo.toFixed(2)}~${v.toFixed(2)}` : v.toFixed(2);
+        return `<span title="上沿=关键支撑位; 下沿=按历史同类形态的中位回撤再让一档">${txt}</span>`;
+      }
+      case "guid_disp": {
+        if(!v) return `<span class="muted" title="历史同类形态样本不足(<3次)或数据未通过体检, 不给频率">${dash}</span>`;
+        const n=c.guid_n||0, p50=c.guid_p50, mae=c.guid_med_mae;
+        const strong = isNum(p50)&&p50>=0.5;
+        const tip=`基于该股自身历史 ${n} 次"同样大回撤+跌到低位"的形态; 期间最大回撤中位 ${isNum(mae)?mae.toFixed(0)+"%":"—"}。这是历史频率, 不是未来预测。`;
+        return `<span style="color:${strong?"#4ade80":"var(--fg)"}" title="${tip}">${v}</span>`;
+      }
       case "growth_quality": {
         if(!v) return dash;
         // 🟢可持续 / 🟡待观察 / 🔴一次性 —— 悬浮显示判断理由与分数

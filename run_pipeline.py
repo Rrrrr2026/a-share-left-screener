@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+import json
 import socket
 import argparse
 import logging
@@ -30,7 +31,9 @@ from ashare import module1_industry as m1
 from ashare import module2_tech as m2
 from ashare import module3_fundamentals as m3
 from ashare import module4_crossscore as m4
+from ashare import module5_probability as m5
 from ashare import module6_profile as m6
+from ashare import module7_guidance as m7
 from ashare import export_data as ex
 
 # Windows 控制台默认 GBK, 输出中文/emoji 会报 UnicodeEncodeError; 统一切到 UTF-8
@@ -208,6 +211,19 @@ def run(full_market: bool, use_cache: bool):
             spot_row=spot_map.get(rec["code"]),
             prosperity=prosperity_map.get(industry) if industry else None)
         fr = m4.cross_score(rec, f, prosperity_map.get(industry) if industry else None)
+        # 模块5: 历史类比概率目标位 (拉10年日线, 统计该股历次同等深跌后的表现)
+        # 失败/数据不够长都只是没有概率栏, 不影响其它字段。
+        try:
+            lg = ds.fetch_hist_long(rec["code"])
+            if lg is not None and not lg.empty:
+                prob = m5.attach_targets(
+                    m5.probability_profile(lg), rec.get("price"),
+                    rec.get("support_price"), rec.get("breakdown_price"))
+                fr["prob_json"] = json.dumps(prob, ensure_ascii=False)
+                fr["prob_n"] = prob.get("prob_n")
+                fr["prob_summary"] = m5.summary_text(prob)
+        except Exception as e:  # noqa: BLE001
+            log.debug("概率目标位失败 %s: %s", rec["code"], e)
         return (rec, detail, f, fr)
 
     results = []
@@ -250,6 +266,39 @@ def run(full_market: bool, use_cache: bool):
             db.save_profile(run_date, fr["code"], p)
         except Exception as e:
             log.debug("深度档案失败 %s: %s", fr["code"], e)
+
+    # ---------------- 模块7: 盈利指引 (阶段D) ----------------
+    # 对综合分最高的前N只, 拉~10年长历史, 统计"历史上同类大回撤之后实际怎么走"。
+    # 数据脏(错乱行)的票会被 fetch_long_hist 的体检拒掉 -> 该股不出指引, 不给假数字。
+    gcfg = CONFIG.get("guidance") or {}
+    if gcfg.get("enabled"):
+        g_targets = (final_records[:show_n] + dip_tail)[:gcfg.get("top_n", 100)]
+        log.info("阶段D 盈利指引: %d 只 (拉%d年历史做同类形态统计) 并发 %d ...",
+                 len(g_targets), gcfg.get("years", 10), gcfg.get("workers", 6))
+        tech_by_code = {rec["code"]: rec for rec, _, _, _ in results}
+
+        def _guide(fr):
+            code = fr["code"]
+            hist = ds.fetch_long_hist(code, years=gcfg.get("years", 10))
+            if hist is None:
+                return code, {"guid_n": 0, "guid_note": "历史数据不可用或未通过体检"}
+            t = tech_by_code.get(code, {})
+            return code, m7.analyze(hist, support_price=t.get("support_price"),
+                                    price_now=t.get("price"))
+
+        n_ok = 0
+        with ThreadPoolExecutor(max_workers=gcfg.get("workers", 6)) as pool:
+            futs = [pool.submit(_guide, fr) for fr in g_targets]
+            for fut in tqdm(as_completed(futs), total=len(futs)):
+                try:
+                    code, g = fut.result()
+                except Exception as e:
+                    log.debug("盈利指引失败: %s", e)
+                    continue
+                db.save_guidance(run_date, code, g)
+                if g.get("guid_n"):
+                    n_ok += 1
+        log.info("盈利指引: %d/%d 只拿到有效样本", n_ok, len(g_targets))
 
     finished = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     db.log_run(run_date, started, finished, n_scanned, len(final_records),

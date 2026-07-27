@@ -35,6 +35,7 @@ MAIN_COLUMNS = [
     ("pe_disp", "市盈率TTM(分位)"), ("pb", "市净率"), ("eps", "EPS"), ("roe", "ROE"),
     ("revenue_yoy", "营收同比%"), ("netprofit_yoy", "归母净利同比%"),
     ("growth_quality", "增速质量"),
+    ("guid_buy_high", "参考买入位"), ("guid_disp", "盈利指引(历史频率)"),
 ]
 
 
@@ -144,6 +145,29 @@ def build_payload(run_date: str | None = None) -> dict:
     for pr in db.fetch_table("profile", run_date):
         profiles[pr["code"]] = _loads(pr["profile_json"], default={})
 
+    # 盈利指引(模块7): 完整对象放 guidance{}, 主表只挂摘要字段
+    guidance = {}
+    for gr in db.fetch_table("guidance", run_date):
+        guidance[gr["code"]] = _loads(gr["guidance_json"], default={})
+    for row in candidates:
+        g = guidance.get(row.get("code")) or {}
+        row["guid_n"] = g.get("guid_n") or 0
+        row["guid_buy_low"] = g.get("guid_buy_low")
+        row["guid_buy_high"] = g.get("guid_buy_high")
+        row["guid_med_mae"] = g.get("guid_med_mae")
+        row["guid_med_gain"] = g.get("guid_med_gain")
+        row["guid_win_rate"] = g.get("guid_win_rate")
+        probs = {p["target"]: p["prob"] for p in (g.get("guid_probs") or [])}
+        row["guid_p100"] = probs.get(100)
+        row["guid_p50"] = probs.get(50)
+        row["guid_p30"] = probs.get(30)
+        if row["guid_n"] and row["guid_p50"] is not None:
+            row["guid_disp"] = (f"+50%:{row['guid_p50']*100:.0f}%／"
+                                f"+100%:{(row['guid_p100'] or 0)*100:.0f}%"
+                                f"({row['guid_n']}次)")
+        else:
+            row["guid_disp"] = None
+
     payload = {
         "meta": {
             "run_date": run_date,
@@ -157,6 +181,7 @@ def build_payload(run_date: str | None = None) -> dict:
         "candidates": candidates,
         "details": details,
         "profiles": profiles,
+        "guidance": guidance,
         "columns": [{"key": k, "label": lab} for k, lab in MAIN_COLUMNS],
     }
     return payload

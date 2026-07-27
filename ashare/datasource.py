@@ -398,6 +398,118 @@ def _hist_from_sina(code: str) -> pd.DataFrame | None:
 
 
 # ===========================================================================
+#  2b) 长历史日线 (盈利指引回测用, ~10年前复权)
+#      东财 push2his / 新浪 / 网易 在本机均不可达 -> 用腾讯 fqkline。
+#      腾讯单次最多返回 ~640 根, 但支持按日期区间查询 -> 分段翻页拼接。
+# ===========================================================================
+_TENCENT_KLINE = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+
+
+def _tencent_symbol(code: str) -> str:
+    code = str(code).zfill(6)
+    if code.startswith("920") or code.startswith(("8", "4")):
+        return "bj" + code
+    if code.startswith(("6", "9")):
+        return "sh" + code
+    return "sz" + code
+
+
+def _tencent_chunk(sym: str, start: str, end: str) -> list:
+    """取一段日线(前复权)。返回 [[date,open,close,high,low,volume], ...]。"""
+    import requests
+    p = {"param": f"{sym},day,{start},{end},640,qfq"}
+    r = requests.get(_TENCENT_KLINE, params=p,
+                     headers={"User-Agent": _BROWSER_UA}, timeout=25)
+    j = r.json()
+    if j.get("msg") == "param error":
+        return []
+    d = j.get("data") or {}
+    if not isinstance(d, dict):
+        return []
+    sub = d.get(sym) or {}
+    if not isinstance(sub, dict):
+        return []
+    return sub.get("qfqday") or sub.get("day") or []
+
+
+def _long_hist_is_sane(df: pd.DataFrame, code: str = "") -> bool:
+    """长历史数据体检。回测最怕"脏数据算出漂亮结论"(实测某些票会返回错乱行:
+    单日 high/low 振幅 60%+、隔日跳变 40%+, 据此算出的 '历史涨过2142%' 是假的)。
+    任何一项超阈值直接判脏 -> 上层拒绝出统计, 而不是给出可信度不明的数字。"""
+    need = {"open", "high", "low", "close"}
+    if df is None or len(df) < 250 or not need.issubset(df.columns):
+        return False
+    o, h, l, c = (df[k].astype(float) for k in ("open", "high", "low", "close"))
+    n = len(df)
+    bad = 0
+    bad += int((h < l).sum())                                   # 最高<最低
+    bad += int((h < o - 1e-9).sum()) + int((h < c - 1e-9).sum())  # 最高不封顶
+    bad += int((l > o + 1e-9).sum()) + int((l > c + 1e-9).sum())  # 最低不兜底
+    if bad > n * 0.01:
+        log.debug("长历史 %s 脏: OHLC 关系违规 %d/%d", code, bad, n)
+        return False
+    # 日内振幅: A股有涨跌停, 正常 <=22%; 超 35% 的行视为错乱
+    rng = ((h - l) / c.replace(0, np.nan)).abs()
+    if int((rng > 0.35).sum()) > n * 0.01:
+        log.debug("长历史 %s 脏: 日内振幅异常 %d/%d", code, int((rng > 0.35).sum()), n)
+        return False
+    # 隔日跳变: 除权/停牌复牌会有大跳, 但占比应极低; 超 25% 的跳变过多 = 拼接错位
+    jump = (c / c.shift(1) - 1).abs()
+    if int((jump > 0.25).sum()) > max(3, n * 0.005):
+        log.debug("长历史 %s 脏: 隔日跳变异常 %d/%d", code, int((jump > 0.25).sum()), n)
+        return False
+    return True
+
+
+def fetch_long_hist(code: str, years: int = 10) -> pd.DataFrame | None:
+    """~N年前复权日线 (date/open/high/low/close/volume)。分段翻页 + 缓存。
+    盈利指引的回测样本靠它; 常规扫描仍用 fetch_hist(500天) 不受影响。"""
+    key = _cache_key("longhist", code, years, dt.date.today().isoformat())
+    c = _cache_load(key)
+    if isinstance(c, str) and c == "BAD":     # 当轮已判定脏, 不再重拉
+        return None
+    if c is not None:
+        return c
+    sym = _tencent_symbol(code)
+    today = dt.date.today()
+    rows, seen = [], set()
+    # 每段约 2.5 年(<640根), 从最早往今天翻
+    seg = 900                                  # 天/段
+    cur = today - dt.timedelta(days=365 * years)
+    while cur < today:
+        nxt = min(cur + dt.timedelta(days=seg), today)
+        try:
+            kl = call_with_retry(_tencent_chunk, sym,
+                                 cur.isoformat(), nxt.isoformat())
+        except Exception as e:
+            log.debug("腾讯长历史 %s [%s~%s] 失败: %s", code, cur, nxt, e)
+            kl = []
+        for k in kl:
+            if not k or len(k) < 5:
+                continue
+            d0 = str(k[0])
+            if d0 in seen:
+                continue
+            seen.add(d0)
+            rows.append(k[:6])
+        cur = nxt + dt.timedelta(days=1)
+    if len(rows) < 250:                        # 不足1年 -> 视为拿不到
+        return None
+    df = pd.DataFrame(rows, columns=["date", "open", "close", "high", "low", "volume"][:len(rows[0])])
+    for col in ("open", "close", "high", "low", "volume"):
+        if col in df.columns:
+            df[col] = _to_num(df[col])
+    df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
+    df = df.dropna(subset=["date", "close"]).sort_values("date").reset_index(drop=True)
+    if not _long_hist_is_sane(df, code):
+        log.info("长历史 %s 未通过数据体检, 放弃(该股不出盈利指引)", code)
+        _cache_save(key, "BAD")          # 缓存坏结果, 当轮不反复重拉
+        return None
+    _cache_save(key, df)
+    return df
+
+
+# ===========================================================================
 #  3) 行业列表 / 成分 / 指数历史  ——  stock_board_industry_*_em (东财一级)
 # ===========================================================================
 def fetch_industry_list() -> pd.DataFrame | None:
