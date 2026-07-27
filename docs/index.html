@@ -252,6 +252,7 @@
       <button class="segbtn" data-tab="tabCo" data-i18n="tab_co">公司与业务</button>
       <button class="segbtn" data-tab="tabCf" data-i18n="tab_cf">现金流与风险</button>
       <button class="segbtn" data-tab="tabNw" data-i18n="tab_nw">消息与博弈</button>
+      <button class="segbtn" data-tab="tabGd" data-i18n="tab_gd">盈利指引</button>
     </div>
 
     <!-- ① 总览 -->
@@ -327,6 +328,46 @@
       <h4 class="sec-title mb-2"><span data-i18n="block_title">大宗交易（暗池代理）</span> <span id="dBlockSum" class="text-xs text-slate-400 font-normal"></span></h4>
       <div id="dBlock" class="card p-4 mb-2"></div>
     </div>
+
+    <!-- ⑤ 盈利指引 -->
+    <div id="tabGd" class="dtab hidden">
+      <div id="dGdEmpty" class="card p-6 text-center text-[13px] hidden" style="color:var(--muted)"></div>
+      <div id="dGdBody" class="hidden">
+        <!-- 参考买入区 + 四个关键统计 -->
+        <div class="card p-4 mb-3">
+          <div class="flex items-baseline justify-between flex-wrap gap-2 mb-1">
+            <h4 class="sec-title" data-i18n="gd_zone">参考买入区间</h4>
+            <span id="dGdZoneNote" class="text-[11.5px]" style="color:var(--muted)"></span>
+          </div>
+          <div id="dGdZone" class="ovnum text-[26px] font-bold" style="color:#38bdf8"></div>
+        </div>
+        <div id="dGdKpi" class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4"></div>
+
+        <!-- 图1: 各目标涨幅的历史频率 -->
+        <h4 class="sec-title mb-1" data-i18n="gd_prob_title">达到各目标涨幅的历史频率</h4>
+        <div class="text-xs mb-2" style="color:var(--muted)" data-i18n="gd_prob_note">
+          在该股历史上"同样大回撤 + 跌到低位"的时刻买入后，一年内最高价曾达到该涨幅的次数占比。
+        </div>
+        <div id="dGdProbChart" style="width:100%;height:190px;" class="mb-4"></div>
+
+        <!-- 图2: 每一次历史样本的实际结果 -->
+        <h4 class="sec-title mb-1" data-i18n="gd_samp_title">历史每一次的实际结果</h4>
+        <div class="text-xs mb-2" style="color:var(--muted)" data-i18n="gd_samp_note">
+          每根横条 = 一次历史形态：左端是买入后最深跌幅(接刀代价)，右端是一年内最高涨幅，圆点是满一年时的收益。
+        </div>
+        <div id="dGdSampChart" style="width:100%;height:260px;" class="mb-4"></div>
+
+        <!-- 样本明细 -->
+        <h4 class="sec-title mb-2" data-i18n="gd_tbl_title">样本明细</h4>
+        <div id="dGdTable" class="card overflow-x-auto mb-4"></div>
+
+        <!-- 方法与局限 -->
+        <div class="card p-4 text-[12.5px] leading-relaxed" style="color:var(--dim)">
+          <div class="font-semibold mb-2" style="color:var(--text)" data-i18n="gd_how_title">这些数字怎么来的 / 不是什么</div>
+          <div data-i18n-html="gd_how_body"></div>
+        </div>
+      </div>
+    </div>
   </div>
 </aside>
 
@@ -363,7 +404,17 @@
       f_rev:"营收同比 ≥", f_np:"归母净利同比 ≥", f_pe:"市盈率TTM ≤", f_gq:"增速质量",
       empty_hint:"无符合条件的标的。可放宽筛选或调整 CONFIG 阈值。",
       footer:"“左侧买入”风险更高，所有标的需人工复核 · 本页所有数据仅供研究，不构成投资建议。",
-      tab_ov:"总览", tab_co:"公司与业务", tab_cf:"现金流与风险", tab_nw:"消息与博弈",
+      tab_ov:"总览", tab_co:"公司与业务", tab_cf:"现金流与风险", tab_nw:"消息与博弈", tab_gd:"盈利指引",
+      gd_zone:"参考买入区间", gd_prob_title:"达到各目标涨幅的历史频率",
+      gd_prob_note:"在该股历史上「同样大回撤 + 跌到低位」的时刻买入后，一年内最高价曾达到该涨幅的次数占比。",
+      gd_samp_title:"历史每一次的实际结果",
+      gd_samp_note:"每根横条 = 一次历史形态：左端是买入后最深跌幅(接刀代价)，右端是一年内最高涨幅，圆点是满一年时的收益。",
+      gd_tbl_title:"样本明细", gd_how_title:"这些数字怎么来的 / 不是什么",
+      gd_n:"历史样本", gd_medgain:"最高涨幅中位", gd_medmae:"最深回撤中位", gd_win:"一年胜率",
+      gd_c_date:"形态出现日", gd_c_entry:"当时价", gd_c_gain:"一年内最高", gd_c_mae:"期间最深", gd_c_ret:"满一年",
+      gd_zone_note:"上沿=关键支撑位，下沿=按历史中位回撤再让一档",
+      gd_none:"该股暂无盈利指引：历史同类形态不足 3 次，或长历史数据未通过体检。样本太少时给出概率反而误导，所以这里留空。",
+      gd_how_body:"<b>做法</b>：在这只股票<b>自己的历史</b>里，找出所有和现在处境相似的时刻——同样从高点回撤≥30%、同样跌到区间低位或超卖——然后统计每一次之后<b>实际</b>走出的结果。<br><br><b>为什么不用机器学习</b>：单只股票十年里这种形态通常只有 3~15 次。样本这么少，任何模型都只会过拟合噪声，给出好看但没有意义的数字。条件频率统计是这个样本量下唯一诚实的做法，而且每个数字都能追溯到上面表格里的具体日期。<br><br><b>怎么保证不自欺</b>：① 两次样本至少间隔 120 个交易日，否则同一波行情会被重复计数、把概率算高；② 只统计有完整一年前向数据的样本，不看一半就下结论；③ 样本少于 3 次直接不给概率；④ 用最高价/最低价算真实可触达的幅度，不用收盘价美化。<br><br><b>这不是什么</b>：<b>这是历史频率，不是未来概率预测。</b>过去在这个形态上涨过，不代表这次会涨；样本再多也只有十几次，统计意义有限。基本面已经变化的公司，历史形态更可能失效。请把它当作「历史上这种位置大概是什么体验」的参考，而不是买入信号。",
       tv_title:"TradingView 交互图（实时）", tv_link:"在 TradingView 打开概览页 ↗",
       fund_glance:"基本面速览", val_pct:"估值历史分位", roe_trend:"ROE 多年趋势",
       co_profile:"公司简介", co_mgmt:"管理层增减持",
@@ -448,7 +499,17 @@
       f_rev:"Rev YoY ≥", f_np:"Net Profit YoY ≥", f_pe:"P/E TTM ≤", f_gq:"Growth Quality",
       empty_hint:"No matches. Loosen the filters or adjust the CONFIG thresholds.",
       footer:"Left-side entries carry higher risk; verify every name manually · data for research only, not investment advice.",
-      tab_ov:"Overview", tab_co:"Company & Business", tab_cf:"Cash Flow & Risk", tab_nw:"News & Positioning",
+      tab_ov:"Overview", tab_co:"Company & Business", tab_cf:"Cash Flow & Risk", tab_nw:"News & Positioning", tab_gd:"Odds",
+      gd_zone:"Reference Buy Zone", gd_prob_title:"Historical frequency of reaching each gain target",
+      gd_prob_note:"Among past moments with the same setup (deep drawdown + near range low), how often the high within one year reached each target.",
+      gd_samp_title:"What actually happened each time",
+      gd_samp_note:"Each bar = one historical instance: left end = deepest drop after entry, right end = highest gain within a year, dot = return at the one-year mark.",
+      gd_tbl_title:"Sample detail", gd_how_title:"Where these numbers come from / what they are not",
+      gd_n:"Samples", gd_medgain:"Median max gain", gd_medmae:"Median max drawdown", gd_win:"1-year win rate",
+      gd_c_date:"Setup date", gd_c_entry:"Price then", gd_c_gain:"Max within 1y", gd_c_mae:"Deepest drop", gd_c_ret:"At 1 year",
+      gd_zone_note:"Upper = key support; lower = one notch below, per median historical drawdown",
+      gd_none:"No odds for this stock: fewer than 3 comparable historical setups, or the long history failed the data sanity check. With too few samples a probability would mislead, so it is left blank.",
+      gd_how_body:"<b>Method</b>: within this stock's <b>own history</b>, find every moment resembling the present — same ≥30% drawdown from the high, same drop to the range low or oversold — then tabulate what <b>actually</b> happened afterwards.<br><br><b>Why not machine learning</b>: a single stock has only 3–15 such setups per decade. At that sample size any model overfits noise and produces numbers that look good but mean nothing. Conditional frequency is the only honest approach here, and every figure traces back to a specific date in the table above.<br><br><b>Guards against self-deception</b>: (1) samples are ≥120 trading days apart, or one rally gets counted twice and inflates the odds; (2) only setups with a full forward year are counted; (3) fewer than 3 samples → no probability shown; (4) highs/lows are used, so the range is what was actually reachable.<br><br><b>What this is not</b>: <b>these are historical frequencies, not forecasts.</b> That the pattern paid off before does not mean it will now, and a dozen samples carry limited statistical weight. For a company whose fundamentals have changed, the historical pattern is more likely to break. Treat it as context for what this kind of level has felt like historically — not as a buy signal.",
       tv_title:"TradingView Chart (live)", tv_link:"Open TradingView overview ↗",
       fund_glance:"Fundamentals at a Glance", val_pct:"Valuation History Percentile", roe_trend:"ROE Multi-Year Trend",
       co_profile:"Company Profile", co_mgmt:"Insider Transactions",
@@ -1098,6 +1159,94 @@
     profCharts[key]=ch; return ch;
   }
   function disposeProf(){ Object.keys(profCharts).forEach(k=>{ if(profCharts[k]){ profCharts[k].dispose(); profCharts[k]=null; } }); }
+
+  // ---------- ⑤ 盈利指引页签 ----------
+  // 数据来自模块7: 在该股自身长历史里找"同样大回撤+跌到低位"的时刻, 统计其后一年的真实结果。
+  // 展示原则: 样本不足就明说不给概率; 每个数字都能在下方样本表里追溯到具体日期。
+  function renderGdTab(){
+    const c=curC||{}; const g=(DATA.guidance||{})[c.code]||{};
+    const samples=g.guid_samples||[]; const n=g.guid_n||0;
+    const empty=$("#dGdEmpty"), body=$("#dGdBody");
+    if(!n || !samples.length){
+      empty.textContent = g.guid_note ? `${t("gd_none")}（${g.guid_note}）` : t("gd_none");
+      empty.classList.remove("hidden"); body.classList.add("hidden"); return;
+    }
+    empty.classList.add("hidden"); body.classList.remove("hidden");
+    const C=tc(), pct=v=>isNum(v)?`${v>0?"+":""}${v.toFixed(1)}%`:dash;
+
+    // --- 买入区间 ---
+    const lo=g.guid_buy_low, hi=g.guid_buy_high;
+    $("#dGdZone").textContent = isNum(hi) ? (isNum(lo)&&lo<hi ? `${CUR}${lo.toFixed(2)} ~ ${CUR}${hi.toFixed(2)}` : `${CUR}${hi.toFixed(2)}`) : dash;
+    $("#dGdZoneNote").textContent = t("gd_zone_note");
+
+    // --- 四个关键统计 ---
+    const kpi=[[t("gd_n"), `${n}`, "var(--text)"],
+               [t("gd_medgain"), pct(g.guid_med_gain), "#f87171"],
+               [t("gd_medmae"), pct(g.guid_med_mae), "#4ade80"],
+               [t("gd_win"), isNum(g.guid_win_rate)?`${(g.guid_win_rate*100).toFixed(0)}%`:dash, "var(--text)"]];
+    $("#dGdKpi").innerHTML = kpi.map(([k,v,col])=>
+      `<div class="card p-3"><div class="ovlabel">${escH(k)}</div>
+       <div class="ovnum text-[19px] font-bold mt-1" style="color:${col}">${escH(v)}</div></div>`).join("");
+
+    // --- 图1: 各目标涨幅的历史频率 (概率是0-100的量, 从0起画条是正确的) ---
+    const probs=(g.guid_probs||[]).slice().reverse();
+    const ch1=pcInit("#dGdProbChart","gdProb");
+    ch1.setOption({backgroundColor:"transparent",
+      grid:{left:62,right:66,top:8,bottom:8},
+      tooltip:{trigger:"axis",axisPointer:{type:"shadow"},
+        formatter:p=>{const d=probs[p[0].dataIndex];
+          return `${t("gd_prob_title")}<br/><b>+${d.target}%</b>：${(d.prob*100).toFixed(0)}%（${d.hits}/${n} 次）`;}},
+      xAxis:{type:"value",max:100,axisLabel:{formatter:"{value}%",color:C.axis,fontSize:11},
+             splitLine:{lineStyle:{color:C.grid,type:"dashed"}},axisLine:{show:false},axisTick:{show:false}},
+      yAxis:{type:"category",data:probs.map(d=>`+${d.target}%`),
+             axisLabel:{color:C.label,fontSize:12},axisLine:{show:false},axisTick:{show:false}},
+      series:[{type:"bar",barWidth:"46%",
+        itemStyle:{color:"#38bdf8",borderRadius:[0,4,4,0]},
+        data:probs.map(d=>+(d.prob*100).toFixed(0)),
+        label:{show:true,position:"right",distance:7,fontSize:11.5,color:C.label,
+               formatter:p=>`${p.value}%  (${probs[p.dataIndex].hits}/${n})`}}]});
+
+    // --- 图2: 每一次样本的实际结果 (以买入价为0轴, 左红=最深跌 右绿=最高涨) ---
+    const sm=samples.slice().reverse();
+    const ch2=pcInit("#dGdSampChart","gdSamp");
+    ch2.setOption({backgroundColor:"transparent",
+      grid:{left:86,right:56,top:26,bottom:8},
+      legend:{top:0,right:8,itemWidth:9,itemHeight:9,textStyle:{color:C.label,fontSize:11},
+              data:[t("gd_c_mae"),t("gd_c_gain"),t("gd_c_ret")]},
+      tooltip:{trigger:"axis",axisPointer:{type:"shadow"},
+        formatter:p=>{const d=sm[p[0].dataIndex];
+          return `<b>${d.date}</b>　${t("gd_c_entry")} ${CUR}${d.entry}<br/>`+
+                 `${t("gd_c_gain")}：<b style="color:#f87171">${pct(d.max_gain_pct)}</b><br/>`+
+                 `${t("gd_c_mae")}：<b style="color:#4ade80">${pct(d.mae_pct)}</b><br/>`+
+                 `${t("gd_c_ret")}：<b>${pct(d.ret_1y_pct)}</b>`;}},
+      xAxis:{type:"value",axisLabel:{formatter:"{value}%",color:C.axis,fontSize:11},
+             splitLine:{lineStyle:{color:C.grid,type:"dashed"}},axisLine:{show:false},axisTick:{show:false}},
+      yAxis:{type:"category",data:sm.map(d=>d.date),
+             axisLabel:{color:C.label,fontSize:11},axisLine:{show:false},axisTick:{show:false}},
+      series:[
+        {name:t("gd_c_mae"),type:"bar",stack:"o",barWidth:"52%",
+         itemStyle:{color:"rgba(74,222,128,.75)",borderRadius:[4,0,0,4]},
+         data:sm.map(d=>d.mae_pct)},
+        {name:t("gd_c_gain"),type:"bar",stack:"o",barWidth:"52%",
+         itemStyle:{color:"rgba(248,113,113,.8)",borderRadius:[0,4,4,0]},
+         data:sm.map(d=>d.max_gain_pct)},
+        {name:t("gd_c_ret"),type:"scatter",symbolSize:9,z:5,
+         itemStyle:{color:C.label,borderColor:(document.body.classList.contains("light")?"#fff":"#0f1626"),borderWidth:2},
+         data:sm.map((d,i)=>[d.ret_1y_pct,i])}
+      ]});
+
+    // --- 样本明细表 ---
+    const th=[t("gd_c_date"),t("gd_c_entry"),t("gd_c_gain"),t("gd_c_mae"),t("gd_c_ret")];
+    $("#dGdTable").innerHTML =
+      `<table class="w-full"><thead><tr>${th.map((x,i)=>
+        `<th class="${i?'text-right':'text-left'}">${escH(x)}</th>`).join("")}</tr></thead><tbody>`+
+      samples.map(d=>`<tr>
+        <td>${escH(d.date)}</td>
+        <td class="num">${CUR}${d.entry}</td>
+        <td class="num" style="color:#f87171">${pct(d.max_gain_pct)}</td>
+        <td class="num" style="color:#4ade80">${pct(d.mae_pct)}</td>
+        <td class="num">${pct(d.ret_1y_pct)}</td></tr>`).join("")+`</tbody></table>`;
+  }
   function fm(v){ if(!isNum(v)) return dash; const a=Math.abs(v), s=v<0?"-":""; return a>=1000? `${s}$${(a/1000).toFixed(1)}B` : `${s}$${a.toFixed(0)}M`; }
   const escH = s => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
@@ -1180,6 +1329,7 @@
     if(id==="tabCo") renderCoTab();
     else if(id==="tabCf") renderCfTab();
     else if(id==="tabNw") renderNwTab();
+    else if(id==="tabGd") renderGdTab();
   }
   document.querySelectorAll('#dTabs .segbtn').forEach(b=>{ b.onclick=()=>switchTab(b.dataset.tab); });
   let roeGran="y", cashGran="y";

@@ -35,7 +35,8 @@ MAIN_COLUMNS = [
     ("pe_disp", "市盈率TTM(分位)"), ("pb", "市净率"), ("eps", "EPS"), ("roe", "ROE"),
     ("revenue_yoy", "营收同比%"), ("netprofit_yoy", "归母净利同比%"),
     ("growth_quality", "增速质量"),
-    ("guid_buy_high", "参考买入位"), ("guid_disp", "盈利指引(历史频率)"),
+    # 注: 盈利指引(买入位/概率)不进主表 —— 它需要图表与方法说明才能被正确解读,
+    #     放在详情抽屉的「盈利指引」页签里(第5个)。摘要字段仍随 candidates 下发。
 ]
 
 
