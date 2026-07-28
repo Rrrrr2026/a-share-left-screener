@@ -201,9 +201,11 @@ def run(full_market: bool, use_cache: bool):
         rec, detail = rd
         industry = rec.get("industry")
         if not industry:
-            # 全市场回退时个股无行业归属 -> 雪球补全(走443可达), 让"所属行业"列不再空。
-            # 名称与同花顺景气榜口径不完全一致, 完全一致时顺带吃到"景气加成"。
-            industry = ds.fetch_stock_industry(rec["code"])
+            # 全市场回退时个股无行业归属。优先用快照自带的 f100(东财行业) —— 它在拉
+            # 股票池时**顺带**就取到了, 零额外请求、全市场覆盖; 快照没有才逐只补(雪球/巨潮)。
+            industry = (spot_map.get(rec["code"]) or {}).get("industry")
+            if not industry:
+                industry = ds.fetch_stock_industry(rec["code"])
             rec["industry"] = industry
         f = m3.pull_fundamentals(
             rec["code"], industry=industry,

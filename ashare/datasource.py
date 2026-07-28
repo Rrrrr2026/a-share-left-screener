@@ -212,14 +212,127 @@ def fetch_spot_snapshot(force: bool = False) -> pd.DataFrame | None:
         c = _cache_load(key)
         if c is not None:
             return c
-    df = _spot_from_em()
+    # 顺序: 东财直连(多主机, 最稳) -> akshare东财 -> 新浪。
+    # 直连放第一位是因为 akshare 写死的主机在本机被挡, 而其余东财主机可达。
+    df = _spot_from_em_direct()
+    if df is None or df.empty:
+        log.info("东财直连快照不可用, 尝试 akshare 东财 ...")
+        df = _spot_from_em()
     if df is None or df.empty:
         log.info("东财快照不可用, 尝试新浪快照 ...")
         df = _spot_from_sina()
     if df is None or df.empty:
+        log.error("全部快照源均失败 -> 股票池为空, 本轮无法扫描。"
+                  "请检查网络/代理是否放行 push2.eastmoney.com")
         return None
     df["code"] = df["code"].astype(str).str.zfill(6)
     _cache_save(key, df)
+    return df
+
+
+# 东财行情主机池。akshare 写死用 17.push2, 而本机代理恰好挡住这一台 ——
+# 其余主机(push2 / 1.push2 / push2delay / 82.push2)实测均可达。
+# 2026-07-27 事故: akshare 东财快照失败 + 新浪快照 akshare 解析报错(list index out of
+# range) -> 股票池为空 -> 扫描数 0。故自己直连 + 多主机故障转移, 不再受制于 akshare。
+_EM_HOSTS = ("push2.eastmoney.com", "1.push2.eastmoney.com",
+             "push2delay.eastmoney.com", "82.push2.eastmoney.com",
+             "2.push2.eastmoney.com")
+_em_host_ok = None          # 记住第一个成功的主机, 后续优先用它
+_em_host_fails = {}         # 主机 -> 连续失败次数; 连挂多次就本轮拉黑, 不再浪费超时
+
+
+def _em_get(path: str, params: dict, timeout: int = 8):
+    """对东财接口做多主机轮询 + JSON 容错。全部失败返回 None。
+
+    分页要打几十次, 若每次都从头撞坏主机, 光超时就拖垮整轮(实测 298s):
+    故 ① 记住上次成功的主机并排最前; ② 连续失败 3 次的主机本轮拉黑跳过。
+    """
+    import requests
+    global _em_host_ok
+    live = [h for h in _EM_HOSTS if _em_host_fails.get(h, 0) < 3]
+    if not live:                                   # 全被拉黑 -> 清零重来(网络可能恢复了)
+        _em_host_fails.clear()
+        live = list(_EM_HOSTS)
+    if _em_host_ok in live:                        # 上次成功的主机排最前
+        live.remove(_em_host_ok); live.insert(0, _em_host_ok)
+    headers = {"User-Agent": _BROWSER_UA, "Referer": "https://quote.eastmoney.com/"}
+    for h in live:
+        try:
+            r = requests.get(f"https://{h}{path}", params=params,
+                             headers=headers, timeout=timeout)
+            if r.status_code != 200 or not r.text.strip().startswith("{"):
+                raise ValueError(f"bad body {r.status_code}")
+            j = r.json()
+            if not isinstance(j, dict) or j.get("data") is None:
+                raise ValueError("no data")
+            _em_host_ok = h
+            _em_host_fails[h] = 0
+            return j["data"]
+        except Exception as e:
+            _em_host_fails[h] = _em_host_fails.get(h, 0) + 1
+            if _em_host_fails[h] == 3:
+                log.info("东财主机 %s 连续失败3次, 本轮跳过", h)
+            log.debug("东财主机 %s 失败: %s", h, str(e)[:60])
+            continue
+    return None
+
+
+def _spot_from_em_direct() -> pd.DataFrame | None:
+    """全A快照: 直连东财 clist 分页拉取(不经 akshare), 带主机故障转移。
+    一次拿到 代码/名称/价格/量额/换手/量比/PE/PB/市值, 即股票池 + 估值字段。"""
+    fields = "f12,f14,f2,f3,f5,f6,f8,f9,f10,f15,f16,f20,f21,f23,f100"  # f100=所属行业
+    fs = "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048"   # 沪深主板/创业/科创/北交
+    rows, pn, pz = [], 1, 200
+    total = None
+    while True:
+        # 单页重试: 中途一次抖动就 break 会**静默截断股票池**(漏掉的股票整轮扫不到),
+        # 这比慢几秒严重得多 -> 每页最多重试3次(轮换主机), 仍失败才放弃并明确告警。
+        d = None
+        for _try in range(3):
+            d = _em_get("/api/qt/clist/get",
+                        {"pn": pn, "pz": pz, "po": 1, "np": 1, "fltt": 2, "invt": 2,
+                         "fid": "f3", "fs": fs, "fields": fields})
+            if d:
+                break
+            time.sleep(0.6 * (_try + 1))
+        if not d:
+            log.warning("东财快照第 %d 页三次重试仍失败, 股票池可能不完整", pn)
+            break
+        if total is None:
+            total = d.get("total") or 0
+        diff = d.get("diff") or []
+        if isinstance(diff, dict):          # 个别返回是 {"0":{...}} 形式
+            diff = list(diff.values())
+        if not diff:
+            break
+        rows.extend(diff)
+        if total and len(rows) >= total:
+            break
+        pn += 1
+        if pn > 60:                          # 安全上限 (60*200=12000 只)
+            break
+    if not rows:
+        return None
+    if total and len(rows) < total * 0.95:
+        log.warning("东财快照只取到 %d/%d 只(缺 %.0f%%), 本轮扫描范围偏小",
+                    len(rows), total, (1 - len(rows) / total) * 100)
+    df = pd.DataFrame(rows).rename(columns={
+        "f12": "code", "f14": "name", "f2": "price", "f3": "pct_chg",
+        "f5": "volume", "f6": "amount", "f8": "turnover", "f9": "pe_ttm",
+        "f10": "volume_ratio", "f15": "high", "f16": "low",
+        "f20": "total_mv", "f21": "float_mv", "f23": "pb", "f100": "industry"})
+    keep = [c for c in ("code", "name", "price", "pct_chg", "volume", "amount",
+                        "turnover", "pe_ttm", "volume_ratio", "high", "low",
+                        "total_mv", "float_mv", "pb", "industry") if c in df.columns]
+    df = df[keep].copy()
+    for col in df.columns:
+        if col not in ("code", "name", "industry"):
+            df[col] = _to_num(df[col])       # 东财用 "-" 表示缺失 -> NaN
+    df["code"] = df["code"].astype(str).str.zfill(6)
+    if "industry" in df.columns:              # "-" / "" 视为无行业
+        df["industry"] = df["industry"].astype(str).str.strip()
+        df.loc[df["industry"].isin(["-", "", "nan", "None"]), "industry"] = None
+    log.info("东财快照(直连 %s): %d 只", _em_host_ok, len(df))
     return df
 
 
@@ -529,7 +642,63 @@ def fetch_industry_list() -> pd.DataFrame | None:
     return df
 
 
+def _industry_list_em_direct() -> pd.DataFrame | None:
+    """东财一级行业板块列表 —— 直连 clist(fs=m:90 t:2), 走主机池。
+    拿到板块代码后, 成分股可用 fs=b:<board_code> 取到 -> 恢复'按行业扫描'的正常路径。"""
+    d = _em_get("/api/qt/clist/get",
+                {"pn": 1, "pz": 500, "po": 1, "np": 1, "fltt": 2, "invt": 2,
+                 "fid": "f3", "fs": "m:90 t:2 f:!50", "fields": "f12,f14,f3"})
+    if not d:
+        return None
+    diff = d.get("diff") or []
+    if isinstance(diff, dict):
+        diff = list(diff.values())
+    if not diff:
+        return None
+    df = pd.DataFrame(diff).rename(columns={"f12": "board_code", "f14": "industry",
+                                            "f3": "pct_chg"})
+    if "industry" not in df.columns:
+        return None
+    df.attrs["source"] = "em"
+    log.info("东财行业列表(直连): %d 个", len(df))
+    return df[[c for c in ("industry", "board_code", "pct_chg") if c in df.columns]]
+
+
+def _industry_cons_em_direct(board_code: str) -> pd.DataFrame | None:
+    """某板块成分股 —— 直连 clist(fs=b:<board_code>)。"""
+    rows, pn = [], 1
+    while True:
+        d = _em_get("/api/qt/clist/get",
+                    {"pn": pn, "pz": 200, "po": 1, "np": 1, "fltt": 2, "invt": 2,
+                     "fid": "f3", "fs": f"b:{board_code} f:!50", "fields": "f12,f14"})
+        if not d:
+            break
+        diff = d.get("diff") or []
+        if isinstance(diff, dict):
+            diff = list(diff.values())
+        if not diff:
+            break
+        rows.extend(diff)
+        total = d.get("total") or 0
+        if total and len(rows) >= total:
+            break
+        pn += 1
+        if pn > 20:
+            break
+    if not rows:
+        return None
+    df = pd.DataFrame(rows).rename(columns={"f12": "code", "f14": "name"})
+    if "code" not in df.columns:
+        return None
+    df["code"] = df["code"].astype(str).str.zfill(6)
+    return df[["code", "name"]]
+
+
 def _industry_list_em() -> pd.DataFrame | None:
+    # 注: 这里**故意不用** _industry_list_em_direct()。东财行业指数K线(push2his)在本机
+    # 不可达, 而模块1 需要每个行业的K线; 同花顺又不认东财独有的行业名(实测"文字媒体"
+    # "零食"均 FAIL) -> 若把列表换成东财口径, 景气榜会掉一大批行业。
+    # 行业列表保持"同花顺列表+同花顺K线"的一致口径; 个股行业归属另由快照 f100 提供。
     if _em_realtime_down:
         return None
     try:
@@ -562,12 +731,31 @@ def _industry_list_ths() -> pd.DataFrame | None:
     return df if "industry" in df.columns else None
 
 
+def _board_code_of(industry: str) -> str | None:
+    """行业名 -> 东财板块代码(BKxxxx), 取自行业列表(已缓存)。"""
+    try:
+        lst = fetch_industry_list()
+        if lst is None or lst.empty or "board_code" not in lst.columns:
+            return None
+        hit = lst[lst["industry"].astype(str) == str(industry)]
+        return str(hit.iloc[0]["board_code"]) if len(hit) else None
+    except Exception:
+        return None
+
+
 def fetch_industry_cons(industry: str) -> pd.DataFrame | None:
     key = _cache_key("ind_cons", industry, dt.date.today().isoformat())
     c = _cache_load(key)
     if c is not None:
         return c
-    if _em_realtime_down:    # 东财成分股(push2)无备用源, 直接放弃 -> 上层回退全市场
+    # 先走直连(akshare 默认主机 17.push2 在本机被挡, 其余主机可达)
+    bc = _board_code_of(industry)
+    if bc:
+        df = _industry_cons_em_direct(bc)
+        if df is not None and not df.empty:
+            _cache_save(key, df)
+            return df
+    if _em_realtime_down:    # 直连也失败 -> 上层回退全市场
         return None
     try:
         raw = call_with_retry(_ak().stock_board_industry_cons_em, symbol=industry)
