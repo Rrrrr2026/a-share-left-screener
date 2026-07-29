@@ -275,6 +275,39 @@ def recent_appearance_counts(run_dates: list[str]) -> dict:
     return {r["code"]: r["c"] for r in rows}
 
 
+def recent_breakouts(run_dates: list[str]) -> dict:
+    """近N轮里出现过 🚀 蓄势待发 的股票 -> {code: {days, first, last}}。
+
+    为什么需要跨日: **蓄势是一个持续状态, 不是当天发生的事件** —— 一只票可能磨底
+    数周, 期间每天都算"蓄势"。但综合分在阈值上下浮动会让标签忽隐忽现, 只看当天快照
+    就会漏掉昨天还在、今天差 0.01 分的票。故保留最近若干轮的命中记录一并展示。
+    """
+    if not run_dates:
+        return {}
+    qs = ",".join("?" * len(run_dates))
+    with get_conn() as conn:
+        try:
+            rows = conn.execute(
+                f"SELECT code, COUNT(DISTINCT run_date) days, MIN(run_date) first, "
+                f"MAX(run_date) last FROM final_rank "
+                f"WHERE run_date IN ({qs}) AND breakout=1 GROUP BY code",
+                run_dates).fetchall()
+        except Exception:          # 老库还没有 breakout 列
+            return {}
+    return {r["code"]: {"days": r["days"], "first": r["first"], "last": r["last"]}
+            for r in rows}
+
+
+def recent_run_dates_any(limit: int = 10) -> list[str]:
+    """最近若干个**有数据**的 run_date。不依赖 run_log ——
+    管线中途崩溃时不会写 run_log, 但 final_rank 里是有数据的, 用它才不会漏。"""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT run_date FROM final_rank ORDER BY run_date DESC LIMIT ?",
+            (limit,)).fetchall()
+    return [r["run_date"] for r in rows]
+
+
 def fetch_run_log(run_date: str) -> dict | None:
     with get_conn() as conn:
         cur = conn.execute("SELECT * FROM run_log WHERE run_date=?", (run_date,))

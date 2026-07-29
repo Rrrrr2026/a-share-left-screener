@@ -178,6 +178,7 @@
         <select id="filterInd"><option value="">全部板块</option></select>
         <select id="filterTag">
           <option value="">全部标签</option>
+          <option value="🚀 蓄势待发">🚀 蓄势待发</option>
           <option value="✅ 强左侧">✅ 强左侧</option>
           <option value="🧊 强左侧·横盘吸筹">🧊 强左侧·横盘吸筹</option>
           <option value="⚠️ 技术好但基本面弱">⚠️ 技术好但基本面弱</option>
@@ -932,7 +933,15 @@
   function cellHTML(c, key){
     const v = (key==="final_score") ? getVal(c,key) : c[key];
     switch(key){
-      case "tag": return `<span class="badge ${tagClass(v)}">${v?escH(tagText(v)):dash}</span>`;
+      case "tag": {
+        const base=`<span class="badge ${tagClass(v)}">${v?escH(tagText(v)):dash}</span>`;
+        // 蓄势是持续状态: 今天差一点没达标, 不代表这只票已离开该位置 -> 保留近日痕迹
+        if(!String(v||"").startsWith("🚀") && (c.brk_recent_days||0)>0){
+          const tip=`最近 ${c.brk_recent_days} 轮曾达到 🚀蓄势待发（最近一次 ${c.brk_last_date||"—"}）。蓄势是持续状态，今日未达标不代表已离开该位置。`;
+          return base+` <span class="badge" title="${tip}" style="background:rgba(56,189,248,.14);color:#7dd3fc;border:1px solid rgba(56,189,248,.4)">🚀${c.brk_recent_days}</span>`;
+        }
+        return base;
+      }
       case "kdj_tag": return `<span>${v?escH(kdjText(v)):dash}</span>`;
       case "streak": return streakCell(c.streak);
       case "spark": return sparkSVG(c.spark);
@@ -985,7 +994,12 @@
     if(state.search){ const q=state.search.toLowerCase();
       rows = rows.filter(c=> (c.code||"").toLowerCase().includes(q) || (c.name||"").toLowerCase().includes(q)); }
     if(state.ind) rows = rows.filter(c=> c.industry===state.ind);
-    if(state.tag) rows = rows.filter(c=> c.tag===state.tag);
+    if(state.tag){
+      // 选 🚀 时把"近N轮曾达标"的一并带出 —— 蓄势是持续状态, 不是当天事件
+      if(state.tag.startsWith("🚀"))
+        rows = rows.filter(c=> String(c.tag||"").startsWith("🚀") || (c.brk_recent_days||0)>0);
+      else rows = rows.filter(c=> c.tag===state.tag);
+    }
     if(state.favOnly) rows = rows.filter(c=> favs.has(c.code));
     if(state.minScore>0) rows = rows.filter(c=> isNum(getVal(c,"final_score")) && getVal(c,"final_score")>=state.minScore);
     if(state.maxDist<30) rows = rows.filter(c=> isNum(c.dist_support_pct) && Math.abs(c.dist_support_pct)<=state.maxDist);
@@ -1051,7 +1065,13 @@
     const avg=a=>a.length? (a.reduce((s,x)=>s+x,0)/a.length):null;
     const inds=new Set(cs.map(c=>c.industry).filter(Boolean)).size;
     const U=(n)=>LANG==="en"?"":" 只", G=(n)=>LANG==="en"?"":" 个";
+    // 🚀 常驻显示(即使今日 0 只) —— 用户每天首要关注它, 不能因为没命中就整个消失,
+    // 那样无法区分"今天没有"和"功能坏了"。括号内为近10轮曾达标的只数。
+    const brkNow = DATA.candidates.filter(c=>String(c.tag||"").startsWith("🚀")).length;
+    const brkRec = DATA.candidates.filter(c=>(c.brk_recent_days||0)>0
+                     && !String(c.tag||"").startsWith("🚀")).length;
     const items=[
+      ["🚀 蓄势待发", brkNow+U()+(brkRec?`（近日 ${brkRec}）`:""), brkNow?"#7dd3fc":"var(--muted)"],
       [t("strip_strong"), strong+U(), "#4ade80"],
       [t("strip_avgdist"), isNum(avg(dists))?avg(dists).toFixed(2)+"%":dash, "#38bdf8"],
       [t("strip_avgup"), isNum(avg(ups))?avg(ups).toFixed(1)+"%":dash, "#f59e0b"],

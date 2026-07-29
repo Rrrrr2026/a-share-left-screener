@@ -64,6 +64,9 @@ def build_payload(run_date: str | None = None) -> dict:
     selected_inds = [r["industry"] for r in industries_sorted if r.get("selected")]
 
     appear = db.recent_appearance_counts(db.recent_run_dates(5))   # 连续上榜次数
+    # 🚀 跨日追踪: 蓄势是持续状态, 昨天/前天命中的今天多半还在同一位置。
+    # 只看当天快照会因分数在阈值上下浮动而漏掉, 故并入近10轮的命中记录。
+    brk_recent = db.recent_breakouts(db.recent_run_dates_any(10))
     candidates = []
     for fr in finals:
         code = fr["code"]
@@ -128,6 +131,9 @@ def build_payload(run_date: str | None = None) -> dict:
             "target_price": f.get("target_price"), "analyst_rating": f.get("analyst_rating"),
             "analyst_count": f.get("analyst_count"), "upside_pct": f.get("upside_pct"),
             "streak": appear.get(code, 1),
+            # 近N轮命中🚀的记录(即使今天没达标也保留, 供筛选与展示)
+            "brk_recent_days": (brk_recent.get(code) or {}).get("days", 0),
+            "brk_last_date": (brk_recent.get(code) or {}).get("last"),
         }
         candidates.append(row)
 

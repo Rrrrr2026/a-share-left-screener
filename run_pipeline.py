@@ -220,6 +220,11 @@ def run(full_market: bool, use_cache: bool):
             if r:
                 hits.append(r)
     log.info("技术命中 %d 只", len(hits))
+    # 扫描数一旦已知就先落库(status=running)。原来只在全流程末尾写 run_log,
+    # 后续任一阶段崩溃(实测发生过多次)就整条记录丢失 -> 看板上"今日扫描数"变空白,
+    # 用户无从判断跑了多少。这里先记一笔, 末尾再用最终结果覆盖成 ok。
+    db.log_run(run_date, started, "", n_scanned, len(hits), selected_inds,
+               "running", "阶段A已完成, 后续阶段进行中")
 
     # ---------------- 模块3-4: 仅对技术分最高的前N只拉基本面 (阶段B) ----------------
     # 技术分降序; 同分时按代码升序, 保证跨次运行结果确定(否则受线程完成顺序影响)
