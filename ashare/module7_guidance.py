@@ -63,9 +63,13 @@ DEFAULTS = {
 }
 
 
-def _cfg() -> dict:
+def _cfg(overrides: dict | None = None) -> dict:
+    """DEFAULTS <- CONFIG.guidance <- 显式传入。**必须走这里合并**:
+    外部(如管线)常只传 CONFIG['guidance'](v1遗留键), 直接当 cfg 用会 KeyError。"""
     d = dict(DEFAULTS)
     d.update(CONFIG.get("guidance") or {})
+    if overrides:
+        d.update({k: v for k, v in overrides.items() if v is not None})
     return d
 
 
@@ -160,7 +164,7 @@ def observations_for(code: str, df: pd.DataFrame, meta: dict, cfg: dict) -> list
 def build_model(codes: list, spot_map: dict, hist_getter, cfg: dict = None,
                 progress=None) -> dict | None:
     """扫一批股票的长历史, 汇成跨股票样本池。返回 dict 并落盘。"""
-    cfg = cfg or _cfg()
+    cfg = _cfg(cfg)
     X, Y, IND, CODES, NAMES = [], [], [], [], []
     n_ok = 0
     for j, code in enumerate(codes):
@@ -207,7 +211,7 @@ def build_model(codes: list, spot_map: dict, hist_getter, cfg: dict = None,
 
 
 def load_model(cfg: dict = None) -> dict | None:
-    cfg = cfg or _cfg()
+    cfg = _cfg(cfg)
     if not os.path.exists(MODEL_PATH):
         return None
     try:
@@ -238,7 +242,7 @@ def _weighted_quantile(vals, w, q):
 def predict(code: str, df: pd.DataFrame, model: dict, spot_row: dict | None = None,
             support_price: float | None = None, cfg: dict = None) -> dict:
     """对一只股票给出盈利指引。df 为其日线(至少 ~300 根)。"""
-    cfg = cfg or _cfg()
+    cfg = _cfg(cfg)
     out = {"guid_n": 0, "guid_probs": [], "guid_note": None, "guid_tier": None,
            "guid_med_gain": None, "guid_med_mae": None, "guid_win_rate": None,
            "guid_buy_low": None, "guid_buy_high": None, "guid_samples": [],

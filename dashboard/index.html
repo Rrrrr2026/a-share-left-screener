@@ -411,8 +411,9 @@
       gd_samp_note:"每根横条 = 一次历史形态：左端是买入后最深跌幅(接刀代价)，右端是一年内最高涨幅，圆点是满一年时的收益。",
       gd_tbl_title:"样本明细", gd_how_title:"这些数字怎么来的 / 不是什么",
       gd_n:"历史样本", gd_medgain:"最高涨幅中位", gd_medmae:"最深回撤中位", gd_win:"一年胜率",
-      gd_c_date:"形态出现日", gd_c_entry:"当时价", gd_c_gain:"一年内最高", gd_c_mae:"期间最深", gd_c_ret:"满一年",
-      gd_zone_note:"上沿=关键支撑位，下沿=按历史中位回撤再让一档",
+      gd_c_date:"可比案例", gd_c_entry:"相似度", gd_c_gain:"一年内最高", gd_c_mae:"期间最深", gd_c_ret:"满一年",
+      gd_zone_note:"上沿=关键支撑位，下沿=按同类案例中位回撤再让一档",
+      gd_tier:"匹配层级", gd_vol:"本股年化波动", gd_sameind:"其中同行业",
       gd_none:"该股暂无盈利指引：历史同类形态不足 3 次，或长历史数据未通过体检。样本太少时给出概率反而误导，所以这里留空。",
       gd_how_body:"<b>做法</b>：在这只股票<b>自己的历史</b>里，找出所有和现在处境相似的时刻——同样从高点回撤≥30%、同样跌到区间低位或超卖——然后统计每一次之后<b>实际</b>走出的结果。<br><br><b>为什么不用机器学习</b>：单只股票十年里这种形态通常只有 3~15 次。样本这么少，任何模型都只会过拟合噪声，给出好看但没有意义的数字。条件频率统计是这个样本量下唯一诚实的做法，而且每个数字都能追溯到上面表格里的具体日期。<br><br><b>怎么保证不自欺</b>：① 两次样本至少间隔 120 个交易日，否则同一波行情会被重复计数、把概率算高；② 只统计有完整一年前向数据的样本，不看一半就下结论；③ 样本少于 3 次直接不给概率；④ 用最高价/最低价算真实可触达的幅度，不用收盘价美化。<br><br><b>这不是什么</b>：<b>这是历史频率，不是未来概率预测。</b>过去在这个形态上涨过，不代表这次会涨；样本再多也只有十几次，统计意义有限。基本面已经变化的公司，历史形态更可能失效。请把它当作「历史上这种位置大概是什么体验」的参考，而不是买入信号。",
       tv_title:"TradingView 交互图（实时）", tv_link:"在 TradingView 打开概览页 ↗",
@@ -506,8 +507,9 @@
       gd_samp_note:"Each bar = one historical instance: left end = deepest drop after entry, right end = highest gain within a year, dot = return at the one-year mark.",
       gd_tbl_title:"Sample detail", gd_how_title:"Where these numbers come from / what they are not",
       gd_n:"Samples", gd_medgain:"Median max gain", gd_medmae:"Median max drawdown", gd_win:"1-year win rate",
-      gd_c_date:"Setup date", gd_c_entry:"Price then", gd_c_gain:"Max within 1y", gd_c_mae:"Deepest drop", gd_c_ret:"At 1 year",
-      gd_zone_note:"Upper = key support; lower = one notch below, per median historical drawdown",
+      gd_c_date:"Comparable case", gd_c_entry:"Similarity", gd_c_gain:"Max within 1y", gd_c_mae:"Deepest drop", gd_c_ret:"At 1 year",
+      gd_zone_note:"Upper = key support; lower = one notch below, per median drawdown of comparable cases",
+      gd_tier:"Match tier", gd_vol:"Annualized vol", gd_sameind:"same industry",
       gd_none:"No odds for this stock: fewer than 3 comparable historical setups, or the long history failed the data sanity check. With too few samples a probability would mislead, so it is left blank.",
       gd_how_body:"<b>Method</b>: within this stock's <b>own history</b>, find every moment resembling the present — same ≥30% drawdown from the high, same drop to the range low or oversold — then tabulate what <b>actually</b> happened afterwards.<br><br><b>Why not machine learning</b>: a single stock has only 3–15 such setups per decade. At that sample size any model overfits noise and produces numbers that look good but mean nothing. Conditional frequency is the only honest approach here, and every figure traces back to a specific date in the table above.<br><br><b>Guards against self-deception</b>: (1) samples are ≥120 trading days apart, or one rally gets counted twice and inflates the odds; (2) only setups with a full forward year are counted; (3) fewer than 3 samples → no probability shown; (4) highs/lows are used, so the range is what was actually reachable.<br><br><b>What this is not</b>: <b>these are historical frequencies, not forecasts.</b> That the pattern paid off before does not mean it will now, and a dozen samples carry limited statistical weight. For a company whose fundamentals have changed, the historical pattern is more likely to break. Treat it as context for what this kind of level has felt like historically — not as a buy signal.",
       tv_title:"TradingView Chart (live)", tv_link:"Open TradingView overview ↗",
@@ -1180,7 +1182,9 @@
     $("#dGdZoneNote").textContent = t("gd_zone_note");
 
     // --- 四个关键统计 ---
-    const kpi=[[t("gd_n"), `${n}`, "var(--text)"],
+    const kpi=[[t("gd_n"), `${n}`+(g.guid_same_ind?`（${t("gd_sameind")}${g.guid_same_ind}）`:""), "var(--text)"],
+               [t("gd_tier"), g.guid_tier||dash, "#38bdf8"],
+               [t("gd_vol"), isNum(g.guid_vol_ann)?g.guid_vol_ann.toFixed(0)+"%":dash, "var(--text)"],
                [t("gd_medgain"), pct(g.guid_med_gain), "#f87171"],
                [t("gd_medmae"), pct(g.guid_med_mae), "#4ade80"],
                [t("gd_win"), isNum(g.guid_win_rate)?`${(g.guid_win_rate*100).toFixed(0)}%`:dash, "var(--text)"]];
@@ -1215,13 +1219,15 @@
               data:[t("gd_c_mae"),t("gd_c_gain"),t("gd_c_ret")]},
       tooltip:{trigger:"axis",axisPointer:{type:"shadow"},
         formatter:p=>{const d=sm[p[0].dataIndex];
-          return `<b>${d.date}</b>　${t("gd_c_entry")} ${CUR}${d.entry}<br/>`+
+          return `<b>${d.name||d.code||d.date||""}</b>`+
+                 (d.industry?`　<span style="color:var(--muted)">${d.industry}</span>`:"")+
+                 (isNum(d.vol_ann)?`　波动${d.vol_ann.toFixed(0)}%`:"")+`<br/>`+
                  `${t("gd_c_gain")}：<b style="color:#f87171">${pct(d.max_gain_pct)}</b><br/>`+
                  `${t("gd_c_mae")}：<b style="color:#4ade80">${pct(d.mae_pct)}</b><br/>`+
                  `${t("gd_c_ret")}：<b>${pct(d.ret_1y_pct)}</b>`;}},
       xAxis:{type:"value",axisLabel:{formatter:"{value}%",color:C.axis,fontSize:11},
              splitLine:{lineStyle:{color:C.grid,type:"dashed"}},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:"category",data:sm.map(d=>d.date),
+      yAxis:{type:"category",data:sm.map(d=>(d.name||d.code||d.date||"")),
              axisLabel:{color:C.label,fontSize:11},axisLine:{show:false},axisTick:{show:false}},
       series:[
         {name:t("gd_c_mae"),type:"bar",stack:"o",barWidth:"52%",
@@ -1241,8 +1247,8 @@
       `<table class="w-full"><thead><tr>${th.map((x,i)=>
         `<th class="${i?'text-right':'text-left'}">${escH(x)}</th>`).join("")}</tr></thead><tbody>`+
       samples.map(d=>`<tr>
-        <td>${escH(d.date)}</td>
-        <td class="num">${CUR}${d.entry}</td>
+        <td>${escH(d.name||d.code||d.date||"")}${d.industry?`<span style="color:var(--muted)"> · ${escH(d.industry)}</span>`:""}</td>
+        <td class="num">${isNum(d.similarity)?(d.similarity*100).toFixed(0)+"%":(d.entry!=null?CUR+d.entry:dash)}</td>
         <td class="num" style="color:#f87171">${pct(d.max_gain_pct)}</td>
         <td class="num" style="color:#4ade80">${pct(d.mae_pct)}</td>
         <td class="num">${pct(d.ret_1y_pct)}</td></tr>`).join("")+`</tbody></table>`;

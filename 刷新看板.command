@@ -8,8 +8,15 @@ cd "/Users/rogerluo/Desktop/美股Claude Boosting/a-share-left-screener" || {
     echo "❌ 找不到项目目录"; read -n1 -p "按任意键关闭..."; exit 1; }
 
 # 防并发: 已有一轮在跑就不重复启动(否则两个管线抢同一个数据库)
-if pgrep -f run_pipeline.py >/dev/null 2>&1; then
-    echo "⚠️ 已有一轮刷新正在运行, 不重复启动 —— 等它跑完即可。"
+# 防并发: 只认"真的在跑 run_pipeline 的 python 进程"。
+# 原来用 pgrep -f run_pipeline.py 过于宽松, 出现过误判把用户挡在门外;
+# 现在额外要求命令行含 python, 并把 PID/已运行时长打出来, 便于判断是否是残留。
+RUNNING=$(pgrep -fl "python.*run_pipeline\.py" 2>/dev/null | head -1)
+if [ -n "$RUNNING" ]; then
+    RPID=$(echo "$RUNNING" | awk '{print $1}')
+    RELAPSED=$(ps -o etime= -p "$RPID" 2>/dev/null | tr -d ' ')
+    echo "⚠️ 检测到已有一轮刷新在运行 (PID $RPID, 已运行 ${RELAPSED:-?})"
+    echo "   如果它确实卡住了, 可以先终止: kill $RPID   然后重新双击本文件。"
     echo "   先打开现有看板供查看..."
     open dashboard/index.html
     echo "此窗口可以关闭。"
