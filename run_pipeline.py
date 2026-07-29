@@ -18,6 +18,7 @@ import socket
 import argparse
 import logging
 import datetime as dt
+import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # 防卡死: 给所有网络请求设默认超时。akshare/requests 若不显式传 timeout, 单个卡住的
@@ -57,6 +58,40 @@ def _tqdm():
         def _f(x, **k):
             return x
         return _f
+
+
+def _training_pool(spot, n_target: int) -> list:
+    """给盈利指引挑训练股票: 按 行业 × 市值档 分层抽样, 保证样本池覆盖各类资金结构。
+    (全用大盘银行股训练出来的规律, 套到小盘票上是错的 —— 这是分层的意义。)"""
+    if spot is None or spot.empty:
+        return []
+    df = spot.copy()
+    if "total_mv" in df.columns:
+        df = df[df["total_mv"].notna()]
+        try:
+            df["_mv_tier"] = pd.qcut(df["total_mv"], 4, labels=False, duplicates="drop")
+        except Exception:
+            df["_mv_tier"] = 0
+    else:
+        df["_mv_tier"] = 0
+    df["_ind"] = df.get("industry", pd.Series("—", index=df.index)).fillna("—")
+    # 剔除 ST / 北交所, 与扫描口径一致
+    df = df[~df["name"].astype(str).str.contains("ST", case=False, na=False)]
+    df = df[~df["code"].astype(str).str.startswith(("8", "4", "920"))]
+    groups = list(df.groupby(["_ind", "_mv_tier"], observed=True))
+    if not groups:
+        return list(df["code"].head(n_target))
+    per = max(1, n_target // len(groups))
+    picked = []
+    for _, g in groups:
+        # 组内取成交额最大的几只(流动性好, 数据质量高)
+        gg = g.sort_values("amount", ascending=False) if "amount" in g.columns else g
+        picked.extend(list(gg["code"].head(per)))
+    if len(picked) < n_target:                    # 不够就按成交额补齐
+        rest = df[~df["code"].isin(picked)]
+        rest = rest.sort_values("amount", ascending=False) if "amount" in rest.columns else rest
+        picked.extend(list(rest["code"].head(n_target - len(picked))))
+    return picked[:n_target]
 
 
 def run(full_market: bool, use_cache: bool):
@@ -280,27 +315,50 @@ def run(full_market: bool, use_cache: bool):
     gcfg = CONFIG.get("guidance") or {}
     if gcfg.get("enabled"):
         g_targets = (final_records[:show_n] + dip_tail)[:gcfg.get("top_n", 100)]
-        log.info("阶段D 盈利指引: %d 只 (拉%d年历史做同类形态统计) 并发 %d ...",
-                 len(g_targets), gcfg.get("years", 10), gcfg.get("workers", 6))
         tech_by_code = {rec["code"]: rec for rec, _, _, _ in results}
 
-        def _guide(fr):
-            code = fr["code"]
-            hist = ds.fetch_long_hist(code, years=gcfg.get("years", 10))
-            if hist is None:
-                return code, {"guid_n": 0, "guid_note": "历史数据不可用或未通过体检"}
-            t = tech_by_code.get(code, {})
-            return code, m7.analyze(hist, support_price=t.get("support_price"),
-                                    price_now=t.get("price"))
+        # v2: 先建/加载**跨股票**样本池。单只股票十年只有3~15次形态, 必然"样本不足";
+        # 汇集数百只股票的历史后有几万条观测, 再靠"同行业/同波动档"分层 + 按自身
+        # 波动率归一化来保证可比性(不同资金结构的股票不能直接混着数)。
+        model = m7.load_model(gcfg)
+        if model is None:
+            pool_codes = _training_pool(spot, gcfg.get("train_stocks", 800))
+            log.info("阶段D-1 构建盈利指引样本池: %d 只股票的历史 ...", len(pool_codes))
+            done = [0]
 
-        n_ok = 0
-        with ThreadPoolExecutor(max_workers=gcfg.get("workers", 6)) as pool:
-            futs = [pool.submit(_guide, fr) for fr in g_targets]
-            for fut in tqdm(as_completed(futs), total=len(futs)):
+            def _hist_for_train(code):
+                done[0] += 1
+                if done[0] % 50 == 0:
+                    log.info("  样本池 %d/%d", done[0], len(pool_codes))
+                # 必须用**长历史**: 常规日线只有~640根, 扣掉250天前向窗口和260天预热后
+                # 每只仅剩13个观测点, 再滤掉非回撤状态就所剩无几(实测259只只出101条)。
+                # 10年历史每只约180个观测点, 才撑得起跨股票样本池。
+                return ds.fetch_long_hist(code, years=gcfg.get("years", 10))
+
+            # 并发拉(fetch_hist 已改走腾讯, 线程安全)
+            hist_cache = {}
+            with ThreadPoolExecutor(max_workers=workers) as tp:
+                for c, h in zip(pool_codes, tp.map(_hist_for_train, pool_codes)):
+                    if h is not None:
+                        hist_cache[c] = h
+            model = m7.build_model(list(hist_cache.keys()), spot_map,
+                                   lambda c: hist_cache.get(c), gcfg)
+
+        if model is None:
+            log.warning("盈利指引样本池构建失败, 本轮跳过阶段D")
+        else:
+            log.info("阶段D-2 盈利指引: %d 只 (近邻回归, 样本池 %s 条) ...",
+                     len(g_targets), f"{len(model['X']):,}")
+            n_ok = 0
+            for fr in tqdm(g_targets):
+                code = fr["code"]
                 try:
-                    code, g = fut.result()
+                    hist = ds.fetch_hist(code)
+                    t = tech_by_code.get(code, {})
+                    g = m7.predict(code, hist, model, spot_row=spot_map.get(code),
+                                   support_price=t.get("support_price"), cfg=gcfg)
                 except Exception as e:
-                    log.debug("盈利指引失败: %s", e)
+                    log.debug("盈利指引失败 %s: %s", code, e)
                     continue
                 db.save_guidance(run_date, code, g)
                 if g.get("guid_n"):

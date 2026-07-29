@@ -302,6 +302,93 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
             consol_ok = consol_score >= ccfg["min_score"]
             consol_note = "、".join(parts)
 
+    # ---- 🚀 "爆发前夕" (在横盘吸筹基础上, 找蓄势将尽、随时可能启动的) ----
+    # 思路: 横盘吸筹说明"在磨底", 但磨底可能还要磨很久。真正要抓的是**磨到尾声**的:
+    #   a) 吸筹证据: 价格没涨但 OBV(能量潮)在爬 —— 有人在悄悄收集(量价背离)
+    #   b) 买盘占优: 上涨日的成交量明显大于下跌日 —— 承接强于抛压
+    #   c) 波动压缩: 布林带宽/ATR 压到近一年低位 —— 弹簧压到底, 变盘临近
+    #   d) 位置就绪: 价格已在横盘区间上沿, 而不是刚跌到下沿
+    #   e) 量能拐点: 地量之后温和放量(但不能是暴量 —— 暴量多是出货/异动)
+    # 只在 consol_ok 成立时才评, 且各分项都做上下限, 避免单一指标失真就误报。
+    bcfg = c.get("breakout") or {}
+    brk_ok, brk_score, brk_note = False, 0.0, ""
+    if bcfg and consol_ok and "volume" in df.columns and len(close) >= 130:
+        W = int(ccfg.get("window", 60))
+        v = pd.to_numeric(df["volume"], errors="coerce")
+        parts_b, bw = [], bcfg["weights"]
+        num_b = den_b = 0.0
+        ret = close.pct_change()
+
+        # a) OBV 背离: 近W日 OBV 在爬 而价格没涨 = 有人在悄悄收集
+        # ⚠ OBV 是累计量, 量纲与价格完全不同, **不能**直接把两者的斜率相减。
+        # 必须先各自 z-score 标准化, 斜率单位统一成"窗口内漂移了几个标准差", 才可比。
+        def _z_drift(s):
+            s = s.dropna()
+            if len(s) < 15:
+                return np.nan
+            sd = float(s.std())
+            if not np.isfinite(sd) or sd <= 0:
+                return np.nan
+            z = (s - float(s.mean())) / sd
+            x = np.arange(len(z), dtype=float)
+            try:
+                k = float(np.polyfit(x, z.values, 1)[0])
+            except Exception:
+                return np.nan
+            return k * len(z)          # 整个窗口内漂移的标准差数
+        obv = (np.sign(ret.fillna(0)) * v.fillna(0)).cumsum()
+        obv_s, px_s = _z_drift(obv.tail(W)), _z_drift(close.tail(W))
+        if not np.isnan(obv_s) and not np.isnan(px_s):
+            f = max(0.0, min(1.0, (obv_s - px_s) / max(1e-6, bcfg["obv_div_full"])))
+            num_b += bw["obv"] * f; den_b += bw["obv"]
+            if f > 0.4: parts_b.append(f"量能背离(价平量增 {obv_s - px_s:.1f}σ)")
+
+        # b) 上涨日 vs 下跌日 量能比
+        win_r, win_v = ret.tail(W), v.tail(W)
+        up_v = float(win_v[win_r > 0].mean()) if (win_r > 0).any() else np.nan
+        dn_v = float(win_v[win_r < 0].mean()) if (win_r < 0).any() else np.nan
+        if not np.isnan(up_v) and not np.isnan(dn_v) and dn_v > 0:
+            udr = up_v / dn_v
+            f = max(0.0, min(1.0, (udr - 1.0) / max(1e-6, bcfg["ud_ratio_full"] - 1.0)))
+            num_b += bw["updown"] * f; den_b += bw["updown"]
+            if udr >= bcfg["ud_ratio_min"]: parts_b.append(f"买盘占优(涨跌量比{udr:.2f})")
+
+        # c) 波动压缩: 当前布林带宽在近250日的分位(越低越好)
+        ma20 = close.rolling(20).mean()
+        sd20 = close.rolling(20).std()
+        bw_series = (2 * bcfg.get("boll_k", 2.0) * sd20 / ma20).replace([np.inf, -np.inf], np.nan)
+        if bw_series.notna().sum() >= 120:
+            cur_bw = float(bw_series.iloc[-1])
+            hist_bw = bw_series.tail(250).dropna()
+            pctile = float((hist_bw < cur_bw).mean() * 100.0)
+            f = max(0.0, min(1.0, (bcfg["squeeze_pct_full"] - pctile) / max(1e-6, bcfg["squeeze_pct_full"])))
+            num_b += bw["squeeze"] * f; den_b += bw["squeeze"]
+            if pctile <= bcfg["squeeze_pct_max"]: parts_b.append(f"波动压缩(带宽{pctile:.0f}%分位)")
+
+        # d) 位置: 处于横盘区间的上沿
+        win_c = close.tail(W)
+        lo_w, hi_w = float(win_c.min()), float(win_c.max())
+        if hi_w > lo_w:
+            pos = (px - lo_w) / (hi_w - lo_w)
+            f = max(0.0, min(1.0, (pos - bcfg["pos_min"]) / max(1e-6, 1.0 - bcfg["pos_min"])))
+            num_b += bw["position"] * f; den_b += bw["position"]
+            if pos >= bcfg["pos_min"]: parts_b.append(f"位于区间上沿({pos*100:.0f}%)")
+
+        # e) 量能拐点: 近5日均量/前20日均量, 温和放量最佳(暴量视为异动, 不加分)
+        if len(v.dropna()) >= 30:
+            v5 = float(v.tail(5).mean()); v20 = float(v.tail(25).head(20).mean())
+            if v20 > 0:
+                vr = v5 / v20
+                lo_r, hi_r = bcfg["vol_pickup"], bcfg["vol_spike_cap"]
+                f = 0.0 if vr < lo_r else (max(0.0, 1.0 - (vr - hi_r) / hi_r) if vr > hi_r
+                                           else min(1.0, (vr - lo_r) / max(1e-6, 1.4 - lo_r)))
+                num_b += bw["pickup"] * f; den_b += bw["pickup"]
+                if lo_r <= vr <= hi_r: parts_b.append(f"温和放量({vr:.2f}x)")
+
+        brk_score = round(num_b / den_b, 3) if den_b else 0.0
+        brk_ok = brk_score >= bcfg["min_score"]
+        brk_note = "、".join(parts_b)
+
     record = {
         "code": code, "name": name,
         "price": round(px, 2),
@@ -347,6 +434,9 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         "consol": bool(consol_ok),
         "consol_score": float(consol_score),
         "consol_note": consol_note,
+        "breakout": bool(brk_ok),
+        "breakout_score": float(brk_score),
+        "breakout_note": brk_note,
     }
 
     # ---- 详情图表逐日序列 ----

@@ -117,6 +117,9 @@ def build_payload(run_date: str | None = None) -> dict:
             "roe_trend_q": _loads(f.get("roe_trend_q_json")),
             "fund_flags": _loads(f.get("fund_flags_json")),
             # 新增: sparkline / 风控 / 量能 / 斐波那契 / 分析师(A股多为空) / 连续上榜
+            "breakout": bool(fr.get("breakout")),
+            "breakout_score": fr.get("breakout_score"),
+            "breakout_note": fr.get("breakout_note") or "",
             "spark": _loads(t.get("spark_json"), default=[]),
             "atr_pct": t.get("atr_pct"), "max_dd_pct": t.get("max_dd_pct"),
             "beta": t.get("beta"), "vol_ratio_calc": t.get("vol_ratio_calc"),
@@ -128,7 +131,9 @@ def build_payload(run_date: str | None = None) -> dict:
         }
         candidates.append(row)
 
-    candidates.sort(key=lambda r: (-(r.get("final_score") or -1), r.get("code") or ""))
+    # 🚀 蓄势待发 置顶(用户每天首要关注), 其余按综合分降序
+    candidates.sort(key=lambda r: (0 if str(r.get("tag", "")).startswith("🚀") else 1,
+                                   -(r.get("final_score") or -1), r.get("code") or ""))
     top_n = CONFIG["output"]["final_top_n"]
     head = candidates[:top_n]                                   # 支撑型主榜(展示上限)
     # 深跌抄底桶: 支撑分低会被 final_top_n 截掉, 这里把落榜的 dip 候选按 dip_score 补回来

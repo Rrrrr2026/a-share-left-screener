@@ -72,7 +72,8 @@ _TAG_EN = {"✅ 强左侧": "✅ Strong Left",
            "⚠️ 技术好但基本面弱": "⚠️ Tech-strong, Weak Fundamentals",
            "🔎 观察": "🔎 Watch",
            "🪸 深跌抄底": "🪸 Deep-Dip Bottom-Fish",
-           "🧊 强左侧·横盘吸筹": "🧊 Strong Left · Basing/Accumulation"}
+           "🧊 强左侧·横盘吸筹": "🧊 Strong Left · Basing/Accumulation",
+           "🚀 蓄势待发": "🚀 Coiled / Pre-Breakout"}
 _DIP_CONFIRM_EN = {"底背离": "bullish divergence", "缩柱": "shrinking MACD histogram",
                    "金叉": "KDJ golden cross", "放量": "volume spike"}
 _OSC_EN = {"超卖": "oversold", "缩柱": "shrinking MACD histogram", "底背离": "bullish divergence"}
@@ -175,6 +176,11 @@ def _conclusion_text(tech_rec: dict, f: dict, tag: str) -> str:
     sigs = []
     if tag.startswith("🧊") and tech_rec.get("consol_note"):
         sigs.append("大跌后横盘吸筹(" + tech_rec["consol_note"] + ")")
+    if tag.startswith("🚀"):
+        if tech_rec.get("consol_note"):
+            sigs.append("已横盘吸筹(" + tech_rec["consol_note"] + ")")
+        if tech_rec.get("breakout_note"):
+            sigs.append("且蓄势将尽(" + tech_rec["breakout_note"] + ")")
     if tech_rec.get("sig_channel"):
         sigs.append("贴近上升通道下轨")
     if tech_rec.get("sig_pivot"):
@@ -222,6 +228,10 @@ def cross_score(tech_rec: dict, fund: dict, prosperity_score: float | None) -> d
     # 所以 🧊 一定同时满足强左侧的技术+基本面(+景气)门槛, 只是形态更进一步(已跌透在磨底)。
     if tech_rec.get("consol") and tag == "✅ 强左侧":
         tag = "🧊 强左侧·横盘吸筹"
+    # 🚀 蓄势待发: 在"强左侧+横盘吸筹"之上再叠一层——已磨到尾声、随时可能启动。
+    # 层层收窄: 强左侧(技术+基本面达标) -> 🧊(已跌透在磨底) -> 🚀(吸筹见效+波动压缩+位置就绪)
+    if tech_rec.get("breakout") and tag == "🧊 强左侧·横盘吸筹":
+        tag = "🚀 蓄势待发"
     text = _conclusion_text(tech_rec, fund, tag)
     text_en = _conclusion_text_en(tech_rec, fund, tag)
 
@@ -237,6 +247,9 @@ def cross_score(tech_rec: dict, fund: dict, prosperity_score: float | None) -> d
         "consol": bool(tech_rec.get("consol")),
         "consol_score": round(float(tech_rec.get("consol_score") or 0.0), 3),
         "consol_note": tech_rec.get("consol_note") or "",
+        "breakout": bool(tech_rec.get("breakout")),
+        "breakout_score": round(float(tech_rec.get("breakout_score") or 0.0), 3),
+        "breakout_note": tech_rec.get("breakout_note") or "",
         "tech_score": round(tech_score, 3),
         "tech_norm": round(tech_norm, 1),
         "fund_score": fund_score,

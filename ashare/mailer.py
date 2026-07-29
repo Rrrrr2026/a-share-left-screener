@@ -81,6 +81,29 @@ def build_summary_text(payload: dict, cfg: dict = CONFIG) -> str:
         L.append("入选景气行业:" + "、".join(sel))
     L.append("")
 
+    # —— 🚀 蓄势待发: 用户每天首要关注, 必须排在最前 ——
+    brk = [c for c in cands if str(c.get("tag", "")).startswith("🚀")]
+    brk.sort(key=lambda c: -(c.get("breakout_score") or 0.0))
+    if brk:
+        L.append(f"🚀 蓄势待发 ({len(brk)} 只) —— 强左侧 + 横盘吸筹 + 蓄势将尽")
+        for c in brk:
+            L.append(
+                f"  · {c.get('name','?')}({c.get('code','')})"
+                f"  现价 {c.get('price','—')}"
+                f"  综合{c.get('final_score','—')}"
+                f"  距支撑 {_fmt_pct(c.get('dist_support_pct'))}"
+                f"  行业:{c.get('industry') or '—'}"
+            )
+            if c.get("breakout_note"):
+                L.append(f"      蓄势信号：{c['breakout_note']}")
+            if c.get("guid_disp"):
+                L.append(f"      盈利指引：{c['guid_disp']}")
+        L.append("")
+    else:
+        L.append("🚀 蓄势待发：今日无 —— 该标签条件严格(需同时满足强左侧、横盘吸筹、"
+                 "量价背离/波动压缩/位置就绪), 无符合的属正常。")
+        L.append("")
+
     # —— 深跌抄底桶 (dip 标记 / dip_score 高的) ——
     dips = [c for c in cands if c.get("dip") or c.get("dip_confirm")]
     dips.sort(key=lambda c: -(c.get("dip_score") or 0.0))
@@ -178,7 +201,11 @@ def send_summary_email(payload: dict | None = None,
 
     msg = EmailMessage()
     n_hit = meta.get("n_hit") or len(payload.get("candidates") or [])
-    msg["Subject"] = f"[左侧抄底] {run_date} · {n_hit}只候选"
+    n_brk = sum(1 for c in (payload.get("candidates") or [])
+                if str(c.get("tag", "")).startswith("🚀"))
+    # 🚀 是用户每天首要关注的, 直接放进标题, 不用点开就知道今天有没有
+    msg["Subject"] = (f"[左侧抄底] {run_date} · 🚀蓄势待发{n_brk}只 · 共{n_hit}只候选"
+                      if n_brk else f"[左侧抄底] {run_date} · {n_hit}只候选")
     msg["From"] = sender
     msg["To"] = ", ".join(recipients)
     msg["Date"] = formatdate(localtime=True)

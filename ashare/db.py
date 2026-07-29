@@ -101,7 +101,9 @@ def _migrate(conn):
                       ("sig_vol", "TEXT"), ("boll_low", "REAL"), ("fib_382", "REAL"),
                       ("fib_500", "REAL"), ("fib_618", "REAL"),
                       ("dip", "INTEGER"), ("dip_score", "REAL"), ("dip_confirm", "TEXT"),
-                      ("consol", "INTEGER"), ("consol_score", "REAL"), ("consol_note", "TEXT")],
+                      ("consol", "INTEGER"), ("consol_score", "REAL"), ("consol_note", "TEXT"),
+                      ("breakout", "INTEGER"), ("breakout_score", "REAL"),
+                      ("breakout_note", "TEXT")],
         "fundamental": [("target_price", "REAL"), ("analyst_rating", "TEXT"),
                         ("analyst_count", "REAL"), ("upside_pct", "REAL"),
                         ("roe_trend_q_json", "TEXT"),
@@ -110,6 +112,8 @@ def _migrate(conn):
         "final_rank": [("conclusion_en", "TEXT"),
                        ("dip", "INTEGER"), ("dip_score", "REAL"), ("dip_confirm", "TEXT"),
                        ("consol", "INTEGER"), ("consol_score", "REAL"), ("consol_note", "TEXT"),
+                       ("breakout", "INTEGER"), ("breakout_score", "REAL"),
+                       ("breakout_note", "TEXT"),
                        ("prob_json", "TEXT"), ("prob_n", "REAL"), ("prob_summary", "TEXT")],
     }
     for table, cols in want.items():
@@ -192,6 +196,7 @@ def save_fundamental(run_date: str, code: str, f: dict):
         "dividend_yield", "eps", "eps_yoy", "roe", "revenue_yoy", "netprofit_yoy",
         "gross_margin", "debt_ratio",
         "growth_quality", "growth_quality_score", "growth_quality_note",
+        "breakout", "breakout_score", "breakout_note",
         "target_price", "analyst_rating", "analyst_count", "upside_pct")}
     row.update({
         "run_date": run_date, "code": code,
