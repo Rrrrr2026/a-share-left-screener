@@ -451,8 +451,13 @@ def _finalize_hist(df: pd.DataFrame) -> pd.DataFrame | None:
 
 
 def fetch_hist(code: str) -> pd.DataFrame | None:
-    """个股日线(前复权)。优先东财, 被限/失败时退回新浪
-    (东财被限频时新浪 stock_zh_a_daily 仍可用, 保证扫描不空跑)。"""
+    """个股日线(前复权)。顺序: 东财(akshare) -> 腾讯(直连) -> 新浪(加锁, 最后手段)。
+
+    ⚠ 顺序不是随便排的: 阶段A 要用 16 线程扫 4000+ 只, 而 akshare 的新浪日线
+    (stock_zh_a_daily) 内部用 py_mini_racer(V8) 算复权 —— V8 非线程安全, 并发下
+    必崩整个进程(2026-07-29 实测 2971/4411 处 Trace/BPT trap 5)。腾讯是纯 requests、
+    线程安全、640根足够 MA250, 因此排在新浪之前; 新浪只在腾讯也失败时用, 且必须加锁。
+    """
     f = CONFIG["fetch"]
     # 缓存键含 lookback_days: 改了回看天数(bar数)会自动失效旧缓存, 避免用到过短的历史
     key = _cache_key("hist", code, f["adjust"], f["lookback_days"], dt.date.today().isoformat())
@@ -463,7 +468,10 @@ def fetch_hist(code: str) -> pd.DataFrame | None:
     if not _em_hist_down:
         df = _hist_from_em(code)
     if df is None or df.empty:
-        df = _hist_from_sina(code)
+        df = _hist_from_tencent(code)          # 线程安全, 无 V8
+    if df is None or df.empty:
+        with _ths_lock:                        # 新浪走 py_mini_racer, 必须串行
+            df = _hist_from_sina(code)
     if df is None or df.empty:
         return None
     _cache_save(key, df)
@@ -493,6 +501,28 @@ def _hist_from_em(code: str) -> pd.DataFrame | None:
         "date": ["日期"], "open": ["开盘"], "high": ["最高"], "low": ["最低"],
         "close": ["收盘"], "volume": ["成交量"], "amount": ["成交额"], "pct_chg": ["涨跌幅"],
     }))
+
+
+def _hist_from_tencent(code: str) -> pd.DataFrame | None:
+    """个股日线(前复权) —— 腾讯 fqkline, **纯 requests, 线程安全**。
+
+    存在的理由: akshare 的新浪日线 stock_zh_a_daily 内部用 py_mini_racer(V8) 算复权,
+    而阶段A 要用 16 线程扫 4000+ 只 —— V8 非线程安全, 必崩
+    (2026-07-29 实测在 2971/4411 处 Trace/BPT trap 5, 整轮报废)。
+    腾讯单次返回 ~640 根, 足够覆盖 MA250 所需的 ~330 根, 故作为东财之后的首选。
+    """
+    try:
+        kl = _tencent_chunk(_tencent_symbol(code), "", "")
+    except Exception as e:
+        log.debug("腾讯日线 %s 失败: %s", code, e)
+        return None
+    if not kl:
+        return None
+    rows = [k[:6] for k in kl if k and len(k) >= 5]
+    if len(rows) < 60:
+        return None
+    df = pd.DataFrame(rows, columns=["date", "open", "close", "high", "low", "volume"][:len(rows[0])])
+    return _finalize_hist(df)
 
 
 def _hist_from_sina(code: str) -> pd.DataFrame | None:
