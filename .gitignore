@@ -19,3 +19,6 @@ Thumbs.db
 
 # 注意: docs/ 目录用于 GitHub Pages, 需要上传(含 docs/dashboard_data.js)
 !docs/dashboard_data.js
+
+# 同花顺API Key(本地凭据, 勿提交)
+data/.fuyao_key

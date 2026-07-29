@@ -465,7 +465,10 @@ def fetch_hist(code: str) -> pd.DataFrame | None:
     if c is not None:
         return c
     df = None
-    if not _em_hist_down:
+    from . import fuyao
+    if fuyao.available():                      # 同花顺: 结构稳定、无V8、线程安全
+        df = fuyao.hist(code, years=2.5)
+    if (df is None or df.empty) and not _em_hist_down:
         df = _hist_from_em(code)
     if df is None or df.empty:
         df = _hist_from_tencent(code)          # 线程安全, 无 V8
@@ -620,6 +623,14 @@ def fetch_long_hist(code: str, years: int = 10) -> pd.DataFrame | None:
         return None
     if c is not None:
         return c
+    # 优先同花顺: 一次请求拿满10年前复权, 不需要分段拼接 -> 从源头消除
+    # "每段复权基准不同导致断裂"的问题(腾讯那条路实测茅台47处跳变)。
+    from . import fuyao
+    if fuyao.available():
+        fdf = fuyao.hist(code, years=years)
+        if fdf is not None and _long_hist_is_sane(fdf, code):
+            _cache_save(key, fdf)
+            return fdf
     sym = _tencent_symbol(code)
     today = dt.date.today()
     rows, seen = [], set()
