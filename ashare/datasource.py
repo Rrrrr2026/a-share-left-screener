@@ -71,6 +71,13 @@ _em_realtime_down = False
 _em_hist_down = False
 _flag_lock = threading.Lock()
 
+# ⚠ 同花顺(THS)专用锁。akshare 的 stock_board_*_ths 系列用 py_mini_racer(V8) 解密
+# 生成 cookie; V8 **不是线程安全的**, 多线程同时初始化会让整个进程硬崩溃
+# (2026-07-29 实测: Check failed: !pool->IsInitialized() -> Trace/BPT trap 5, 退出133,
+#  整轮数据全丢)。模块1 用 16 线程并发跑 90 个行业, 必然踩中 -> 所有 THS 调用串行化。
+# 代价: THS 那部分变串行(每行业约3s), 但换来的是不会整轮崩掉。
+_ths_lock = threading.RLock()
+
 
 def _mark_em_down(reason: str = ""):
     global _em_realtime_down
@@ -719,7 +726,8 @@ def _industry_list_em() -> pd.DataFrame | None:
 
 def _industry_list_ths() -> pd.DataFrame | None:
     try:
-        raw = call_with_retry(_ak().stock_board_industry_name_ths)
+        with _ths_lock:                      # V8 非线程安全, 见 _ths_lock 说明
+            raw = call_with_retry(_ak().stock_board_industry_name_ths)
     except Exception as e:
         log.warning("同花顺行业列表失败: %s", e)
         return None
@@ -731,16 +739,33 @@ def _industry_list_ths() -> pd.DataFrame | None:
     return df if "industry" in df.columns else None
 
 
+_board_map_cache = None
+_board_map_lock = threading.Lock()
+
+
 def _board_code_of(industry: str) -> str | None:
-    """行业名 -> 东财板块代码(BKxxxx), 取自行业列表(已缓存)。"""
-    try:
-        lst = fetch_industry_list()
-        if lst is None or lst.empty or "board_code" not in lst.columns:
-            return None
-        hit = lst[lst["industry"].astype(str) == str(industry)]
-        return str(hit.iloc[0]["board_code"]) if len(hit) else None
-    except Exception:
-        return None
+    """行业名 -> 东财板块代码(BKxxxx)。
+
+    ⚠ 这里**绝不能**调 fetch_industry_list(): 该函数在东财失败时会回退到同花顺,
+    而 akshare 的同花顺接口用 py_mini_racer(V8) 解密。本函数是在模块1的16线程池
+    **内部**被调用的, 多线程同时初始化 V8 会直接把进程打崩
+    (2026-07-29 事故: Check failed: !pool->IsInitialized() -> Trace/BPT trap, 退出133)。
+    故只用东财直连列表(纯 requests, 线程安全), 且用锁保证只拉一次。
+    """
+    global _board_map_cache
+    if _board_map_cache is None:
+        with _board_map_lock:
+            if _board_map_cache is None:          # 双检锁: 只有第一个线程去拉
+                m = {}
+                try:
+                    lst = _industry_list_em_direct()
+                    if lst is not None and not lst.empty and "board_code" in lst.columns:
+                        m = dict(zip(lst["industry"].astype(str),
+                                     lst["board_code"].astype(str)))
+                except Exception as e:
+                    log.debug("板块代码表获取失败: %s", e)
+                _board_map_cache = m              # 失败也写空表, 避免每次重试
+    return (_board_map_cache or {}).get(str(industry))
 
 
 def fetch_industry_cons(industry: str) -> pd.DataFrame | None:
@@ -831,7 +856,8 @@ def _industry_hist_ths(industry: str) -> pd.DataFrame | None:
     end = dt.date.today()
     start = end - dt.timedelta(days=CONFIG["fetch"]["lookback_days"])
     try:
-        raw = call_with_retry(
+        with _ths_lock:                      # V8 非线程安全, 见 _ths_lock 说明
+          raw = call_with_retry(
             _ak().stock_board_industry_index_ths,
             symbol=industry,
             start_date=start.strftime("%Y%m%d"),
@@ -1309,7 +1335,8 @@ def _fund_flow_em() -> pd.DataFrame | None:
 
 def _fund_flow_ths() -> pd.DataFrame | None:
     try:
-        raw = call_with_retry(_ak().stock_board_industry_summary_ths)
+        with _ths_lock:                      # V8 非线程安全, 见 _ths_lock 说明
+            raw = call_with_retry(_ak().stock_board_industry_summary_ths)
     except Exception as e:
         log.debug("同花顺行业摘要失败: %s", e)
         return None
