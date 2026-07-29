@@ -180,8 +180,17 @@ def build_payload(run_date: str | None = None) -> dict:
     payload = {
         "meta": {
             "run_date": run_date,
-            "updated_at": runlog.get("finished_at") or run_date,
+            # 管线正常收尾才有 run_log; 崩溃/中断时没有 -> 退回"本文件生成时刻",
+            # 至少让用户知道数据是什么时候产出的, 而不是只剩一个日期。
+            "updated_at": (runlog.get("finished_at")
+                           or dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
             "n_scanned": runlog.get("n_scanned"),
+            # 没有 run_log = 那一轮没正常跑完(扫描数等统计缺失)。明确标出来,
+            # 免得用户看到空白以为是页面坏了。
+            "run_status": ("ok" if runlog.get("finished_at") else "partial"),
+            "run_status_note": ("" if runlog.get("finished_at") else
+                                "该轮管线未正常收尾(中途报错或被中断), 扫描总数缺失; "
+                                "候选股与各项指标仍可用。建议重跑一次取完整数据。"),
             "n_hit": len(candidates),   # 与主表展示条数一致
             "selected_industries": selected_inds,
             "disclaimer": DISCLAIMER,

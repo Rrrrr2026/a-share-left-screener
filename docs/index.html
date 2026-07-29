@@ -711,7 +711,16 @@
   function renderOverview(){
     const meta = DATA.meta||{};
     $("#updatedAt").textContent = meta.updated_at || dash;
-    $("#ovScanned").textContent = isNum(meta.n_scanned)?meta.n_scanned:dash;
+    const scEl=$("#ovScanned");
+    scEl.textContent = isNum(meta.n_scanned)?meta.n_scanned:dash;
+    // 扫描数缺失几乎总是"那轮管线没跑完", 直接把原因挂上去, 而不是留个哑巴横杠
+    if(!isNum(meta.n_scanned)){
+      // 警示标记放在**数值**上而不是标签上: 标签带 data-i18n, 语言切换会重刷 textContent,
+      // 把加上去的图标冲掉(实测如此)。数值节点没有 i18n 绑定, 才留得住。
+      scEl.innerHTML = `${dash} <span style="font-size:14px;color:#fbbf24;vertical-align:middle">⚠</span>`;
+      scEl.title = meta.run_status_note || "该轮未记录扫描总数";
+      scEl.style.cursor="help";
+    }
     $("#ovHit").textContent = isNum(meta.n_hit)?meta.n_hit:(DATA.candidates.length||dash);
     $("#ovInds").textContent = (meta.selected_industries||[]).length || dash;
     $("#ovDate").textContent = meta.run_date || dash;
