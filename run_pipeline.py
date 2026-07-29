@@ -132,10 +132,15 @@ def run(full_market: bool, use_cache: bool):
                 seen.add(code)
                 universe.append((code, name, ind_name))
         log.info("候选池: 入选行业成分股 %d 只", len(universe))
-        # 成分股全部获取失败(东财实时端点被重置)时, 回退到全市场扫描, 保证流程不空跑
-        if len(universe) == 0:
-            log.warning("行业成分股获取失败(东财push2被限, 无可用备用成分接口), 回退到全市场扫描。"
-                        "行业景气榜仍展示; 但个股缺行业归属, '所属行业/景气加成/行业PE对比'将显示 '—'。")
+        # 候选池下限兜底。两种翻车都会走到这里:
+        #  ① 成分股接口全挂 -> 0 只(老问题);
+        #  ② 行业列表混进二/三级板块 -> 选中"股份制银行Ⅲ""快递"这类极细行业,
+        #     8 个加起来才 78 只(2026-07-29 实测), 扫出来的榜单毫无意义。
+        # 与其交付一个看似成功、实则只扫了 1.5% 市场的结果, 不如回退全市场。
+        min_pool = CONFIG["industry"].get("min_pool", 400)
+        if len(universe) < min_pool:
+            log.warning("候选池仅 %d 只(<%d), 判定行业筛选异常(成分股拿不到, 或行业列表"
+                        "过于细分), 回退全市场扫描以保证覆盖面。", len(universe), min_pool)
             universe = _full_market_universe()
 
     # 行业 PE 中位 (用于基本面对比)

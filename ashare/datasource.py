@@ -645,8 +645,34 @@ def fetch_industry_list() -> pd.DataFrame | None:
     if df is None or df.empty:
         return None
     df = df.drop_duplicates(subset=["industry"]).reset_index(drop=True)
+    df = _keep_top_level_industries(df)
     _cache_save(key, df)
     return df
+
+
+# 一级行业通常 ~90-130 个。若接口返回几百个, 说明混进了二级/三级板块
+# (2026-07-29 实测东财返回 486 个, 含"股份制银行Ⅲ""体育Ⅱ"这类)。
+# 细分行业成分股极少, top_n 选中它们会让候选池塌成几十只 —— 必须先归一到一级。
+_SUB_LEVEL_SUFFIX = ("Ⅱ", "Ⅲ", "II", "III")
+_MAX_SANE_INDUSTRIES = 150
+
+
+def _keep_top_level_industries(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty or len(df) <= _MAX_SANE_INDUSTRIES:
+        return df
+    n0 = len(df)
+    mask = ~df["industry"].astype(str).str.endswith(_SUB_LEVEL_SUFFIX)
+    out = df[mask].reset_index(drop=True)
+    log.info("行业列表 %d 个疑似含二/三级板块, 剔除带 Ⅱ/Ⅲ 后缀的 -> %d 个", n0, len(out))
+    if len(out) > _MAX_SANE_INDUSTRIES:
+        # 仍然过多(东财三级板块未必都带后缀) -> 退回东财直连的一级列表(实测 100 个)
+        direct = _industry_list_em_direct()
+        if direct is not None and not direct.empty and len(direct) <= _MAX_SANE_INDUSTRIES:
+            log.info("仍有 %d 个, 改用东财直连一级行业列表 %d 个", len(out), len(direct))
+            return direct
+        log.warning("行业列表仍有 %d 个(疑似细分), 候选池可能偏小; 已由管线的池子下限兜底",
+                    len(out))
+    return out
 
 
 def _industry_list_em_direct() -> pd.DataFrame | None:
