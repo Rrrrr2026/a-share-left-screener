@@ -242,6 +242,26 @@ def run(full_market: bool, use_cache: bool):
     log.info("深跌抄底桶: 命中 %d 只, 并入候选 %d 只", len(dip_pool), len(dip_new))
     log.info("阶段B 基本面+交叉打分: 取技术分最高的 %d 只(含深跌抄底) ...", len(top_hits))
 
+    # 预热全市场季度业绩批量缓存 (近四季归母/营收单季同比×4 的数据源), 避免并发首调用
+    try:
+        n_qr = ds.prefetch_quarterly_reports()
+        log.info("季度业绩批量缓存: 覆盖 %d 只", n_qr)
+    except Exception as e:
+        log.warning("季度业绩批量预热失败(增速×4列将为空): %s", e)
+
+    # 市场地位 (垄断力代理): 东财行业内 总市值排名/份额 — 全量来自快照(零额外请求)
+    dom_map = {}
+    if spot is not None and not spot.empty and {"industry", "total_mv"} <= set(spot.columns):
+        _s = spot[["code", "industry", "total_mv"]].dropna()
+        _s = _s[(_s["industry"].astype(str) != "") & (_s["total_mv"] > 0)]
+        for ind_name, g in _s.groupby("industry"):
+            g = g.sort_values("total_mv", ascending=False).reset_index(drop=True)
+            total = float(g["total_mv"].sum())
+            for i, r in g.iterrows():
+                share = round(float(r["total_mv"]) / total * 100.0, 1) if total > 0 else None
+                dom_map[r["code"]] = {"rank": int(i) + 1, "n": int(len(g)), "share": share}
+        log.info("市场地位分组: %d 个行业, 覆盖 %d 只", _s["industry"].nunique(), len(dom_map))
+
     def _fund_stock(rd):
         rec, detail = rd
         industry = rec.get("industry")
@@ -257,6 +277,13 @@ def run(full_market: bool, use_cache: bool):
             industry_pe_median=industry_pe_median.get(industry) if industry else None,
             spot_row=spot_map.get(rec["code"]),
             prosperity=prosperity_map.get(industry) if industry else None)
+        # 市场地位 (行业内市值排名/份额, 👑=行业第一且份额≥15%)
+        d = dom_map.get(rec["code"])
+        if d:
+            crown = "👑" if (d["rank"] == 1 and (d["share"] or 0) >= 15) else ""
+            share_txt = f" · {d['share']}%" if d["share"] is not None else ""
+            f["dominance_disp"] = f"{crown}#{d['rank']}/{d['n']}{share_txt}"
+            f["dom_rank"], f["dom_n"], f["dom_share"] = d["rank"], d["n"], d["share"]
         fr = m4.cross_score(rec, f, prosperity_map.get(industry) if industry else None)
         # 模块5: 历史类比概率目标位 (拉10年日线, 统计该股历次同等深跌后的表现)
         # 失败/数据不够长都只是没有概率栏, 不影响其它字段。
@@ -378,6 +405,10 @@ def run(full_market: bool, use_cache: bool):
     # ---------------- 导出仪表盘 ----------------
     ex.write_dashboard_js(run_date)
     ex.write_csv(run_date)
+    try:
+        ex.write_history_snapshot(run_date)
+    except Exception as e:
+        log.warning("历史快照写出失败: %s", e)
     log.info("✅ 全部完成。请双击打开 dashboard/index.html")
 
 

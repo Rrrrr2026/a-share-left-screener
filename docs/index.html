@@ -70,6 +70,7 @@
   body.light .text-slate-300,body.light .text-slate-200,body.light .text-slate-100{color:#1e293b!important}
   body.light .text-slate-500{color:#94a3b8!important}
   body.light .text-sky-300{color:#0369a1!important}
+  body.light #histBanner{color:#075985!important}   /* 历史快照提示条在浅色主题下要可读 */
   .miniStat{ background:var(--card); border:1px solid var(--border); border-radius:999px; padding:5px 13px; font-size:12.5px;
              box-shadow:var(--shadow); white-space:nowrap; }
   .segbtn{ padding:5px 13px; border-radius:9px; border:1px solid var(--inputborder); background:var(--input); color:var(--dim);
@@ -114,6 +115,7 @@
     </div>
     <div class="text-right text-sm text-slate-400">
       <div class="flex items-center justify-end gap-3">
+        <select id="dateSel" class="hidden" data-i18n-title="date_sel_title" title="回看历史扫描结果"></select>
         <button id="refreshBtn" class="segbtn" title="拉取最新已发布数据（重新扫描需运行本地更新脚本）" data-i18n="refresh_btn">🔄 刷新数据</button>
         <button id="langBtn" class="segbtn" title="中文 / English">EN</button>
         <button id="themeBtn" class="segbtn" title="点击切换：白天 / 黑夜 / 跟随系统">🌙 黑夜</button>
@@ -129,6 +131,9 @@
     "左侧买入"是在下跌中、支撑确认前进场，风险天然更高（可能继续下跌或破位）。
     所有标的需<b>人工复核</b>，使用者自负盈亏与风控。
   </div>
+
+  <!-- 历史快照提示条 -->
+  <div id="histBanner" class="hidden card border-sky-500/40 bg-sky-500/5 px-4 py-2 mb-4 text-[13px] leading-relaxed text-sky-200/90"></div>
 
   <!-- 概览卡 -->
   <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
@@ -443,6 +448,12 @@
       tag_strong:"✅ 强左侧", tag_weak:"⚠️ 技术好但基本面弱", tag_watch:"🔎 观察", tag_dip:"🪸 深跌抄底",
       tag_consol:"🧊 强左侧·横盘吸筹",
       kdj_gold:"金叉", kdj_dead:"死叉", kdj_ob:"超买", kdj_os:"超卖", kdj_neutral:"中性",
+      // v2.1: 市场地位 / 增速×4 / 历史快照
+      col_dom:"市场地位",
+      dom_tip:"东财行业内总市值排名与份额(垄断力代理指标; 无产品级市占率免费数据源) · 👑=行业市值第一且份额≥15%",
+      qoq_tip:"四个数=最近4个单季的同比增速(旧→新, 连续为正=逐季都在增长); 主数字为最新报告期同比。",
+      date_sel_title:"回看历史扫描结果",
+      hist_banner_a:"正在查看历史快照 ", hist_banner_b:" — 该日榜单为当日打分, K线明细与深度档案仅最新一天提供；在日期框选回最新日期即可返回。",
       tone_pos:"利好", tone_neg:"利空", tone_neutral:"中性",
       sig_channel:"贴近上升通道下轨", sig_pivot:"接近前期低点", sig_ma_prefix:"回踩",
       c_support:"关键支撑", c_dist:"距支撑", c_break:"破位参考",
@@ -461,7 +472,6 @@
       mg_date:"日期", mg_person:"变动人", mg_relation:"关系", mg_change:"变动数量(股)", mg_price:"均价", mg_way:"途径",
       // 主营构成 / 营收
       no_seg:"暂无主营构成数据", seg_total:"合计", of_rev:"占营收", gm_l:"毛利率", yoy_l:"同比",
-      noprof:"暂无该股档案数据（深度档案未抓取或该轮管线中断）",
       no_rev:"暂无营收数据", rev_annual:"年度营收", rev_net:"归母净利", rev_yoy:"同比增速", rev_qtr:"单季营收",
       // 现金流
       no_echarts:"未能加载 ECharts（需联网），无法绘制图表。", no_cash:"暂无现金流数据", no_notes:"暂无自动要点",
@@ -539,6 +549,11 @@
       tag_strong:"✅ Strong Left", tag_weak:"⚠️ Tech-strong, Weak Fund.", tag_watch:"🔎 Watch", tag_dip:"🪸 Deep-Dip",
       tag_consol:"🧊 Strong Left · Basing",
       kdj_gold:"Golden X", kdj_dead:"Dead X", kdj_ob:"Overbought", kdj_os:"Oversold", kdj_neutral:"Neutral",
+      col_dom:"Mkt Position",
+      dom_tip:"Market-cap rank & share within the EastMoney industry (dominance proxy; no free product-level market-share source) · 👑 = #1 with ≥15% share",
+      qoq_tip:"Four numbers = single-quarter YoY growth for the last 4 quarters (old→new; all positive = growing every quarter). Main figure = latest-period YoY.",
+      date_sel_title:"Browse past scan days",
+      hist_banner_a:"Viewing historical snapshot ", hist_banner_b:" — scores are as of that day; K-line details & deep profiles are only available for the latest day. Pick the latest date to return.",
       tone_pos:"Bullish", tone_neg:"Bearish", tone_neutral:"Neutral",
       sig_channel:"Near rising-channel lower band", sig_pivot:"Near prior low", sig_ma_prefix:"Pullback to ",
       c_support:"Key support", c_dist:"Dist to support", c_break:"Breakdown ref",
@@ -554,7 +569,6 @@
       no_summary:"No company profile", no_officer:"No recent insider-transaction records",
       mg_date:"Date", mg_person:"Person", mg_relation:"Relation", mg_change:"Change (sh)", mg_price:"Avg px", mg_way:"Method",
       no_seg:"No business-segment data", seg_total:"total", of_rev:"of revenue", gm_l:"gross margin", yoy_l:"YoY",
-      noprof:"No profile data (deep profile not fetched, or that run was interrupted)",
       no_rev:"No revenue data", rev_annual:"Annual revenue", rev_net:"Net profit", rev_yoy:"YoY growth", rev_qtr:"Quarterly revenue",
       no_echarts:"Could not load ECharts (needs internet); cannot draw chart.", no_cash:"No cash-flow data", no_notes:"No auto notes",
       cf_ocf:"Operating CF", cf_fcf:"Free CF", cf_capex:"Capex", cf_acq:"Acquisitions", cf_div:"Dividends", cf_ni:"Net profit",
@@ -604,6 +618,7 @@
     s=String(s); for(const k in SUPP_EN){ if(s.indexOf(k)===0) return s.replace(k,SUPP_EN[k]); } return s; }
   // 列 key -> 翻译键
   const COL_I18N={ code:"col_code",name:"col_name",industry:"col_industry",tag:"col_tag",streak:"col_streak",
+    dominance_disp:"col_dom",
     final_score:"col_final",tech_score:"col_tech",fund_score:"col_fund",price:"col_price",spark:"col_spark",
     dist_support_pct:"col_dist",support_disp:"col_support",breakdown_price:"col_break",pos_52w_pct:"col_pos52",
     ret_1m_pct:"col_ret1m",ret_half_year_pct:"col_rethy",turnover:"col_turnover",volume_ratio:"col_volratio",
@@ -813,7 +828,7 @@
   $("#segTree").onclick=()=>{ indKind="treemap"; $("#segTree").classList.add("on"); $("#segBar").classList.remove("on"); renderIndustryChart(); };
 
   // ---------- 主表列 ----------
-  const COLORDER_KEY = "ashare_colorder_v2";
+  const COLORDER_KEY = "ashare_colorder_v3";   // v3: 新增 市场地位 列, 重置旧的自定义列序
   let COLS = DATA.columns && DATA.columns.length ? DATA.columns.slice() : [
     {key:"code",label:"代码"},{key:"name",label:"名称"},{key:"industry",label:"所属板块"},
     {key:"tag",label:"结论标签"},{key:"streak",label:"连续上榜"},{key:"final_score",label:"综合分"},
@@ -824,7 +839,7 @@
   const NUMERIC = new Set(["final_score","tech_score","fund_score","tech_norm","prosperity_score","price","dist_support_pct",
     "breakdown_price","pos_52w_pct","ret_1m_pct","ret_half_year_pct","avg_amt20_yi","dividend_yield","pb","eps","roe",
     "streak","upside_pct","target_price","analyst_count","atr_pct","max_dd_pct","beta","boll_low","volume_ratio","turnover",
-    "revenue_yoy","netprofit_yoy"]);
+    "revenue_yoy","netprofit_yoy","ni_ttm_yoy","rev_ttm_yoy","dom_share","dominance_disp"]);
   // 应用用户保存的列顺序。注意: 新版本新增的列不在旧的 saved 里, 若简单地把未知列排到
   // 末尾(999), 新列会被甩到宽表最右侧、屏幕外, 用户以为"没生效"。这里改为: 已保存的列
   // 按保存顺序排, 新列插回它在默认顺序(DATA.columns)中的相邻位置。
@@ -896,7 +911,11 @@
   $("#wReset").onclick=()=>{ state.weights={t:50,f:30,p:20}; syncWeightUI(); recomputeScores(); persist(); render(); };
 
   // ---------- 表头 ----------
-  function getVal(c,k){ return k==="final_score" ? (isNum(c._final)?c._final:c.final_score) : c[k]; }
+  function getVal(c,k){
+    if(k==="final_score") return isNum(c._final)?c._final:c.final_score;
+    if(k==="dominance_disp") return c.dom_rank;   // 市场地位按行业内排名数值排序 (#1最强)
+    return c[k];
+  }
 
   function buildHead(){
     const tr = $("#headRow"); tr.innerHTML="";
@@ -911,7 +930,7 @@
       th.onclick=()=>{
         if(th.dataset.dragging){ delete th.dataset.dragging; return; }
         if(state.sortKey===c.key){ state.sortDir = state.sortDir==="asc"?"desc":"asc"; }
-        else { state.sortKey=c.key; state.sortDir = NUMERIC.has(c.key)?"desc":"asc"; }
+        else { state.sortKey=c.key; state.sortDir = (c.key==="dominance_disp") ? "asc" : (NUMERIC.has(c.key)?"desc":"asc"); }
         persist(); render();
       };
       th.addEventListener("dragstart", e=>{ e.dataTransfer.setData("text/plain", c.key); e.dataTransfer.effectAllowed="move"; th.style.opacity="0.35"; });
@@ -950,7 +969,28 @@
       case "dist_support_pct": return supportCell(v);
       case "upside_pct": return upsideCell(v);
       case "ret_1m_pct": case "ret_half_year_pct": return signPctCell(v);
-      case "revenue_yoy": case "netprofit_yoy": return signPctCell(v);
+      case "revenue_yoy": case "netprofit_yoy": {
+        // v2.1: 主数字下加 最近4个单季同比 (旧→新, 末位加粗), 一眼看出是否逐季都在增长
+        const ser = (key==="revenue_yoy") ? c.rev_qoq : c.ni_qoq;
+        const labels = Array.isArray(c.ni_q_labels)? c.ni_q_labels : [];
+        if(Array.isArray(ser) && ser.some(x=>isNum(x))){
+          const nums = ser.map((x,i)=>{
+            if(!isNum(x)) return `<span class="text-slate-600">·</span>`;
+            const cls = x>0?"pos":(x<0?"neg":"");
+            const bold = (i===ser.length-1)?"font-semibold":"";
+            const txt = (Math.abs(x)>=100? x.toFixed(0) : x.toFixed(1));
+            return `<span class="${cls} ${bold}">${x>0?"+":""}${txt}</span>`;
+          }).join('<span class="text-slate-600 mx-0.5">›</span>');
+          const tip = t("qoq_tip") + " " + ser.map((x,i)=>`${labels[i]||""} ${isNum(x)?(x>0?"+":"")+x.toFixed(1)+"%":"—"}`).join("  ");
+          return `<div class="num leading-tight whitespace-nowrap" title="${escH(tip)}">${signPctCell(v)}<div class="text-[10px]">${nums}<span class="text-slate-500 ml-0.5">%</span></div></div>`;
+        }
+        return signPctCell(v);
+      }
+      case "dominance_disp": {
+        if(v==null||v==="") return `<span>${dash}</span>`;
+        const gold = String(v).indexOf("👑")>=0;
+        return `<span class="num ${gold?"font-semibold":""}" style="${gold?"color:#fbbf24":""}" title="${t("dom_tip")}">${escH(v)}</span>`;
+      }
       case "guid_buy_high": {
         if(!isNum(v)) return dash;
         const lo=c.guid_buy_low;
@@ -1852,15 +1892,64 @@
       (new Function(txt))();
       const nd=(window.__ASHARE__)||(window.__US__);
       if(!nd || !Array.isArray(nd.candidates)) throw new Error("bad data");
-      DATA=nd;
+      DATA=nd; LIVE_DATA=nd;
+      $("#histBanner").classList.add("hidden");
       recomputeScores(); renderOverview(); applyStaticI18n();
       renderIndustryChart(); updateStrip(); render();
       if(!$("#drawer").classList.contains("translate-x-full")) closeDrawer();
+      initHistory();
       btn.textContent=t("refresh_ok");
     }catch(e){ btn.textContent=t("refresh_fail"); }
     setTimeout(()=>{ btn.disabled=false; btn.textContent=prevLabel; }, 1600);
   }
   $("#refreshBtn").onclick=reloadData;
+
+  // ---------- 历史快照回看 (docs/history/day_<date>.json) ----------
+  let LIVE_DATA = DATA;                 // 最新一天的完整数据 (含K线/档案)
+  let VIEW_DATE = null;                 // 当前实际展示的日期 (失败回退用)
+  let histSeq = 0;                      // 快速连点防乱序
+  function applyData(nd){
+    DATA=nd;
+    recomputeScores(); renderOverview(); applyStaticI18n();
+    renderIndustryChart(); updateStrip(); render();
+    if(!$("#drawer").classList.contains("translate-x-full")) closeDrawer();
+  }
+  async function initHistory(){
+    try{
+      const r = await fetch("history/index.json?_="+Date.now(), {cache:"no-store"});
+      if(!r.ok) return;
+      const j = await r.json();
+      const hist = (j && j.dates) || [];
+      if(!hist.length) return;
+      const cur = (LIVE_DATA.meta||{}).run_date;
+      VIEW_DATE = cur;
+      const dates = hist.slice();
+      if(cur && dates.indexOf(cur)<0) dates.unshift(cur);
+      const sel=$("#dateSel");
+      sel.innerHTML = dates.map(d=>`<option value="${escH(d)}">${d===cur?"📅 "+escH(d):escH(d)}</option>`).join("");
+      sel.value = cur || dates[0];
+      sel.classList.remove("hidden");
+    }catch(e){}   // file:// 或无 history 目录: 保持隐藏
+  }
+  $("#dateSel").onchange = async e=>{
+    const d=e.target.value, cur=(LIVE_DATA.meta||{}).run_date, bn=$("#histBanner");
+    const seq = ++histSeq;
+    if(d===cur){ applyData(LIVE_DATA); VIEW_DATE=cur; bn.classList.add("hidden"); return; }
+    try{
+      const r=await fetch("history/day_"+encodeURIComponent(d)+".json?_="+Date.now(), {cache:"no-store"});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const j=await r.json();
+      if(seq!==histSeq) return;
+      j.details={}; j.profiles={};       // 历史快照不带K线/档案 (瘦身)
+      applyData(j);
+      VIEW_DATE=d;
+      bn.textContent = "📅 "+t("hist_banner_a")+d+t("hist_banner_b");
+      bn.classList.remove("hidden");
+    }catch(err){
+      if(seq===histSeq && VIEW_DATE) e.target.value=VIEW_DATE;
+    }
+  };
+  initHistory();
 
   // ---------- 启动 ----------
   if(!DATA.candidates.length){ $("#emptyHint").classList.remove("hidden"); }

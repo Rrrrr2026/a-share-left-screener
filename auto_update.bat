@@ -10,12 +10,16 @@ echo   A-share screener: update and publish
 echo ==================================================
 echo ==== START ==== >> "%LOG%"
 
+echo [0/3] Seed history from published docs (fresh-clone safety) ...
+robocopy "docs\history" "dashboard\history" /E /XC /XN /XO /NJH /NJS /NDL /NFL >nul 2>&1
+
 echo [1/3] Fetch data and score (about 10-15 min) ...
 "%PYEXE%" run_pipeline.py >> "%LOG%" 2>&1
 
 echo [2/3] Copy result to docs ...
 copy /Y "dashboard\index.html" "docs\index.html" >nul
 copy /Y "dashboard\dashboard_data.js" "docs\dashboard_data.js" >nul
+robocopy "dashboard\history" "docs\history" /MIR /NJH /NJS /NDL /NFL >nul 2>&1
 
 echo [3/3] Publish to GitHub Pages ...
 git add docs >> "%LOG%" 2>&1

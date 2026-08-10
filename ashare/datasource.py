@@ -1417,3 +1417,125 @@ def _fund_flow_ths() -> pd.DataFrame | None:
         return None
     df["net_inflow"] = _to_num(df["net_inflow"])
     return df
+
+
+# ===========================================================================
+#  6b) 全市场季度业绩 (归母净利/营收, 累计口径) —— stock_yjbb_em 按报告期批量
+#      12个报告期 = 3年, 一次全市场; 供"近四季归母/营收同比×4"与"增长持续性"。
+# ===========================================================================
+import threading as _th
+
+_YJBB_LOCK = _th.Lock()
+_YJBB_MAP: dict | None = None
+
+
+def _report_periods(n: int = 12) -> list:
+    """最近 n 个财报报告期 (YYYYMMDD, 新→旧)。含当前正在披露的期。"""
+    today = dt.date.today()
+    periods = []
+    y, q_ends = today.year, [(3, 31), (6, 30), (9, 30), (12, 31)]
+    cand = []
+    for yy in range(y - 4, y + 1):
+        for (m, d) in q_ends:
+            cand.append(dt.date(yy, m, d))
+    cand = [c for c in cand if c <= today]
+    cand.sort(reverse=True)
+    return [f"{c:%Y%m%d}" for c in cand[:n]]
+
+
+def fetch_profit_reports(n_periods: int = 12) -> dict:
+    """批量抓最近 n 个报告期的业绩报表(东财, 每期一次调用覆盖全市场)。
+    返回 {code: {"periods": [...升序 'YYYY-MM-DD'], "ni_cum": [...], "rev_cum": [...]}}
+    ni = 归母净利润(累计, 元), rev = 营业总收入(累计, 元)。整体按天缓存。"""
+    key = _cache_key("yjbb_bulk", n_periods, dt.date.today().isoformat())
+    c = _cache_load(key)
+    if c is not None:
+        return c if isinstance(c, dict) else {}
+    out: dict = {}
+    n_failed = 0
+    for p in _report_periods(n_periods):
+        try:
+            raw = call_with_retry(_ak().stock_yjbb_em, date=p)
+        except Exception as e:
+            log.warning("yjbb 报告期 %s 抓取失败: %s", p, e)
+            n_failed += 1
+            continue
+        if raw is None or len(raw) == 0:
+            continue
+        pd_date = f"{p[:4]}-{p[4:6]}-{p[6:]}"
+        for _, r in raw.iterrows():
+            code = str(r.get("股票代码", "")).strip()
+            if not code:
+                continue
+            d = out.setdefault(code, {})
+            ni = r.get("净利润-净利润")
+            rev = r.get("营业总收入-营业总收入")
+            d[pd_date] = (
+                None if ni is None or (isinstance(ni, float) and np.isnan(ni)) else float(ni),
+                None if rev is None or (isinstance(rev, float) and np.isnan(rev)) else float(rev),
+            )
+        time.sleep(0.3)
+    result = {}
+    for code, dd in out.items():
+        periods = sorted(dd)
+        result[code] = {
+            "periods": periods,
+            "ni_cum": [dd[p][0] for p in periods],
+            "rev_cum": [dd[p][1] for p in periods],
+        }
+    # 有报告期抓取失败时不缓存: 缺期会让单季拆解/TTM出现空洞,
+    # 宁可下次重试, 也不能把不完整的批量数据钉一整天
+    if result and n_failed == 0:
+        _cache_save(key, result)
+    return result
+
+
+def prefetch_quarterly_reports():
+    """在基本面阶段前显式预热 (避免并发首调用打爆接口)。"""
+    global _YJBB_MAP
+    with _YJBB_LOCK:
+        if _YJBB_MAP is None:
+            _YJBB_MAP = fetch_profit_reports()
+    return len(_YJBB_MAP or {})
+
+
+_PREV_Q_MONTH = {"06": "03", "09": "06", "12": "09"}
+
+
+def _single_quarters(periods: list, cums: list) -> list:
+    """A股财报为年内累计值: 单季 = 本期累计 - 上期累计(必须是同年"相邻"季);
+    Q1 = 累计本身。缺季时不得跨季相减(否则把两三个季的和当单季), 记 None。"""
+    out = []
+    for i, (p, v) in enumerate(zip(periods, cums)):
+        if v is None:
+            out.append(None)
+            continue
+        if p[5:7] == "03":
+            out.append(v)
+        elif (i > 0 and periods[i - 1][:4] == p[:4]
+              and periods[i - 1][5:7] == _PREV_Q_MONTH.get(p[5:7])
+              and cums[i - 1] is not None):
+            out.append(v - cums[i - 1])
+        else:
+            out.append(None)
+    return out
+
+
+def get_quarterly_series(code: str) -> dict:
+    """从批量业绩表取单只股票的季度序列:
+    {"periods": [...], "ni_q": [单季归母...], "rev_q": [单季营收...],
+     "ni_cum": [...], "rev_cum": [...], "fy_ni": [年报归母...], "fy_dates": [...]}"""
+    global _YJBB_MAP
+    if _YJBB_MAP is None:
+        prefetch_quarterly_reports()
+    d = (_YJBB_MAP or {}).get(code)
+    if not d:
+        return {}
+    periods = d["periods"]
+    ni_q = _single_quarters(periods, d["ni_cum"])
+    rev_q = _single_quarters(periods, d["rev_cum"])
+    fy = [(p, v) for p, v in zip(periods, d["ni_cum"]) if p[5:7] == "12" and v is not None]
+    return {"periods": periods, "ni_q": ni_q, "rev_q": rev_q,
+            "ni_cum": d["ni_cum"], "rev_cum": d["rev_cum"],
+            "fy_dates": [p for (p, _) in fy], "fy_ni": [v for (_, v) in fy]}
+

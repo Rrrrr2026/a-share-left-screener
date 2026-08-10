@@ -108,7 +108,13 @@ def _migrate(conn):
                         ("analyst_count", "REAL"), ("upside_pct", "REAL"),
                         ("roe_trend_q_json", "TEXT"),
                         ("growth_quality", "TEXT"), ("growth_quality_score", "REAL"),
-                        ("growth_quality_note", "TEXT")],
+                        ("growth_quality_note", "TEXT"),
+                        # v2.1: 近四季单季同比×4 + 市场地位
+                        ("ni_ttm_yoy", "REAL"), ("ni_basis", "TEXT"), ("ni_qoq_json", "TEXT"),
+                        ("ni_q_labels_json", "TEXT"),
+                        ("rev_ttm_yoy", "REAL"), ("rev_basis", "TEXT"), ("rev_qoq_json", "TEXT"),
+                        ("dominance_disp", "TEXT"), ("dom_rank", "INTEGER"),
+                        ("dom_n", "INTEGER"), ("dom_share", "REAL")],
         "final_rank": [("conclusion_en", "TEXT"),
                        ("dip", "INTEGER"), ("dip_score", "REAL"), ("dip_confirm", "TEXT"),
                        ("consol", "INTEGER"), ("consol_score", "REAL"), ("consol_note", "TEXT"),
@@ -197,12 +203,17 @@ def save_fundamental(run_date: str, code: str, f: dict):
         "gross_margin", "debt_ratio",
         "growth_quality", "growth_quality_score", "growth_quality_note",
         "breakout", "breakout_score", "breakout_note",
+        "ni_ttm_yoy", "ni_basis", "rev_ttm_yoy", "rev_basis",
+        "dominance_disp", "dom_rank", "dom_n", "dom_share",
         "target_price", "analyst_rating", "analyst_count", "upside_pct")}
     row.update({
         "run_date": run_date, "code": code,
         "roe_trend_json": json.dumps(f.get("roe_trend", []), ensure_ascii=False),
         "roe_trend_q_json": json.dumps(f.get("roe_trend_q", []), ensure_ascii=False),
         "fund_flags_json": json.dumps(f.get("fund_flags", []), ensure_ascii=False),
+        "ni_qoq_json": json.dumps(f.get("ni_qoq", []), ensure_ascii=False),
+        "ni_q_labels_json": json.dumps(f.get("ni_q_labels", []), ensure_ascii=False),
+        "rev_qoq_json": json.dumps(f.get("rev_qoq", []), ensure_ascii=False),
     })
     _upsert("fundamental", [row])
 

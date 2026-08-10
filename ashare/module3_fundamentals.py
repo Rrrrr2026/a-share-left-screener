@@ -53,8 +53,23 @@ def pull_fundamentals(code: str, industry: str | None = None,
         "gross_margin": None, "debt_ratio": None,
         "growth_quality": None, "growth_quality_score": None,
         "growth_quality_note": None,
+        # v2.1: 近四季 归母/营收 单季同比×4 (全市场业绩表批量) + 市场地位(编排层填)
+        "ni_ttm_yoy": None, "ni_basis": None, "ni_qoq": [], "ni_q_labels": [],
+        "rev_ttm_yoy": None, "rev_basis": None, "rev_qoq": [],
+        "dominance_disp": None, "dom_rank": None, "dom_n": None, "dom_share": None,
         "fund_flags": [],
     }
+
+    # ---- 近四季 归母净利/营收 单季同比×4 (来自全市场业绩表批量缓存, 带缺季防护) ----
+    try:
+        qser = ds.get_quarterly_series(code)
+    except Exception:
+        qser = {}
+    if qser:
+        res["ni_qoq"], res["ni_q_labels"], res["ni_ttm_yoy"], res["ni_basis"] = \
+            _yoy4(qser.get("periods"), qser.get("ni_q"), qser.get("ni_cum"))
+        res["rev_qoq"], _, res["rev_ttm_yoy"], res["rev_basis"] = \
+            _yoy4(qser.get("periods"), qser.get("rev_q"), qser.get("rev_cum"))
 
     # ---- 估值历史: PE/PB 分位 + 股息 ----
     val = ds.fetch_valuation_hist(code)
@@ -272,3 +287,63 @@ def _clean(x):
         return None if (np.isnan(xf) or np.isinf(xf)) else xf
     except Exception:
         return None
+
+
+def _pct_chg(now, prev):
+    """同比/环比 (%): 负基数用 |prev| 作分母 (亏转盈得正增速), 基数近零不计。"""
+    if now is None or prev is None or abs(prev) < 1e-6:
+        return None
+    return round((now - prev) / abs(prev) * 100.0, 1)
+
+
+def _q_label(p: str) -> str:
+    """'2025-09-30' -> '25Q3'。"""
+    try:
+        return f"{p[2:4]}Q{(int(p[5:7]) - 1) // 3 + 1}"
+    except Exception:
+        return p
+
+
+def _consecutive_quarters(ps: list) -> bool:
+    """检查报告期序列是否为连续自然季 (缺期时 TTM 的位置求和会错位跨年)。"""
+    _next = {3: "-06-30", 6: "-09-30", 9: "-12-31", 12: "-03-31"}
+    for a, b in zip(ps, ps[1:]):
+        try:
+            y, m = int(a[:4]), int(a[5:7])
+        except Exception:
+            return False
+        if b != f"{y + (1 if m == 12 else 0)}{_next[m]}":
+            return False
+    return True
+
+
+def _yoy4(periods, singles, cums, k: int = 4):
+    """A股财报口径的增速套件:
+    返回 (单季同比×最近k个[旧→新], 季度标签, 头条增速, 口径标签)。
+    头条优先 真TTM同比(近4单季合计 vs 前4单季合计); 退化用 最新报告期累计同比。"""
+    periods = periods or []
+    singles = singles or []
+    cums = cums or []
+    by_p = {p: v for p, v in zip(periods, singles)}
+    cum_by_p = {p: v for p, v in zip(periods, cums)}
+    yoys, labels = [], []
+    for p in periods[-k:]:
+        prev_p = f"{int(p[:4]) - 1}{p[4:]}"
+        yoys.append(_pct_chg(by_p.get(p), by_p.get(prev_p)))
+        labels.append(_q_label(p))
+    headline, basis = None, None
+    if len(periods) >= 8 and _consecutive_quarters(periods[-8:]):
+        last8 = [by_p.get(p) for p in periods[-8:]]
+        if all(v is not None for v in last8):
+            headline = _pct_chg(sum(last8[4:]), sum(last8[:4]))
+            if headline is not None:
+                basis = "TTM"
+    if headline is None and periods:
+        p = periods[-1]
+        prev_p = f"{int(p[:4]) - 1}{p[4:]}"
+        headline = _pct_chg(cum_by_p.get(p), cum_by_p.get(prev_p))
+        if headline is not None:
+            basis = "累计"
+    return yoys, labels, headline, basis
+
+

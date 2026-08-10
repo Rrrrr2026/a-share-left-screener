@@ -27,6 +27,7 @@ DISCLAIMER = ("本系统仅做技术/基本面数据的自动化整理与形态�
 # 主表中文表头 (顺序即 PRD §8.3)
 MAIN_COLUMNS = [
     ("code", "代码"), ("name", "名称"), ("industry", "所属行业"),
+    ("dominance_disp", "市场地位"),
     ("tag", "结论标签"), ("streak", "连续上榜"), ("final_score", "综合分"), ("tech_score", "技术分"),
     ("fund_score", "基本面分"), ("price", "现价"), ("spark", "近期走势"), ("dist_support_pct", "距支撑%"),
     ("support_disp", "关键支撑位"), ("breakdown_price", "破位位"),
@@ -134,6 +135,14 @@ def build_payload(run_date: str | None = None) -> dict:
             # 近N轮命中🚀的记录(即使今天没达标也保留, 供筛选与展示)
             "brk_recent_days": (brk_recent.get(code) or {}).get("days", 0),
             "brk_last_date": (brk_recent.get(code) or {}).get("last"),
+            # v2.1: 市场地位 + 近四季 归母/营收 单季同比×4 (增速列的四数展示)
+            "dominance_disp": f.get("dominance_disp"), "dom_rank": f.get("dom_rank"),
+            "dom_n": f.get("dom_n"), "dom_share": f.get("dom_share"),
+            "ni_ttm_yoy": f.get("ni_ttm_yoy"), "ni_basis": f.get("ni_basis"),
+            "rev_ttm_yoy": f.get("rev_ttm_yoy"), "rev_basis": f.get("rev_basis"),
+            "ni_qoq": _loads(f.get("ni_qoq_json"), default=[]),
+            "rev_qoq": _loads(f.get("rev_qoq_json"), default=[]),
+            "ni_q_labels": _loads(f.get("ni_q_labels_json"), default=[]),
         }
         candidates.append(row)
 
@@ -219,6 +228,40 @@ def write_dashboard_js(run_date: str | None = None) -> str:
         f.write(js)
     log.info("仪表盘数据已写出: %s (%d 候选)", DASHBOARD_DATA_JS, len(payload["candidates"]))
     return DASHBOARD_DATA_JS
+
+
+HISTORY_DIR = os.path.join(os.path.dirname(DASHBOARD_DATA_JS), "history")
+
+
+def write_history_snapshot(run_date: str | None = None) -> str | None:
+    """把某个 run_date 的候选榜写成"瘦身版"历史快照 (无K线明细/深度档案,
+    体积 ~1MB), 供前端的日期切换器回看历史扫描结果:
+      dashboard/history/day_<date>.json  +  dashboard/history/index.json (可用日期清单)
+    auto_update.bat 会把 history/ 整目录同步到 docs/ 发布。"""
+    payload = build_payload(run_date)
+    rd = payload["meta"].get("run_date")
+    if not rd:
+        return None
+    slim = {"meta": payload["meta"], "industries": payload["industries"],
+            "candidates": payload["candidates"], "columns": payload["columns"]}
+    os.makedirs(HISTORY_DIR, exist_ok=True)
+    path = os.path.join(HISTORY_DIR, f"day_{rd}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(slim, f, ensure_ascii=False)
+    # 更新清单 (按日期倒序, 只保留 history_days 天)
+    keep = CONFIG["output"].get("history_days", 90)
+    dates = sorted({fn[4:14] for fn in os.listdir(HISTORY_DIR)
+                    if fn.startswith("day_") and fn.endswith(".json")}, reverse=True)
+    for stale in dates[keep:]:
+        try:
+            os.remove(os.path.join(HISTORY_DIR, f"day_{stale}.json"))
+        except OSError:
+            pass
+    dates = dates[:keep]
+    with open(os.path.join(HISTORY_DIR, "index.json"), "w", encoding="utf-8") as f:
+        json.dump({"dates": dates}, f)
+    log.info("历史快照已写出: %s (%d 天可回看)", path, len(dates))
+    return path
 
 
 def write_csv(run_date: str | None = None) -> str:
