@@ -13,12 +13,10 @@ from __future__ import annotations
 import os
 import sys
 import time
-import json
 import socket
 import argparse
 import logging
 import datetime as dt
-import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # 防卡死: 给所有网络请求设默认超时。akshare/requests 若不显式传 timeout, 单个卡住的
@@ -32,9 +30,8 @@ from ashare import module1_industry as m1
 from ashare import module2_tech as m2
 from ashare import module3_fundamentals as m3
 from ashare import module4_crossscore as m4
-from ashare import module5_probability as m5
 from ashare import module6_profile as m6
-from ashare import module7_guidance as m7
+from ashare import tradeplan as tp
 from ashare import export_data as ex
 
 # Windows 控制台默认 GBK, 输出中文/emoji 会报 UnicodeEncodeError; 统一切到 UTF-8
@@ -58,40 +55,6 @@ def _tqdm():
         def _f(x, **k):
             return x
         return _f
-
-
-def _training_pool(spot, n_target: int) -> list:
-    """给盈利指引挑训练股票: 按 行业 × 市值档 分层抽样, 保证样本池覆盖各类资金结构。
-    (全用大盘银行股训练出来的规律, 套到小盘票上是错的 —— 这是分层的意义。)"""
-    if spot is None or spot.empty:
-        return []
-    df = spot.copy()
-    if "total_mv" in df.columns:
-        df = df[df["total_mv"].notna()]
-        try:
-            df["_mv_tier"] = pd.qcut(df["total_mv"], 4, labels=False, duplicates="drop")
-        except Exception:
-            df["_mv_tier"] = 0
-    else:
-        df["_mv_tier"] = 0
-    df["_ind"] = df.get("industry", pd.Series("—", index=df.index)).fillna("—")
-    # 剔除 ST / 北交所, 与扫描口径一致
-    df = df[~df["name"].astype(str).str.contains("ST", case=False, na=False)]
-    df = df[~df["code"].astype(str).str.startswith(("8", "4", "920"))]
-    groups = list(df.groupby(["_ind", "_mv_tier"], observed=True))
-    if not groups:
-        return list(df["code"].head(n_target))
-    per = max(1, n_target // len(groups))
-    picked = []
-    for _, g in groups:
-        # 组内取成交额最大的几只(流动性好, 数据质量高)
-        gg = g.sort_values("amount", ascending=False) if "amount" in g.columns else g
-        picked.extend(list(gg["code"].head(per)))
-    if len(picked) < n_target:                    # 不够就按成交额补齐
-        rest = df[~df["code"].isin(picked)]
-        rest = rest.sort_values("amount", ascending=False) if "amount" in rest.columns else rest
-        picked.extend(list(rest["code"].head(n_target - len(picked))))
-    return picked[:n_target]
 
 
 def run(full_market: bool, use_cache: bool):
@@ -145,11 +108,15 @@ def run(full_market: bool, use_cache: bool):
         return rows
 
     universe = []   # list of (code, name, industry)
-    if CONFIG["industry"]["use_full_market"] or not selected_inds:
+    # v2: 扫描面扩大 — 扫"全部行业"的成分股(带行业归属), 景气作为打分/标签而非硬性预筛
+    # (与美股版一致: 全市场扫, 高景气只是加成)。原"仅入选行业"模式已被覆盖。
+    all_inds = (list(ind_df["industry"]) if (ind_df is not None and not ind_df.empty)
+                else list(selected_inds))
+    if CONFIG["industry"]["use_full_market"] or not all_inds:
         universe = _full_market_universe()
     else:
         seen = set()
-        for ind_name in selected_inds:
+        for ind_name in all_inds:
             cons = ds.fetch_industry_cons(ind_name)
             if cons is None:
                 continue
@@ -166,20 +133,36 @@ def run(full_market: bool, use_cache: bool):
                     continue
                 seen.add(code)
                 universe.append((code, name, ind_name))
-        log.info("候选池: 入选行业成分股 %d 只", len(universe))
-        # 候选池下限兜底。两种翻车都会走到这里:
-        #  ① 成分股接口全挂 -> 0 只(老问题);
-        #  ② 行业列表混进二/三级板块 -> 选中"股份制银行Ⅲ""快递"这类极细行业,
-        #     8 个加起来才 78 只(2026-07-29 实测), 扫出来的榜单毫无意义。
-        # 与其交付一个看似成功、实则只扫了 1.5% 市场的结果, 不如回退全市场。
-        min_pool = CONFIG["industry"].get("min_pool", 400)
-        if len(universe) < min_pool:
-            log.warning("候选池仅 %d 只(<%d), 判定行业筛选异常(成分股拿不到, 或行业列表"
-                        "过于细分), 回退全市场扫描以保证覆盖面。", len(universe), min_pool)
+        log.info("候选池: 全行业成分股 %d 只 (行业数 %d)", len(universe), len(ind_to_codes))
+        # 行业成分接口大面积失败会让扫描面悄悄缩水: 覆盖过低时并入全市场池补齐
+        if 0 < len(universe) < 1000:
+            log.warning("行业成分覆盖偏低(%d只), 并入全市场池补齐 ...", len(universe))
+            have = {c for (c, _, _) in universe}
+            for (c, n, i) in _full_market_universe():
+                if c not in have:
+                    universe.append((c, n, i))
+        # 成分股全部获取失败(东财实时端点被重置)时, 回退到全市场扫描, 保证流程不空跑
+        if len(universe) == 0:
+            log.warning("行业成分股获取失败(东财push2被限, 无可用备用成分接口), 回退到全市场扫描。"
+                        "行业景气榜仍展示; 但个股缺行业归属, '所属行业/景气加成/行业PE对比'将显示 '—'。")
             universe = _full_market_universe()
 
     # 行业 PE 中位 (用于基本面对比)
     industry_pe_median = m3.compute_industry_pe_median(spot, ind_to_codes) if ind_to_codes else {}
+
+    # 市场地位 (垄断力代理): 东财行业内 总市值排名/份额。
+    # 全量来自快照(行业+总市值都在里面, 零额外请求) — 成分股接口挂掉也不影响
+    dom_map = {}
+    if spot is not None and not spot.empty and {"industry", "total_mv"} <= set(spot.columns):
+        _s = spot[["code", "industry", "total_mv"]].dropna()
+        _s = _s[(_s["industry"].astype(str) != "") & (_s["total_mv"] > 0)]
+        for ind_name, g in _s.groupby("industry"):
+            g = g.sort_values("total_mv", ascending=False).reset_index(drop=True)
+            total = float(g["total_mv"].sum())
+            for i, r in g.iterrows():
+                share = round(float(r["total_mv"]) / total * 100.0, 1) if total > 0 else None
+                dom_map[r["code"]] = {"rank": int(i) + 1, "n": int(len(g)), "share": share}
+        log.info("市场地位分组: %d 个行业, 覆盖 %d 只", _s["industry"].nunique(), len(dom_map))
 
     # ---------------- 模块2: 技术扫描 (并发, 阶段A) ----------------
     # 网络IO密集 -> 线程池并发; 只做技术打分, 便宜且快。
@@ -199,8 +182,9 @@ def run(full_market: bool, use_cache: bool):
         rec, detail = m2.scan_one(code, name, h, spot_map.get(code), bench_close=bench_close)
         if rec is None:
             return None
-        # 支撑分达标 OR 深跌抄底桶达标, 二者其一即保留 (dip 桶专捞结构已破的深跌超卖股)
-        if rec["tech_score"] < CONFIG["tech"]["min_tech_score"] and not rec.get("dip"):
+        # 支撑分达标 OR 深跌抄底桶 OR 蓄势待发桶, 三者其一即保留
+        if (rec["tech_score"] < CONFIG["tech"]["min_tech_score"]
+                and not rec.get("dip") and not rec.get("coil")):
             return None
         rec["industry"] = industry
         return (rec, detail)
@@ -220,11 +204,6 @@ def run(full_market: bool, use_cache: bool):
             if r:
                 hits.append(r)
     log.info("技术命中 %d 只", len(hits))
-    # 扫描数一旦已知就先落库(status=running)。原来只在全流程末尾写 run_log,
-    # 后续任一阶段崩溃(实测发生过多次)就整条记录丢失 -> 看板上"今日扫描数"变空白,
-    # 用户无从判断跑了多少。这里先记一笔, 末尾再用最终结果覆盖成 ok。
-    db.log_run(run_date, started, "", n_scanned, len(hits), selected_inds,
-               "running", "阶段A已完成, 后续阶段进行中")
 
     # ---------------- 模块3-4: 仅对技术分最高的前N只拉基本面 (阶段B) ----------------
     # 技术分降序; 同分时按代码升序, 保证跨次运行结果确定(否则受线程完成顺序影响)
@@ -240,44 +219,37 @@ def run(full_market: bool, use_cache: bool):
         top_hits.append(rd)
         _seen.add(rd[0]["code"])
     log.info("深跌抄底桶: 命中 %d 只, 并入候选 %d 只", len(dip_pool), len(dip_new))
-    log.info("阶段B 基本面+交叉打分: 取技术分最高的 %d 只(含深跌抄底) ...", len(top_hits))
+    # 并入"蓄势待发"桶 (与 dip 同构, 排除 dip 重叠与展示过滤同口径)
+    coil_pool = sorted([rd for rd in hits if rd[0].get("coil") and not rd[0].get("dip")],
+                       key=lambda rd: -rd[0].get("coil_score", 0.0))
+    coil_new = [rd for rd in coil_pool if rd[0]["code"] not in _seen][:CONFIG["output"].get("coil_top_n", 40)]
+    for rd in coil_new:
+        top_hits.append(rd)
+        _seen.add(rd[0]["code"])
+    log.info("蓄势待发桶: 命中 %d 只, 并入候选 %d 只", len(coil_pool), len(coil_new))
+    log.info("阶段B 基本面+交叉打分: 取技术分最高的 %d 只(含深跌/蓄势) ...", len(top_hits))
 
-    # 预热全市场季度业绩批量缓存 (近四季归母/营收单季同比×4 的数据源), 避免并发首调用
-    try:
-        n_qr = ds.prefetch_quarterly_reports()
-        log.info("季度业绩批量缓存: 覆盖 %d 只", n_qr)
-    except Exception as e:
-        log.warning("季度业绩批量预热失败(增速×4列将为空): %s", e)
-
-    # 市场地位 (垄断力代理): 东财行业内 总市值排名/份额 — 全量来自快照(零额外请求)
-    dom_map = {}
-    if spot is not None and not spot.empty and {"industry", "total_mv"} <= set(spot.columns):
-        _s = spot[["code", "industry", "total_mv"]].dropna()
-        _s = _s[(_s["industry"].astype(str) != "") & (_s["total_mv"] > 0)]
-        for ind_name, g in _s.groupby("industry"):
-            g = g.sort_values("total_mv", ascending=False).reset_index(drop=True)
-            total = float(g["total_mv"].sum())
-            for i, r in g.iterrows():
-                share = round(float(r["total_mv"]) / total * 100.0, 1) if total > 0 else None
-                dom_map[r["code"]] = {"rank": int(i) + 1, "n": int(len(g)), "share": share}
-        log.info("市场地位分组: %d 个行业, 覆盖 %d 只", _s["industry"].nunique(), len(dom_map))
+    # 预热全市场季度业绩批量缓存 (近四季归母/营收同比×4 的数据源), 避免并发首调用
+    n_qr = ds.prefetch_quarterly_reports()
+    log.info("季度业绩批量缓存: 覆盖 %d 只", n_qr)
 
     def _fund_stock(rd):
         rec, detail = rd
         industry = rec.get("industry")
         if not industry:
-            # 全市场回退时个股无行业归属。优先用快照自带的 f100(东财行业) —— 它在拉
-            # 股票池时**顺带**就取到了, 零额外请求、全市场覆盖; 快照没有才逐只补(雪球/巨潮)。
+            # 全市场回退时个股无行业归属: 快照的东财行业列免费全覆盖, 没有再逐只补
             industry = (spot_map.get(rec["code"]) or {}).get("industry")
             if not industry:
-                industry = ds.fetch_stock_industry(rec["code"])
+                try:
+                    industry = ds.fetch_stock_industry(rec["code"])
+                except Exception:
+                    industry = None
             rec["industry"] = industry
         f = m3.pull_fundamentals(
             rec["code"], industry=industry,
             industry_pe_median=industry_pe_median.get(industry) if industry else None,
-            spot_row=spot_map.get(rec["code"]),
-            prosperity=prosperity_map.get(industry) if industry else None)
-        # 市场地位 (行业内市值排名/份额, 👑=行业第一且份额≥15%)
+            spot_row=spot_map.get(rec["code"]))
+        # 市场地位 (行业内市值排名/份额)
         d = dom_map.get(rec["code"])
         if d:
             crown = "👑" if (d["rank"] == 1 and (d["share"] or 0) >= 15) else ""
@@ -285,19 +257,6 @@ def run(full_market: bool, use_cache: bool):
             f["dominance_disp"] = f"{crown}#{d['rank']}/{d['n']}{share_txt}"
             f["dom_rank"], f["dom_n"], f["dom_share"] = d["rank"], d["n"], d["share"]
         fr = m4.cross_score(rec, f, prosperity_map.get(industry) if industry else None)
-        # 模块5: 历史类比概率目标位 (拉10年日线, 统计该股历次同等深跌后的表现)
-        # 失败/数据不够长都只是没有概率栏, 不影响其它字段。
-        try:
-            lg = ds.fetch_hist_long(rec["code"])
-            if lg is not None and not lg.empty:
-                prob = m5.attach_targets(
-                    m5.probability_profile(lg), rec.get("price"),
-                    rec.get("support_price"), rec.get("breakdown_price"))
-                fr["prob_json"] = json.dumps(prob, ensure_ascii=False)
-                fr["prob_n"] = prob.get("prob_n")
-                fr["prob_summary"] = m5.summary_text(prob)
-        except Exception as e:  # noqa: BLE001
-            log.debug("概率目标位失败 %s: %s", rec["code"], e)
         return (rec, detail, f, fr)
 
     results = []
@@ -311,104 +270,95 @@ def run(full_market: bool, use_cache: bool):
                 continue
 
     # 按综合分排序后落库(同分按代码升序, 结果确定); 详情(K线)只存前 N 只以控制 JS 体积
-    results.sort(key=lambda x: (-(x[3].get("final_score") or -1), x[0]["code"]))
+    results.sort(key=lambda x: (-(x[3]["final_score"] if x[3].get("final_score") is not None else -1),
+                                x[0]["code"]))
     detail_n = CONFIG["output"]["dashboard_detail_top_n"]
     show_n = CONFIG["output"].get("final_top_n") or len(results)
     final_records = [x[3] for x in results]
-    # export 浮现集合 = 前 show_n 名 + (排名>show_n 的 dip 按 dip_score 取前 dip_top_n)。
-    # detail 与 profile 都对齐这个集合: 既保证浮现的 dip 股点开有 K线/档案, 又不为不展示的股白存(控 JS 体积)。
+    # export 浮现集合 = 前 show_n 名 + 落榜的 dip/coil 按各自分数补足 (与 export 过滤同口径)
     dip_tail = sorted([fr for fr in final_records[show_n:] if fr.get("dip")],
                       key=lambda fr: -(fr.get("dip_score") or 0.0))[:CONFIG["output"].get("dip_top_n", 40)]
-    # 所有"会展示"的 dip 股(主榜内的 + 补进来的)都存 K线: 🪸 股点开有图不空;
-    # 非展示的 dip 不存, 控 JS 体积。(前 detail_n 名照常存, 与支撑股一致)
-    shown_dip = {fr["code"] for fr in final_records[:show_n] if fr.get("dip")} | {fr["code"] for fr in dip_tail}
+    coil_tail = sorted([fr for fr in final_records[show_n:]
+                        if fr.get("coil") and not fr.get("dip")],
+                       key=lambda fr: -(fr.get("coil_score") or 0.0))[:CONFIG["output"].get("coil_top_n", 40)]
+    shown_extra = ({fr["code"] for fr in final_records[:show_n] if fr.get("dip") or fr.get("coil")}
+                   | {fr["code"] for fr in dip_tail} | {fr["code"] for fr in coil_tail})
     for idx, (rec, detail, f, fr) in enumerate(results):
         db.save_tech(run_date, [rec])
         db.save_fundamental(run_date, rec["code"], f)
         db.save_final(run_date, [fr])
-        if (idx < detail_n or rec["code"] in shown_dip) and detail:
+        if (idx < detail_n or rec["code"] in shown_extra) and detail:
             db.save_detail(run_date, rec["code"], detail)
+
+    # ---------------- 阶段C1: 买卖点建议 (Trade Plan) ----------------
+    # 历史数据走当日缓存(fetch_hist 命中即秒回); coil 股自动走"突破型"剧本。
+    plan_targets = final_records[:show_n] + dip_tail + coil_tail
+    tech_by_code = {rec["code"]: rec for (rec, _, _, _) in results}
+    log.info("阶段C1 买卖点回测: %d 只 ...", len(plan_targets))
+    plan_stats = {}
+    for fr in tqdm(plan_targets):
+        try:
+            h = ds.fetch_hist(fr["code"])
+            plan_stats[fr["code"]] = tp.compute_event_stats(h) if h is not None else None
+        except Exception as e:
+            log.debug("买卖点回测 %s 失败: %s", fr["code"], e)
+            plan_stats[fr["code"]] = None
+    prior = tp.pool_prior([s for s in plan_stats.values() if s])
+    log.info("  事件池: 全池 %d 次事件 (先验)", prior.get("n", 0))
+    n_plans = 0
+    for fr in plan_targets:
+        rec = tech_by_code.get(fr["code"])
+        if not rec:
+            continue
+        try:
+            plan = tp.build_trade_plan(rec, plan_stats.get(fr["code"]), prior)
+            if plan:
+                db.save_trade_plan(run_date, fr["code"], plan)
+                n_plans += 1
+        except Exception as e:
+            log.debug("买卖点生成 %s 失败: %s", fr["code"], e)
+    log.info("  买卖点建议: %d 只已生成", n_plans)
 
     # ---------------- 模块6: 个股深度档案 (阶段C) ----------------
     # 仅对最终展示的候选生成: 简介/主营构成/营收增速/现金流+漏洞/风险/新闻/两融/龙虎榜/大宗
     # 注: akshare 部分东财接口用 py_mini_racer(V8) 解密, 多线程会崩 -> 单线程串行。
-    prof_targets = final_records[:show_n] + dip_tail
-    log.info("阶段C 深度档案: %d 只 (主营/现金流/新闻/两融/大宗) 单线程 ...", len(prof_targets))
+    prof_targets = final_records[:show_n] + dip_tail + coil_tail
+    # 时间预算: 东财F10被限频时单只档案可能要几分钟, 无预算会让整轮永远跑不完、
+    # 计划任务被1/4小时上限杀掉 → 网站断更(2026-07/08 两度发生的根因)。
+    # 预算内尽量拉新档案; 超时/失败的股票回落到库里最近一天的档案(公司简介/年报数据变化很慢)。
+    _budget_sec = CONFIG["output"].get("profile_budget_min", 45) * 60
+    _t0 = time.time()
+    log.info("阶段C 深度档案: %d 只 (主营/现金流/新闻/两融/大宗) 单线程, 预算 %d 分钟 ...",
+             len(prof_targets), _budget_sec // 60)
+    _done_codes = set()
     for fr in tqdm(prof_targets):
+        if time.time() - _t0 > _budget_sec:
+            log.warning("深度档案超出时间预算, 已拉 %d/%d, 其余回落到最近档案",
+                        len(_done_codes), len(prof_targets))
+            break
         try:
             p = m6.pull_profile(fr["code"], sector=fr.get("industry"))
             db.save_profile(run_date, fr["code"], p)
+            if p.get("summary") or (p.get("revenue") or {}).get("years"):
+                _done_codes.add(fr["code"])
         except Exception as e:
             log.debug("深度档案失败 %s: %s", fr["code"], e)
+    # 回落: 没拉到(或全空)的股票, 用库里最近一个run_date的档案顶上
+    _miss = [fr["code"] for fr in prof_targets if fr["code"] not in _done_codes]
+    n_fb = db.backfill_profiles_from_latest(run_date, _miss) if _miss else 0
+    log.info("深度档案: 新拉 %d, 回落补齐 %d, 缺口 %d",
+             len(_done_codes), n_fb, len(_miss) - n_fb)
 
-    # ---------------- 模块7: 盈利指引 (阶段D) ----------------
-    # 对综合分最高的前N只, 拉~10年长历史, 统计"历史上同类大回撤之后实际怎么走"。
-    # 数据脏(错乱行)的票会被 fetch_long_hist 的体检拒掉 -> 该股不出指引, 不给假数字。
-    gcfg = CONFIG.get("guidance") or {}
-    if gcfg.get("enabled"):
-        g_targets = (final_records[:show_n] + dip_tail)[:gcfg.get("top_n", 100)]
-        tech_by_code = {rec["code"]: rec for rec, _, _, _ in results}
-
-        # v2: 先建/加载**跨股票**样本池。单只股票十年只有3~15次形态, 必然"样本不足";
-        # 汇集数百只股票的历史后有几万条观测, 再靠"同行业/同波动档"分层 + 按自身
-        # 波动率归一化来保证可比性(不同资金结构的股票不能直接混着数)。
-        model = m7.load_model(gcfg)
-        if model is None:
-            pool_codes = _training_pool(spot, gcfg.get("train_stocks", 800))
-            log.info("阶段D-1 构建盈利指引样本池: %d 只股票的历史 ...", len(pool_codes))
-            done = [0]
-
-            def _hist_for_train(code):
-                done[0] += 1
-                if done[0] % 50 == 0:
-                    log.info("  样本池 %d/%d", done[0], len(pool_codes))
-                # 必须用**长历史**: 常规日线只有~640根, 扣掉250天前向窗口和260天预热后
-                # 每只仅剩13个观测点, 再滤掉非回撤状态就所剩无几(实测259只只出101条)。
-                # 10年历史每只约180个观测点, 才撑得起跨股票样本池。
-                return ds.fetch_long_hist(code, years=gcfg.get("years", 10))
-
-            # 并发拉(fetch_hist 已改走腾讯, 线程安全)
-            hist_cache = {}
-            with ThreadPoolExecutor(max_workers=workers) as tp:
-                for c, h in zip(pool_codes, tp.map(_hist_for_train, pool_codes)):
-                    if h is not None:
-                        hist_cache[c] = h
-            model = m7.build_model(list(hist_cache.keys()), spot_map,
-                                   lambda c: hist_cache.get(c), gcfg)
-
-        if model is None:
-            log.warning("盈利指引样本池构建失败, 本轮跳过阶段D")
-        else:
-            log.info("阶段D-2 盈利指引: %d 只 (近邻回归, 样本池 %s 条) ...",
-                     len(g_targets), f"{len(model['X']):,}")
-            n_ok = 0
-            for fr in tqdm(g_targets):
-                code = fr["code"]
-                try:
-                    hist = ds.fetch_hist(code)
-                    t = tech_by_code.get(code, {})
-                    g = m7.predict(code, hist, model, spot_row=spot_map.get(code),
-                                   support_price=t.get("support_price"), cfg=gcfg)
-                except Exception as e:
-                    log.debug("盈利指引失败 %s: %s", code, e)
-                    continue
-                db.save_guidance(run_date, code, g)
-                if g.get("guid_n"):
-                    n_ok += 1
-        log.info("盈利指引: %d/%d 只拿到有效样本", n_ok, len(g_targets))
-
+    data_date = str(_bench["date"].iloc[-1]) if (_bench is not None and not _bench.empty) else run_date
     finished = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     db.log_run(run_date, started, finished, n_scanned, len(final_records),
-               selected_inds, "ok")
+               selected_inds, "ok", data_date=data_date)
     log.info("扫描完成: 扫描 %d, 命中 %d", n_scanned, len(final_records))
 
     # ---------------- 导出仪表盘 ----------------
     ex.write_dashboard_js(run_date)
     ex.write_csv(run_date)
-    try:
-        ex.write_history_snapshot(run_date)
-    except Exception as e:
-        log.warning("历史快照写出失败: %s", e)
+    ex.write_history_snapshot(run_date)
     log.info("✅ 全部完成。请双击打开 dashboard/index.html")
 
 

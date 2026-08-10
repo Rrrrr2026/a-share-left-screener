@@ -22,7 +22,9 @@ def zscore(series: pd.Series) -> pd.Series:
     mu = s.mean(skipna=True)
     sd = s.std(skipna=True)
     if not sd or np.isnan(sd):
-        return pd.Series(np.zeros(len(s)), index=s.index)
+        # 退化列(全同值/仅一个有效值): 有效值记0, 缺失仍记NaN
+        # (不能把NaN也变成0 —— 那会给无数据的行伪造中性分)
+        return pd.Series(np.where(s.isna(), np.nan, 0.0), index=s.index)
     return (s - mu) / sd
 
 

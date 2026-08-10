@@ -60,7 +60,7 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
     if px < c["min_price"]:
         return None, None
 
-    # 流动性: 近20日日均成交额(亿)
+    # 流动性: 近20日日均成交额(亿元)
     amt_yi = np.nan
     if "amount" in df.columns:
         amt_yi = float(df["amount"].astype(float).tail(20).mean()) / 1e8
@@ -98,7 +98,8 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         if cands:
             nearest = min(cands, key=lambda p: abs(p - px))
             dist_pivot = (px - nearest) / px * 100.0
-            near_pivot = abs(dist_pivot) <= c["near_pivot_pct"]
+            # 与通道/均线同口径: 现价最多只允许在前低下方1% (再深就是已破位, 不再算"贴近支撑")
+            near_pivot = -1.0 <= dist_pivot <= c["near_pivot_pct"]
             if near_pivot:
                 prox = max(0.0, 1 - abs(dist_pivot) / c["near_pivot_pct"])
                 score += w["pivot"] * (0.5 + 0.5 * prox)
@@ -164,7 +165,7 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
     vol_ratio_calc, vol_confirm_txt = None, ""
     if "volume" in df.columns:
         vol = df["volume"].astype(float)
-        avg20v = vol.tail(20).mean()
+        avg20v = vol.iloc[:-1].tail(20).mean()   # 基准剔除当日, 否则放量被自身稀释(2倍量只显示1.9)
         if avg20v and not np.isnan(avg20v) and avg20v > 0:
             vol_ratio_calc = round(float(vol.iloc[-1] / avg20v), 2)
             shrink = vol_ratio_calc < c.get("vol_shrink_ratio", 0.85)
@@ -173,6 +174,64 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
                 score += w.get("vol_confirm", 0.0) * (0.7 if shrink else 0.5)
                 vol_confirm_txt = "缩量企稳" if shrink else "放量"
     signals["vol"] = vol_confirm_txt
+
+    # --- 7) RSI底背离 (价创新低而RSI低点抬高) — 超跌组的补充确认 ---
+    rsi_div = False
+    if len(close) > look:
+        c_seg2 = close.tail(look).reset_index(drop=True)
+        r_seg = r.tail(look).reset_index(drop=True)
+        if c_seg2.idxmin() >= look - 15:
+            half = look // 2
+            r1, r2 = r_seg.iloc[:half].min(), r_seg.iloc[half:].min()
+            if not (np.isnan(r1) or np.isnan(r2)) and r2 > r1 + 2.0:
+                rsi_div = True
+    if rsi_div:
+        score += w.get("oversold_div", 1.2) * 0.25
+        signals["osc"] = (signals["osc"] or "") + "RSI背离"
+
+    # --- 8) 支撑强度: 主支撑区(±1.5%)近一年被触碰次数, 触碰越多支撑越"厚" ---
+    supp_touches = 0
+    _main_supp = None
+    if support_cands:
+        _main_supp = min(support_cands, key=lambda kv: abs(px - kv[1]))[1]
+        zone_lo, zone_hi = _main_supp * 0.985, _main_supp * 1.015
+        lows_250 = low.tail(250).values
+        last_touch = -10
+        for i2, lv in enumerate(lows_250):
+            if not np.isnan(lv) and zone_lo <= lv <= zone_hi and i2 - last_touch >= 5:
+                supp_touches += 1
+                last_touch = i2
+        if supp_touches >= 2:
+            score += w.get("supp_strength", 0.0) * min(1.0, (supp_touches - 1) / 3.0)
+
+    # --- 9) 趋势规整: MA250上方且MA250上行的回踩(stage-2回调)优于破位下行 ---
+    trend_ok = 0
+    ma250_last = ma_vals.get(250)
+    ma250_last = None if (ma250_last is None or np.isnan(ma250_last)) else float(ma250_last)
+    if ma250_last:
+        ma250_series = close.rolling(250).mean()
+        ma250_prev = float(ma250_series.iloc[-21]) if len(ma250_series) > 21 else np.nan
+        rising = (not np.isnan(ma250_prev)) and ma250_last > ma250_prev
+        if px >= ma250_last and rising:
+            trend_ok = 2
+            score += w.get("trend_regime", 0.0)
+        elif px >= ma250_last * 0.97 or rising:
+            trend_ok = 1
+            score += w.get("trend_regime", 0.0) * 0.5
+
+    # --- 10) 相对强度 vs SPY: 近60日超额收益为正的回调更可能是强势股洗盘 ---
+    rs_60 = None
+    if bench_close is not None and len(bench_close) > 61:
+        st_ret = ind.cumulative_return(close, 60)
+        try:
+            _b = bench_close.astype(float)
+            b_ret = float(_b.iloc[-1] / _b.iloc[-61] - 1.0) * 100.0
+        except Exception:
+            b_ret = np.nan
+        if not (np.isnan(st_ret) or np.isnan(b_ret)):
+            rs_60 = round(st_ret - b_ret, 2)
+            if rs_60 > 0:
+                score += w.get("rel_strength", 0.0) * min(1.0, rs_60 / 10.0)
 
     n_hit = (sum(1 for k in ("channel", "pivot", "ma") if signals[k])
              + (1 if hit_osc else 0) + (1 if vol_confirm_txt else 0))
@@ -185,9 +244,12 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         dist_support = (px - support_price) / px * 100.0
     breakdown_price = None
     all_support_prices = [p for (_, p) in support_cands] + pivot_levels
-    all_support_prices = [p for p in all_support_prices if p and p <= px * 1.02]
+    # 只看现价下方10%以内的支撑: 破位参考应贴着"正在守的位", 而不是两年前25%下方的老低点
+    all_support_prices = [p for p in all_support_prices if p and px * 0.90 <= p <= px * 1.02]
     if all_support_prices:
         breakdown_price = min(all_support_prices) * 0.97   # 破位 = 最低支撑下方3%
+    elif support_price is not None:
+        breakdown_price = support_price * 0.97
 
     # ---- 52周高低 / 位置 / 近半年涨跌 ----
     win52 = min(250, len(df))
@@ -197,10 +259,12 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
     ret_half = ind.cumulative_return(close, 120)
     ret_1m = ind.cumulative_return(close, 21)     # 近一月涨幅 (≈21个交易日)
 
-    # ---- KDJ ----
+    # ---- KDJ (金叉/死叉 需真实交叉事件, 传前一根K/D判别) ----
     k, d_, j = ind.kdj(high, low, close)
     kk, dd, jj = ind.safe_last(k), ind.safe_last(d_), ind.safe_last(j)
-    kdj_tag = ind.kdj_tag(kk, dd, jj)
+    kk_p = float(k.iloc[-2]) if len(k) > 1 else np.nan
+    dd_p = float(d_.iloc[-2]) if len(d_) > 1 else np.nan
+    kdj_tag = ind.kdj_tag(kk, dd, jj, kk_p, dd_p)
 
     # ---- 风控指标 + 行内sparkline + 斐波那契回撤 ----
     atrp = ind.atr_pct(high, low, close)
@@ -221,8 +285,9 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         turnover = _nz(spot_row.get("turnover"))
         amount_today = _nz(spot_row.get("amount"))
 
-    # ---- 独立"深跌超卖抄底"桶 (与支撑型 tech_score 完全解耦, 不改动 score) ----
+    # ---- 独立"深跌超卖抄底"桶 (与上面的支撑型 tech_score 完全解耦, 不改动 score) ----
     # 硬门槛: 深跌(回撤>=阈值) + 超卖(RSI<=阈值) + 逼近52周低点. 三者全中才进桶。
+    # dip_score 仅用于桶内排序, 不进入 tech_score / final_score。
     dcfg = c.get("dip") or {}
     dip_ok, dip_score = False, 0.0
     dip_confirm = ""
@@ -235,6 +300,7 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         nearlow = _pos <= dcfg["pos_52w_max"]
         if deep and oversold_d and nearlow:
             dip_ok = True
+            # 见底确认: 底背离 / 绿柱缩短 / KDJ金叉 / 放量高潮 (数量越多越可能真见底)
             confirms = []
             if bull_div: confirms.append("底背离")
             if green_shrink: confirms.append("缩柱")
@@ -250,144 +316,60 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
             dip_score = round(dw["depth"] * f_depth + dw["oversold"] * f_os
                               + dw["nearlow"] * f_near + dw["confirm"] * f_conf, 3)
 
-    # ---- "大跌后横盘吸筹" 形态 (独立于 tech_score, 只做形态标注) ----
-    # 目标: A杀之后不再创新低、低位窄幅震荡、波动与成交同步收敛 —— 典型的磨底/吸筹区。
-    # 与"深跌抄底(dip)"的区别: dip 抓的是**正在跌、刚超卖**; 这里抓的是**跌完了、在横**。
-    ccfg = c.get("consolidation") or {}
-    consol_ok, consol_score, consol_note = False, 0.0, ""
-    if ccfg and len(close) >= ccfg["window"] + 40:
-        W = int(ccfg["window"])
-        win = close.tail(W)
-        wmax, wmin, wmean = float(win.max()), float(win.min()), float(win.mean())
-        rng_pct = (wmax - wmin) / wmean * 100.0 if wmean else np.nan
-        slope = ind.reg_slope_norm(close, W)
-        # 波动收敛: 近半窗 ATR% vs 前半窗 ATR%
-        atr_recent = ind.atr_pct(high.tail(W // 2), low.tail(W // 2), close.tail(W // 2))
-        atr_prior = ind.atr_pct(high.tail(W).head(W // 2), low.tail(W).head(W // 2),
-                                close.tail(W).head(W // 2))
-        # 量能: 近20日均量 / 前40日均量
-        vol_dry = np.nan
-        if "volume" in df.columns:
-            _v = pd.to_numeric(df["volume"], errors="coerce").dropna()
-            if len(_v) >= 60:
-                v20 = float(_v.tail(20).mean())
-                v_prior = float(_v.tail(60).head(40).mean())
-                vol_dry = (v20 / v_prior) if v_prior else np.nan
-
-        deep_enough = (not np.isnan(drawdown)) and drawdown >= ccfg["drawdown_min"]
-        if deep_enough and not np.isnan(rng_pct):
-            parts, cw = [], ccfg["weights"]
-            num = den = 0.0
-            # a) 走平: 斜率越接近0越好
-            if not np.isnan(slope):
-                f = max(0.0, 1.0 - abs(slope) / max(1e-6, ccfg["slope_max"]))
-                num += cw["flat"] * f; den += cw["flat"]
-                if f > 0.5: parts.append("股价走平")
-            # b) 窄幅: 区间越窄越好
-            f = max(0.0, 1.0 - rng_pct / max(1e-6, ccfg["range_max_pct"]))
-            num += cw["narrow"] * f; den += cw["narrow"]
-            if f > 0.4: parts.append(f"{W}日振幅仅{rng_pct:.0f}%")
-            # c) 波动收敛
-            if not np.isnan(atr_recent) and not np.isnan(atr_prior) and atr_prior > 0:
-                ratio = atr_recent / atr_prior
-                f = max(0.0, min(1.0, (ccfg["atr_contract"] * 1.3 - ratio) / (ccfg["atr_contract"] * 1.3)))
-                num += cw["contract"] * f; den += cw["contract"]
-                if ratio <= ccfg["atr_contract"]: parts.append("波动收敛")
-            # d) 缩量(地量) —— 吸筹常见: 无人问津、成交萎缩
-            if not np.isnan(vol_dry):
-                f = max(0.0, min(1.0, (1.15 - vol_dry) / 0.45))
-                num += cw["volume"] * f; den += cw["volume"]
-                if vol_dry <= ccfg["vol_dry_max"]: parts.append(f"缩量至前期{vol_dry*100:.0f}%")
-            consol_score = round(num / den, 3) if den else 0.0
-            consol_ok = consol_score >= ccfg["min_score"]
-            consol_note = "、".join(parts)
-
-    # ---- 🚀 "爆发前夕" (在横盘吸筹基础上, 找蓄势将尽、随时可能启动的) ----
-    # 思路: 横盘吸筹说明"在磨底", 但磨底可能还要磨很久。真正要抓的是**磨到尾声**的:
-    #   a) 吸筹证据: 价格没涨但 OBV(能量潮)在爬 —— 有人在悄悄收集(量价背离)
-    #   b) 买盘占优: 上涨日的成交量明显大于下跌日 —— 承接强于抛压
-    #   c) 波动压缩: 布林带宽/ATR 压到近一年低位 —— 弹簧压到底, 变盘临近
-    #   d) 位置就绪: 价格已在横盘区间上沿, 而不是刚跌到下沿
-    #   e) 量能拐点: 地量之后温和放量(但不能是暴量 —— 暴量多是出货/异动)
-    # 只在 consol_ok 成立时才评, 且各分项都做上下限, 避免单一指标失真就误报。
-    bcfg = c.get("breakout") or {}
-    brk_ok, brk_score, brk_note = False, 0.0, ""
-    if bcfg and consol_ok and "volume" in df.columns and len(close) >= 130:
-        W = int(ccfg.get("window", 60))
-        v = pd.to_numeric(df["volume"], errors="coerce")
-        parts_b, bw = [], bcfg["weights"]
-        num_b = den_b = 0.0
-        ret = close.pct_change()
-
-        # a) OBV 背离: 近W日 OBV 在爬 而价格没涨 = 有人在悄悄收集
-        # ⚠ OBV 是累计量, 量纲与价格完全不同, **不能**直接把两者的斜率相减。
-        # 必须先各自 z-score 标准化, 斜率单位统一成"窗口内漂移了几个标准差", 才可比。
-        def _z_drift(s):
-            s = s.dropna()
-            if len(s) < 15:
-                return np.nan
-            sd = float(s.std())
-            if not np.isfinite(sd) or sd <= 0:
-                return np.nan
-            z = (s - float(s.mean())) / sd
-            x = np.arange(len(z), dtype=float)
-            try:
-                k = float(np.polyfit(x, z.values, 1)[0])
-            except Exception:
-                return np.nan
-            return k * len(z)          # 整个窗口内漂移的标准差数
-        obv = (np.sign(ret.fillna(0)) * v.fillna(0)).cumsum()
-        obv_s, px_s = _z_drift(obv.tail(W)), _z_drift(close.tail(W))
-        if not np.isnan(obv_s) and not np.isnan(px_s):
-            f = max(0.0, min(1.0, (obv_s - px_s) / max(1e-6, bcfg["obv_div_full"])))
-            num_b += bw["obv"] * f; den_b += bw["obv"]
-            if f > 0.4: parts_b.append(f"量能背离(价平量增 {obv_s - px_s:.1f}σ)")
-
-        # b) 上涨日 vs 下跌日 量能比
-        win_r, win_v = ret.tail(W), v.tail(W)
-        up_v = float(win_v[win_r > 0].mean()) if (win_r > 0).any() else np.nan
-        dn_v = float(win_v[win_r < 0].mean()) if (win_r < 0).any() else np.nan
-        if not np.isnan(up_v) and not np.isnan(dn_v) and dn_v > 0:
-            udr = up_v / dn_v
-            f = max(0.0, min(1.0, (udr - 1.0) / max(1e-6, bcfg["ud_ratio_full"] - 1.0)))
-            num_b += bw["updown"] * f; den_b += bw["updown"]
-            if udr >= bcfg["ud_ratio_min"]: parts_b.append(f"买盘占优(涨跌量比{udr:.2f})")
-
-        # c) 波动压缩: 当前布林带宽在近250日的分位(越低越好)
-        ma20 = close.rolling(20).mean()
-        sd20 = close.rolling(20).std()
-        bw_series = (2 * bcfg.get("boll_k", 2.0) * sd20 / ma20).replace([np.inf, -np.inf], np.nan)
-        if bw_series.notna().sum() >= 120:
-            cur_bw = float(bw_series.iloc[-1])
-            hist_bw = bw_series.tail(250).dropna()
-            pctile = float((hist_bw < cur_bw).mean() * 100.0)
-            f = max(0.0, min(1.0, (bcfg["squeeze_pct_full"] - pctile) / max(1e-6, bcfg["squeeze_pct_full"])))
-            num_b += bw["squeeze"] * f; den_b += bw["squeeze"]
-            if pctile <= bcfg["squeeze_pct_max"]: parts_b.append(f"波动压缩(带宽{pctile:.0f}%分位)")
-
-        # d) 位置: 处于横盘区间的上沿
-        win_c = close.tail(W)
-        lo_w, hi_w = float(win_c.min()), float(win_c.max())
-        if hi_w > lo_w:
-            pos = (px - lo_w) / (hi_w - lo_w)
-            f = max(0.0, min(1.0, (pos - bcfg["pos_min"]) / max(1e-6, 1.0 - bcfg["pos_min"])))
-            num_b += bw["position"] * f; den_b += bw["position"]
-            if pos >= bcfg["pos_min"]: parts_b.append(f"位于区间上沿({pos*100:.0f}%)")
-
-        # e) 量能拐点: 近5日均量/前20日均量, 温和放量最佳(暴量视为异动, 不加分)
-        if len(v.dropna()) >= 30:
-            v5 = float(v.tail(5).mean()); v20 = float(v.tail(25).head(20).mean())
-            if v20 > 0:
-                vr = v5 / v20
-                lo_r, hi_r = bcfg["vol_pickup"], bcfg["vol_spike_cap"]
-                f = 0.0 if vr < lo_r else (max(0.0, 1.0 - (vr - hi_r) / hi_r) if vr > hi_r
-                                           else min(1.0, (vr - lo_r) / max(1e-6, 1.4 - lo_r)))
-                num_b += bw["pickup"] * f; den_b += bw["pickup"]
-                if lo_r <= vr <= hi_r: parts_b.append(f"温和放量({vr:.2f}x)")
-
-        brk_score = round(num_b / den_b, 3) if den_b else 0.0
-        brk_ok = brk_score >= bcfg["min_score"]
-        brk_note = "、".join(parts_b)
+    # ---- 独立"蓄势待发"桶 (🚀): 深回调后横盘收敛 + 贴近箱体上沿 + 突破前兆 ----
+    # 与 dip 桶同构: 不进 tech_score, 只作独立标签与桶内排序。
+    ccfg = c.get("coil") or {}
+    coil_ok, coil_score = False, 0.0
+    coil_confirm = ""
+    box_hi = box_lo = 0.0
+    if ccfg and len(close) >= 260:
+        cb = int(ccfg.get("consol_bars", 30))
+        box_hi = float(high.tail(cb).max())
+        box_lo = float(low.tail(cb).min())
+        box_mid = (box_hi + box_lo) / 2.0
+        range_pct = (box_hi - box_lo) / box_mid * 100.0 if box_mid > 0 else 999.0
+        hi250 = float(high.tail(250).max())
+        # 大回调在先: 箱体上沿仍比250日高点低足够多, 且高点不是刚形成的
+        deep_pull = hi250 > 0 and (hi250 - box_hi) / hi250 >= ccfg.get("drawdown_min", 0.25)
+        try:
+            bars_since_high = (len(df) - 1) - int(high.tail(250).idxmax())
+        except Exception:
+            bars_since_high = 0
+        aged = bars_since_high >= int(ccfg.get("bars_since_high_min", 40))
+        tight = range_pct <= ccfg.get("range_max_pct", 16.0)
+        near_hi = (box_hi > 0 and px >= box_mid
+                   and (box_hi - px) / box_hi * 100.0 <= ccfg.get("near_high_pct", 5.0))
+        if deep_pull and aged and tight and near_hi:
+            # 布林带宽挤压分位 (近一年): 越低说明波动被压得越扁, 突破弹性越大
+            bw = (close.rolling(20).std() * 4.0) / close.rolling(20).mean()
+            bw_hist = bw.tail(250).dropna()
+            bw_now = ind.safe_last(bw)
+            bw_pct = (float((bw_hist <= bw_now).mean() * 100.0)
+                      if (not np.isnan(bw_now) and len(bw_hist) > 60) else None)
+            squeeze = bw_pct is not None and bw_pct <= ccfg.get("squeeze_pctile", 40.0)
+            coil_ok = True
+            confirms = []
+            if squeeze:
+                confirms.append("波动挤压")
+            if hist_now > hist_prev:
+                confirms.append("MACD走强")
+            if not np.isnan(kk) and not np.isnan(dd) and kk > dd:
+                confirms.append("KDJ多头")
+            ma60_v = ma_vals.get(60)
+            if ma60_v is not None and not np.isnan(ma60_v) and px >= float(ma60_v):
+                confirms.append("站上MA60")
+            if (vol_ratio_calc is not None and vol_ratio_calc >= 1.3
+                    and px >= float(close.iloc[-2])):
+                confirms.append("放量上攻")
+            coil_confirm = "/".join(confirms)
+            cw = ccfg.get("weights", {})
+            f_tight = max(0.0, 1.0 - range_pct / max(ccfg.get("range_max_pct", 16.0), 1e-6))
+            f_near = max(0.0, 1.0 - ((box_hi - px) / box_hi * 100.0)
+                         / max(ccfg.get("near_high_pct", 5.0), 1e-6)) if box_hi > 0 else 0.0
+            f_sq = (1.0 - bw_pct / 100.0) if bw_pct is not None else 0.3
+            f_conf = len(confirms) / 5.0
+            coil_score = round(cw.get("tight", 1.0) * f_tight + cw.get("near_high", 1.0) * f_near
+                               + cw.get("squeeze", 1.0) * f_sq + cw.get("confirm", 0.8) * f_conf, 3)
 
     record = {
         "code": code, "name": name,
@@ -426,17 +408,20 @@ def scan_one(code: str, name: str, df: pd.DataFrame, spot_row: dict | None = Non
         "sig_vol": signals.get("vol", ""),
         "boll_low": _nz(boll_low_val),
         "fib_382": fib["f382"], "fib_500": fib["f500"], "fib_618": fib["f618"],
+        # v2 新增信号 (透明化展示用)
+        "supp_touches": int(supp_touches),
+        "trend_ok": int(trend_ok),
+        "rs_60": _nz(rs_60),
         # 深跌抄底桶 (独立于 tech_score)
         "dip": bool(dip_ok),
         "dip_score": float(dip_score),
         "dip_confirm": dip_confirm,
-        # 大跌后横盘吸筹形态
-        "consol": bool(consol_ok),
-        "consol_score": float(consol_score),
-        "consol_note": consol_note,
-        "breakout": bool(brk_ok),
-        "breakout_score": float(brk_score),
-        "breakout_note": brk_note,
+        # 蓄势待发桶 (独立于 tech_score); 箱体上下沿供突破型买卖点与前端展示
+        "coil": bool(coil_ok),
+        "coil_score": float(coil_score),
+        "coil_confirm": coil_confirm,
+        "box_hi": round(box_hi, 2) if coil_ok else None,
+        "box_lo": round(box_lo, 2) if coil_ok else None,
     }
 
     # ---- 详情图表逐日序列 ----

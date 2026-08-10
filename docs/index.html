@@ -9,25 +9,17 @@
 <script src="dashboard_data.js"></script>
 <style>
   :root{
-    /* 深色: 底最暗 -> 卡片抬升 -> 表头再抬升, 形成清晰的三层高度关系 */
-    --bg:#070b14; --card:#0f1626; --border:#1d2840; --text:#e8edf7; --dim:#93a6c6; --muted:#6f83a5;
-    --head:#141d31; --rowhover:#18233c; --input:#111a2c; --inputborder:#26344f; --gridline:#1a2337;
-    --drawer:#0b111d; --accent:#38bdf8; --zebra:rgba(255,255,255,.016);
-    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+    --bg:#0b1220; --card:#111a2e; --border:#1e2a44; --text:#e5e7eb; --dim:#9fb4d6; --muted:#7e93b8;
+    --head:#0e1830; --rowhover:#16223c; --input:#0e1830; --inputborder:#26344f; --gridline:#1b2640;
+    --drawer:#0b1220;
   }
   body.light{
-    --bg:#f4f7fb; --card:#ffffff; --border:#e2e8f2; --text:#0f172a; --dim:#475569; --muted:#7c8ba3;
-    --head:#f7fafd; --rowhover:#f0f6ff; --input:#ffffff; --inputborder:#d5dfec; --gridline:#eaf0f7;
-    --drawer:#f8fafd; --accent:#0284c7; --zebra:rgba(15,23,42,.014);
-    --shadow:0 1px 2px rgba(15,23,42,.05), 0 8px 24px -14px rgba(15,23,42,.18);
+    --bg:#eef2f8; --card:#ffffff; --border:#d7e0ee; --text:#0f172a; --dim:#334155; --muted:#64748b;
+    --head:#eaf0f8; --rowhover:#eaf1fb; --input:#ffffff; --inputborder:#cbd5e1; --gridline:#e6ecf5;
+    --drawer:#f6f8fc;
   }
-  body { background:var(--bg); color:var(--text); font-family: -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
-         transition:background .25s,color .25s; -webkit-font-smoothing:antialiased; }
-  /* 卡片: 轻边框 + 柔和投影, 让每块内容"浮"起来而不是糊成一片 */
-  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); }
-  /* 区块标题: 统一用左侧竖条 + 加粗, 建立层级 */
-  .blk-title{ font-size:15px; font-weight:700; letter-spacing:.01em; display:flex; align-items:center; gap:9px; }
-  .blk-title::before{ content:""; width:3px; height:15px; border-radius:2px; background:var(--accent); flex:none; }
+  body { background:var(--bg); color:var(--text); font-family: -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; transition:background .25s,color .25s; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; }
   th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
   th.sortable:hover { color:#93c5fd; }
   tbody tr:hover { background:var(--rowhover) !important; cursor:pointer; }
@@ -40,9 +32,8 @@
   body:not(.light) .tag-watch { color:#cbd5e1; }
   .tag-dip    { background:rgba(244,114,182,.15); color:#be185d; border:1px solid rgba(244,114,182,.45); }
   body:not(.light) .tag-dip { color:#f9a8d4; }
-  /* 🧊 大跌后横盘吸筹 (强左侧的升级形态) —— 冰蓝, 与强左侧的绿区分开 */
-  .tag-consol { background:rgba(56,189,248,.15); color:#0369a1; border:1px solid rgba(56,189,248,.5); }
-  body:not(.light) .tag-consol { color:#7dd3fc; }
+  .tag-coil   { background:rgba(251,146,60,.15); color:#c2410c; border:1px solid rgba(251,146,60,.5); }
+  body:not(.light) .tag-coil { color:#fdba74; }
   .num { font-variant-numeric: tabular-nums; text-align:right; }
   .pos { color:#ef4444; } .neg { color:#16a34a; }   /* A股习惯: 涨红跌绿 */
   body:not(.light) .pos { color:#f87171; } body:not(.light) .neg { color:#4ade80; }
@@ -52,16 +43,9 @@
   ::-webkit-scrollbar{height:9px;width:9px} ::-webkit-scrollbar-thumb{background:#8496b5;border-radius:6px}
   select,input { background:var(--input); border:1px solid var(--inputborder); color:var(--text); border-radius:8px; padding:6px 10px; }
   input[type=range]{ padding:0; height:6px; accent-color:#38bdf8; cursor:pointer; }
-  table { border-collapse: separate; border-spacing:0; width:100%; }
-  th,td { padding:10px 11px; border-bottom:1px solid var(--border); font-size:13px; }
-  /* 表头: 小字号+字距+大写感, 与数据行拉开层级; 不再和正文一个重量 */
-  thead th { position:sticky; top:0; background:var(--head); z-index:2; color:var(--muted);
-             font-size:11.5px; font-weight:600; letter-spacing:.06em; text-transform:none;
-             padding-top:11px; padding-bottom:11px; border-bottom:1px solid var(--border);
-             backdrop-filter:saturate(1.2) blur(2px); }
-  tbody tr:nth-child(even){ background:var(--zebra); }   /* 斑马纹: 极淡, 只帮眼睛横向跟行 */
-  tbody td{ vertical-align:middle; }
-  tbody tr{ transition:background .12s; }
+  table { border-collapse: collapse; width:100%; }
+  th,td { padding:7px 9px; border-bottom:1px solid var(--border); font-size:13px; }
+  thead th { position:sticky; top:0; background:var(--head); z-index:2; color:var(--dim); }
   .star{ cursor:pointer; font-size:16px; line-height:1; color:#64748b; }
   .star.on{ color:#facc15; }
   /* 明色主题下把深色 Tailwind 文本改为可读色 */
@@ -71,21 +55,9 @@
   body.light .text-slate-500{color:#94a3b8!important}
   body.light .text-sky-300{color:#0369a1!important}
   body.light #histBanner{color:#075985!important}   /* 历史快照提示条在浅色主题下要可读 */
-  .miniStat{ background:var(--card); border:1px solid var(--border); border-radius:999px; padding:5px 13px; font-size:12.5px;
-             box-shadow:var(--shadow); white-space:nowrap; }
-  .segbtn{ padding:5px 13px; border-radius:9px; border:1px solid var(--inputborder); background:var(--input); color:var(--dim);
-           font-size:12.5px; cursor:pointer; transition:all .15s; }
-  .segbtn:hover{ color:var(--text); border-color:var(--accent); }
-  .segbtn.on{ background:var(--accent); color:#04121d; border-color:var(--accent); font-weight:600; }
-  body.light .segbtn.on{ color:#fff; }
-  /* 概览大数字: 等宽数字 + 更紧的行高, 让 4 张卡读起来像仪表而不像段落 */
-  .ovnum{ font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.1; }
-  .ovlabel{ font-size:11.5px; letter-spacing:.04em; color:var(--muted); }
-  /* 免责声明: 低视觉重量但两种主题下都清晰可读 */
-  .disclaimer{ border-color:rgba(245,158,11,.30); background:rgba(245,158,11,.05);
-               color:#c99a4e; box-shadow:none; }
-  body:not(.light) .disclaimer{ color:#d9b271; }
-  body.light .disclaimer{ color:#8a6218; background:rgba(245,158,11,.09); border-color:rgba(245,158,11,.35); }
+  .miniStat{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:6px 12px; font-size:13px; }
+  .segbtn{ padding:4px 12px; border-radius:8px; border:1px solid var(--inputborder); background:var(--input); color:var(--dim); font-size:13px; cursor:pointer; }
+  .segbtn.on{ background:#0ea5e9; color:#fff; border-color:#0ea5e9; }
   /* ---- 详情抽屉 分页签 & 版式 ---- */
   .sec-title{ font-size:15px; font-weight:600; color:var(--text); display:flex; align-items:center; gap:8px; }
   .sec-title::before{ content:""; width:3px; height:14px; border-radius:2px; background:#38bdf8; flex:none; }
@@ -110,8 +82,8 @@
   <!-- 标题 -->
   <header class="flex items-center justify-between flex-wrap gap-3 mb-4">
     <div>
-      <h1 class="text-[26px] font-bold text-white tracking-tight" data-i18n="title">A股 · 「左侧支撑位」筛选与监控台</h1>
-      <p class="text-[13px] mt-1.5" style="color:var(--muted)" data-i18n="subtitle">高景气行业内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分</p>
+      <h1 class="text-2xl font-bold text-white" data-i18n="title">美股 · 「左侧支撑位」筛选与监控台</h1>
+      <p class="text-sm text-slate-400 mt-1" data-i18n="subtitle">全美股(市值≥$1亿) · 高景气板块内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分</p>
     </div>
     <div class="text-right text-sm text-slate-400">
       <div class="flex items-center justify-end gap-3">
@@ -121,14 +93,14 @@
         <button id="themeBtn" class="segbtn" title="点击切换：白天 / 黑夜 / 跟随系统">🌙 黑夜</button>
         <span><span data-i18n="updated">最后更新：</span><span id="updatedAt" class="text-slate-200">—</span></span>
       </div>
-      <div class="mt-1" data-i18n="datasource">数据源：akshare（东财行业 · 前复权日线）· 价格单位 人民币 ¥</div>
+      <div class="mt-1" data-i18n="datasource">数据源：Yahoo Finance（全美股 · GICS 板块）· 价格单位 USD</div>
     </div>
   </header>
 
   <!-- 免责声明 -->
-  <div class="card disclaimer px-4 py-2.5 mb-4 text-[12px] leading-relaxed" data-i18n-html="disclaimer">
-    ⚠️ <b>免责声明</b>：本系统仅对A股做技术/基本面数据的自动化整理与形态筛选，<b>不构成任何投资建议</b>。
-    "左侧买入"是在下跌中、支撑确认前进场，风险天然更高（可能继续下跌或破位）。
+  <div class="card border-amber-500/40 bg-amber-500/5 px-4 py-3 mb-4 text-[13px] leading-relaxed text-amber-200/90" data-i18n-html="disclaimer">
+    ⚠️ <b>免责声明</b>：本系统仅对美股做技术/基本面数据的自动化整理与形态筛选，<b>不构成任何投资建议</b>。
+    "左侧买入"是在下跌中、支撑确认前进场，风险天然更高（可能继续下跌或破位）。价格单位为美元(USD)。
     所有标的需<b>人工复核</b>，使用者自负盈亏与风控。
   </div>
 
@@ -137,10 +109,10 @@
 
   <!-- 概览卡 -->
   <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-    <div class="card p-4"><div class="ovlabel" data-i18n="ov_scanned">今日扫描数</div><div id="ovScanned" class="ovnum text-[28px] font-bold text-white mt-1.5">—</div></div>
-    <div class="card p-4"><div class="ovlabel" data-i18n="ov_hit">命中候选数</div><div id="ovHit" class="ovnum text-[28px] font-bold text-sky-300 mt-1.5">—</div></div>
-    <div class="card p-4"><div class="ovlabel" data-i18n="ov_inds">入选景气板块</div><div id="ovInds" class="ovnum text-[28px] font-bold text-emerald-300 mt-1.5">—</div></div>
-    <div class="card p-4"><div class="ovlabel" data-i18n="ov_date">数据日期</div><div id="ovDate" class="ovnum text-[28px] font-bold text-white mt-1.5">—</div></div>
+    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_scanned">今日扫描数</div><div id="ovScanned" class="text-2xl font-bold text-white mt-1">—</div></div>
+    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_hit">命中候选数</div><div id="ovHit" class="text-2xl font-bold text-sky-300 mt-1">—</div></div>
+    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_inds">入选景气板块</div><div id="ovInds" class="text-2xl font-bold text-emerald-300 mt-1">—</div></div>
+    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_date">数据日期</div><div id="ovDate" class="text-2xl font-bold text-white mt-1">—</div></div>
   </section>
   <!-- 派生统计条 -->
   <section id="ovStrip" class="flex flex-wrap gap-2 mb-5"></section>
@@ -148,20 +120,20 @@
   <!-- 行业景气榜 -->
   <section class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-      <h2 class="blk-title" data-i18n="sec_board">板块景气榜</h2>
+      <h2 class="text-lg font-semibold text-white" data-i18n="sec_board">板块景气榜</h2>
       <div class="flex items-center gap-2">
         <span class="text-xs text-slate-400 mr-1" data-i18n="sec_hint">点击板块可筛选主表 · 绿色=入选</span>
         <button class="segbtn on" id="segBar" data-i18n="seg_bar">条形图</button>
         <button class="segbtn" id="segTree" data-i18n="seg_tree">矩形树图</button>
       </div>
     </div>
-    <div id="industryChart" style="width:100%;height:300px;"></div>
+    <div id="industryChart" style="width:100%;height:380px;"></div>
   </section>
 
   <!-- 权重实验室 -->
   <section class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-      <h2 class="blk-title" data-i18n="wlab_title">综合分权重实验室</h2>
+      <h2 class="text-lg font-semibold text-white" data-i18n="wlab_title">综合分权重实验室</h2>
       <div class="flex items-center gap-3">
         <span class="text-xs text-slate-400" data-i18n="wlab_hint">拖动滑块即时重算「综合分」并重新排序（不改变原始命中）</span>
         <button id="wReset" class="segbtn" data-i18n="wlab_reset">恢复默认 50/30/20</button>
@@ -177,17 +149,16 @@
   <!-- 候选股主表 -->
   <section class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
-      <h2 class="blk-title"><span data-i18n="tbl_title">候选股主表</span> <span id="rowCount" class="text-[12px] font-normal" style="color:var(--muted)"></span></h2>
+      <h2 class="text-lg font-semibold text-white"><span data-i18n="tbl_title">候选股主表</span> <span id="rowCount" class="text-sm text-slate-400 font-normal"></span></h2>
       <div class="flex items-center gap-2 flex-wrap text-sm">
         <input id="search" placeholder="搜索 代码 / 名称" data-i18n-ph="search_ph" class="w-40" />
         <select id="filterInd"><option value="">全部板块</option></select>
         <select id="filterTag">
           <option value="">全部标签</option>
-          <option value="🚀 蓄势待发">🚀 蓄势待发</option>
           <option value="✅ 强左侧">✅ 强左侧</option>
-          <option value="🧊 强左侧·横盘吸筹">🧊 强左侧·横盘吸筹</option>
           <option value="⚠️ 技术好但基本面弱">⚠️ 技术好但基本面弱</option>
           <option value="🪸 深跌抄底">🪸 深跌抄底</option>
+          <option value="🚀 蓄势待发">🚀 蓄势待发</option>
           <option value="🔎 观察">🔎 观察</option>
         </select>
         <button id="advBtn" class="segbtn" data-i18n="adv_btn">高级筛选 ▾</button>
@@ -201,30 +172,6 @@
       <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_dist">距支撑绝对值 ≤</span><span id="fDistV">不限</span></div><input id="fDist" type="range" min="0" max="30" value="30" class="w-full"/></div>
       <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_roe">ROE ≥</span><span id="fRoeV">不限</span></div><input id="fRoe" type="range" min="-10" max="40" value="-10" class="w-full"/></div>
       <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_up">最大回撤劣于 ≥</span><span id="fUpV">不限</span></div><input id="fUp" type="range" min="-80" max="0" value="-80" class="w-full"/></div>
-      <!-- 成长/估值筛选: 支持"营收增速>40% 且 PE<35 且 强左侧"这类组合条件 -->
-      <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_rev">营收同比 ≥</span><span id="fRevV">不限</span></div><input id="fRev" type="range" min="-50" max="200" step="5" value="-50" class="w-full"/></div>
-      <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_np">归母净利同比 ≥</span><span id="fNpV">不限</span></div><input id="fNp" type="range" min="-50" max="200" step="5" value="-50" class="w-full"/></div>
-      <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_pe">市盈率TTM ≤</span><span id="fPeV">不限</span></div><input id="fPe" type="range" min="0" max="150" step="5" value="150" class="w-full"/></div>
-      <div><div class="text-xs text-slate-400 mb-1" data-i18n="f_gq">增速质量</div>
-        <select id="fGq" class="w-full">
-          <option value="">全部</option><option value="🟢">🟢 可持续</option>
-          <option value="🟡">🟡 待观察</option><option value="🔴">🔴 一次性</option>
-        </select></div>
-    </div>
-    <!-- 精细区间筛选: 每个数值指标都能设 最小–最大, 多条件同时生效
-         (例: 市盈率 20–40 且 营收同比 30–50 且 标签=强左侧) -->
-    <div id="rangePanel" class="hidden mb-3">
-      <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
-        <div class="text-xs text-slate-400" data-i18n="f_rng_hint">
-          每个指标可设最小/最大值，留空 = 不限；多个条件同时生效（“与”关系）。缺该数据的股票在启用条件时会被排除。</div>
-        <div class="flex items-center gap-2">
-          <span id="rngCount" class="text-xs" style="color:#7dd3fc"></span>
-          <button id="rngClear" class="px-2 py-1 rounded text-xs"
-                  style="background:rgba(148,163,184,.15);border:1px solid rgba(148,163,184,.3)"
-                  data-i18n="f_rng_clear">清空条件</button>
-        </div>
-      </div>
-      <div id="rangeGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2"></div>
     </div>
     <div class="overflow-x-auto" style="max-height:64vh;">
       <table id="mainTable">
@@ -258,17 +205,25 @@
       <button class="segbtn" data-tab="tabCo" data-i18n="tab_co">公司与业务</button>
       <button class="segbtn" data-tab="tabCf" data-i18n="tab_cf">现金流与风险</button>
       <button class="segbtn" data-tab="tabNw" data-i18n="tab_nw">消息与博弈</button>
-      <button class="segbtn" data-tab="tabGd" data-i18n="tab_gd">盈利指引</button>
     </div>
 
     <!-- ① 总览 -->
     <div id="tabOv" class="dtab">
       <div id="dConclusion" class="card p-3 text-[13px] leading-relaxed text-slate-200 mb-3"></div>
+      <!-- 🎯 买卖点建议 (Trade Plan) -->
+      <div id="dPlanWrap" class="card p-4 mb-3 hidden" style="border-color:rgba(56,189,248,.35)">
+        <div class="flex items-center justify-between flex-wrap gap-1 mb-2">
+          <h4 class="sec-title" data-i18n="plan_title">🎯 买卖点建议</h4>
+          <span id="dPlanMeta" class="text-xs text-slate-400"></span>
+        </div>
+        <div id="dPlanGrid" class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3"></div>
+        <div id="dPlanLadder" class="space-y-2"></div>
+        <div id="dPlanNote" class="text-xs text-slate-500 mt-3 leading-relaxed"></div>
+      </div>
       <div id="dChips" class="flex flex-wrap gap-2 mb-3"></div>
       <div id="dRisk" class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2"></div>
       <div id="dFib" class="text-xs text-slate-400 mb-3"></div>
-      <div id="detailChart" style="width:100%;height:600px;"></div>
-      <div class="mt-4">
+      <div class="mt-1">
         <div class="flex items-center justify-between mb-2">
           <h4 class="sec-title" data-i18n="tv_title">TradingView 交互图（实时）</h4>
           <a id="tvLink" href="#" target="_blank" rel="noopener" class="text-sky-300 text-sm hover:underline" data-i18n="tv_link">在 TradingView 打开概览页 ↗</a>
@@ -281,6 +236,8 @@
         <div class="card p-3"><div class="text-sm text-slate-300 mb-2" data-i18n="val_pct">估值分位</div><div id="dVal"></div></div>
         <div class="card p-3"><div class="flex items-center justify-between mb-2"><div class="text-sm text-slate-300" data-i18n="roe_trend">ROE 多年趋势</div><span class="granTgl inline-flex gap-1" data-tgt="roe"><button class="segbtn on" style="padding:2px 8px;font-size:11px" data-g="y" data-i18n="gran_year">年度</button><button class="segbtn" style="padding:2px 8px;font-size:11px" data-g="q" data-i18n="gran_qtr">季度</button></span></div><div id="dRoe" style="height:130px;"></div></div>
       </div>
+      <!-- K线/指标图 移至页面底部 (用户要求) -->
+      <div id="detailChart" class="mt-4" style="width:100%;height:600px;"></div>
     </div>
 
     <!-- ② 公司与业务 -->
@@ -334,46 +291,6 @@
       <h4 class="sec-title mb-2"><span data-i18n="block_title">大宗交易（暗池代理）</span> <span id="dBlockSum" class="text-xs text-slate-400 font-normal"></span></h4>
       <div id="dBlock" class="card p-4 mb-2"></div>
     </div>
-
-    <!-- ⑤ 盈利指引 -->
-    <div id="tabGd" class="dtab hidden">
-      <div id="dGdEmpty" class="card p-6 text-center text-[13px] hidden" style="color:var(--muted)"></div>
-      <div id="dGdBody" class="hidden">
-        <!-- 参考买入区 + 四个关键统计 -->
-        <div class="card p-4 mb-3">
-          <div class="flex items-baseline justify-between flex-wrap gap-2 mb-1">
-            <h4 class="sec-title" data-i18n="gd_zone">参考买入区间</h4>
-            <span id="dGdZoneNote" class="text-[11.5px]" style="color:var(--muted)"></span>
-          </div>
-          <div id="dGdZone" class="ovnum text-[26px] font-bold" style="color:#38bdf8"></div>
-        </div>
-        <div id="dGdKpi" class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4"></div>
-
-        <!-- 图1: 各目标涨幅的历史频率 -->
-        <h4 class="sec-title mb-1" data-i18n="gd_prob_title">达到各目标涨幅的历史频率</h4>
-        <div class="text-xs mb-2" style="color:var(--muted)" data-i18n="gd_prob_note">
-          在该股历史上"同样大回撤 + 跌到低位"的时刻买入后，一年内最高价曾达到该涨幅的次数占比。
-        </div>
-        <div id="dGdProbChart" style="width:100%;height:190px;" class="mb-4"></div>
-
-        <!-- 图2: 每一次历史样本的实际结果 -->
-        <h4 class="sec-title mb-1" data-i18n="gd_samp_title">历史每一次的实际结果</h4>
-        <div class="text-xs mb-2" style="color:var(--muted)" data-i18n="gd_samp_note">
-          每根横条 = 一次历史形态：左端是买入后最深跌幅(接刀代价)，右端是一年内最高涨幅，圆点是满一年时的收益。
-        </div>
-        <div id="dGdSampChart" style="width:100%;height:260px;" class="mb-4"></div>
-
-        <!-- 样本明细 -->
-        <h4 class="sec-title mb-2" data-i18n="gd_tbl_title">样本明细</h4>
-        <div id="dGdTable" class="card overflow-x-auto mb-4"></div>
-
-        <!-- 方法与局限 -->
-        <div class="card p-4 text-[12.5px] leading-relaxed" style="color:var(--dim)">
-          <div class="font-semibold mb-2" style="color:var(--text)" data-i18n="gd_how_title">这些数字怎么来的 / 不是什么</div>
-          <div data-i18n-html="gd_how_body"></div>
-        </div>
-      </div>
-    </div>
   </div>
 </aside>
 
@@ -407,21 +324,9 @@
       tbl_title:"候选股主表", search_ph:"搜索 代码 / 名称", all_inds:"全部行业", all_tags:"全部标签",
       adv_btn:"高级筛选 ▾", fav_only:"只看自选", export:"导出CSV",
       f_score:"综合分 ≥", f_dist:"距支撑绝对值 ≤", f_roe:"ROE ≥", f_up:"最大回撤劣于 ≥", unlimited:"不限",
-      f_rev:"营收同比 ≥", f_np:"归母净利同比 ≥", f_pe:"市盈率TTM ≤", f_gq:"增速质量",
       empty_hint:"无符合条件的标的。可放宽筛选或调整 CONFIG 阈值。",
       footer:"“左侧买入”风险更高，所有标的需人工复核 · 本页所有数据仅供研究，不构成投资建议。",
-      tab_ov:"总览", tab_co:"公司与业务", tab_cf:"现金流与风险", tab_nw:"消息与博弈", tab_gd:"盈利指引",
-      gd_zone:"参考买入区间", gd_prob_title:"达到各目标涨幅的历史频率",
-      gd_prob_note:"在该股历史上「同样大回撤 + 跌到低位」的时刻买入后，一年内最高价曾达到该涨幅的次数占比。",
-      gd_samp_title:"历史每一次的实际结果",
-      gd_samp_note:"每根横条 = 一次历史形态：左端是买入后最深跌幅(接刀代价)，右端是一年内最高涨幅，圆点是满一年时的收益。",
-      gd_tbl_title:"样本明细", gd_how_title:"这些数字怎么来的 / 不是什么",
-      gd_n:"历史样本", gd_medgain:"最高涨幅中位", gd_medmae:"最深回撤中位", gd_win:"一年胜率",
-      gd_c_date:"可比案例", gd_c_entry:"相似度", gd_c_gain:"一年内最高", gd_c_mae:"期间最深", gd_c_ret:"满一年",
-      gd_zone_note:"上沿=关键支撑位，下沿=按同类案例中位回撤再让一档",
-      gd_tier:"匹配层级", gd_vol:"本股年化波动", gd_sameind:"其中同行业",
-      gd_none:"该股暂无盈利指引：历史同类形态不足 3 次，或长历史数据未通过体检。样本太少时给出概率反而误导，所以这里留空。",
-      gd_how_body:"<b>做法</b>：在这只股票<b>自己的历史</b>里，找出所有和现在处境相似的时刻——同样从高点回撤≥30%、同样跌到区间低位或超卖——然后统计每一次之后<b>实际</b>走出的结果。<br><br><b>为什么不用机器学习</b>：单只股票十年里这种形态通常只有 3~15 次。样本这么少，任何模型都只会过拟合噪声，给出好看但没有意义的数字。条件频率统计是这个样本量下唯一诚实的做法，而且每个数字都能追溯到上面表格里的具体日期。<br><br><b>怎么保证不自欺</b>：① 两次样本至少间隔 120 个交易日，否则同一波行情会被重复计数、把概率算高；② 只统计有完整一年前向数据的样本，不看一半就下结论；③ 样本少于 3 次直接不给概率；④ 用最高价/最低价算真实可触达的幅度，不用收盘价美化。<br><br><b>这不是什么</b>：<b>这是历史频率，不是未来概率预测。</b>过去在这个形态上涨过，不代表这次会涨；样本再多也只有十几次，统计意义有限。基本面已经变化的公司，历史形态更可能失效。请把它当作「历史上这种位置大概是什么体验」的参考，而不是买入信号。",
+      tab_ov:"总览", tab_co:"公司与业务", tab_cf:"现金流与风险", tab_nw:"消息与博弈",
       tv_title:"TradingView 交互图（实时）", tv_link:"在 TradingView 打开概览页 ↗",
       fund_glance:"基本面速览", val_pct:"估值历史分位", roe_trend:"ROE 多年趋势",
       co_profile:"公司简介", co_mgmt:"管理层增减持",
@@ -440,20 +345,36 @@
       col_dist:"距支撑%", col_support:"关键支撑位", col_break:"破位位", col_pos52:"52周位置%",
       col_ret1m:"近一月涨%", col_rethy:"近半年涨跌%", col_turnover:"换手率", col_volratio:"量比", col_kdj:"KDJ",
       col_pe:"市盈率TTM(分位)", col_pb:"市净率", col_eps:"EPS", col_roe:"ROE",
-      col_rev_yoy:"营收同比%", col_np_yoy:"归母净利同比%", col_growth_q:"增速质量",
-      col_buy_zone:"参考买入位", col_guid:"盈利指引(历史频率)",
       th_sort:"点击排序 · 按住拖动可调整列的位置", star_col:"自选",
       p_trend:"趋势", p_momentum:"动量", p_breadth:"广度", p_capital:"资金", p_fund:"基本面",
       prosperity_total:"景气总分", selected_paren:"(入选)",
       tag_strong:"✅ 强左侧", tag_weak:"⚠️ 技术好但基本面弱", tag_watch:"🔎 观察", tag_dip:"🪸 深跌抄底",
-      tag_consol:"🧊 强左侧·横盘吸筹",
+      tag_coil:"🚀 蓄势待发",
       kdj_gold:"金叉", kdj_dead:"死叉", kdj_ob:"超买", kdj_os:"超卖", kdj_neutral:"中性",
-      // v2.1: 市场地位 / 增速×4 / 历史快照
-      col_dom:"市场地位",
+      kdj_bull:"偏多", kdj_bear:"偏空",
+      // 新列: 市场地位 / 近四季增速 / 增长持续性
+      col_dom:"市场地位", col_nittm:"近四季归母同比", col_nipttm:"近四季营收同比", col_growq:"增长持续性",
+      qoq_tip:"四个数=最近4个单季的同比增速(旧→新, 连续为正=逐季都在增长); 第二行为近四季合计(TTM)或最新报告期累计的同比。",
       dom_tip:"东财行业内总市值排名与份额(垄断力代理指标; 无产品级市占率免费数据源) · 👑=行业市值第一且份额≥15%",
-      qoq_tip:"四个数=最近4个单季的同比增速(旧→新, 连续为正=逐季都在增长); 主数字为最新报告期同比。",
+      growq_tip:"由 近4年年报归母趋势 × 近4个单季同比 交叉判断: 区分可持续增长与一次性放量",
+      // 历史快照
       date_sel_title:"回看历史扫描结果",
       hist_banner_a:"正在查看历史快照 ", hist_banner_b:" — 该日榜单为当日打分, K线明细与深度档案仅最新一天提供；在日期框选回最新日期即可返回。",
+      // 买卖点建议
+      plan_title:"🎯 买卖点建议", plan_beta:"历史回测",
+      plan_entry:"建议买入区", plan_entry_support:"等回踩支撑区分批买", plan_entry_market:"已失守支撑·现价分批",
+      plan_entry_none:"无明确支撑位·现价分批需谨慎",
+      plan_entry_breakout:"放量突破箱体上沿后追买·未突破前观望", plan_measured:"箱体量度目标",
+      plan_box:"整理箱体", plan_note_breakout:"⚠️ 🚀蓄势股为突破型交易：买点=放量突破箱体上沿，跌回箱体下沿=突破失败止损；目标为经典箱体高度量度目标（非胜率回测，历史回踩胜率描述不了突破交易）。",
+      plan_stop:"止损位", plan_stop_note:"跌破即离场",
+      plan_rr:"盈亏比", plan_hold:"观察窗口", plan_days:"天",
+      plan_target_steady:"稳健目标", plan_target_base:"基准目标", plan_target_stretch:"进取目标",
+      plan_prob:"胜率", plan_med_days:"中位", plan_days_u:"天到达",
+      plan_ladder:"全目标梯子(点开)", plan_gain:"目标涨幅", plan_price_l:"对应价",
+      plan_sample_a:"样本：本股近2年 ", plan_sample_b:" 次类似支撑回踩事件 + 全候选池 ",
+      plan_sample_c:" 次事件作先验（贝叶斯收缩）",
+      plan_stopped:"60日内曾触止损", plan_no_events:"本股历史类似事件不足，胜率主要来自全池先验，参考价值降低",
+      plan_note:"⚠️ 胜率=历史上「先到目标、未先破止损」的频率（60个交易日窗口），为回测统计而非未来保证；左侧建仓请严格分批与止损。A股注意涨跌停板可能影响实际成交价位。",
       tone_pos:"利好", tone_neg:"利空", tone_neutral:"中性",
       sig_channel:"贴近上升通道下轨", sig_pivot:"接近前期低点", sig_ma_prefix:"回踩",
       c_support:"关键支撑", c_dist:"距支撑", c_break:"破位参考",
@@ -475,6 +396,8 @@
       no_rev:"暂无营收数据", rev_annual:"年度营收", rev_net:"归母净利", rev_yoy:"同比增速", rev_qtr:"单季营收",
       // 现金流
       no_echarts:"未能加载 ECharts（需联网），无法绘制图表。", no_cash:"暂无现金流数据", no_notes:"暂无自动要点",
+      noprof:"该标的暂无深度档案（档案每日仅为最终候选生成，且部分标的无年报数据）。",
+      no_kline:"暂无该标的的逐日明细数据。", no_roe:"暂无ROE趋势数据",
       cf_ocf:"经营现金流", cf_fcf:"自由现金流", cf_capex:"资本开支", cf_acq:"收购/并表", cf_div:"分红", cf_ni:"归母净利",
       // 风险
       no_risk:"暂无风险指标数据", risk_ratios:"偿债 / 盈利 / 审计",
@@ -509,21 +432,9 @@
       tbl_title:"Candidate Table", search_ph:"Search code / name", all_inds:"All industries", all_tags:"All tags",
       adv_btn:"Filters ▾", fav_only:"Watchlist only", export:"Export CSV",
       f_score:"Score ≥", f_dist:"|Dist to support| ≤", f_roe:"ROE ≥", f_up:"Max drawdown worse-than ≥", unlimited:"Any",
-      f_rev:"Rev YoY ≥", f_np:"Net Profit YoY ≥", f_pe:"P/E TTM ≤", f_gq:"Growth Quality",
       empty_hint:"No matches. Loosen the filters or adjust the CONFIG thresholds.",
       footer:"Left-side entries carry higher risk; verify every name manually · data for research only, not investment advice.",
-      tab_ov:"Overview", tab_co:"Company & Business", tab_cf:"Cash Flow & Risk", tab_nw:"News & Positioning", tab_gd:"Odds",
-      gd_zone:"Reference Buy Zone", gd_prob_title:"Historical frequency of reaching each gain target",
-      gd_prob_note:"Among past moments with the same setup (deep drawdown + near range low), how often the high within one year reached each target.",
-      gd_samp_title:"What actually happened each time",
-      gd_samp_note:"Each bar = one historical instance: left end = deepest drop after entry, right end = highest gain within a year, dot = return at the one-year mark.",
-      gd_tbl_title:"Sample detail", gd_how_title:"Where these numbers come from / what they are not",
-      gd_n:"Samples", gd_medgain:"Median max gain", gd_medmae:"Median max drawdown", gd_win:"1-year win rate",
-      gd_c_date:"Comparable case", gd_c_entry:"Similarity", gd_c_gain:"Max within 1y", gd_c_mae:"Deepest drop", gd_c_ret:"At 1 year",
-      gd_zone_note:"Upper = key support; lower = one notch below, per median drawdown of comparable cases",
-      gd_tier:"Match tier", gd_vol:"Annualized vol", gd_sameind:"same industry",
-      gd_none:"No odds for this stock: fewer than 3 comparable historical setups, or the long history failed the data sanity check. With too few samples a probability would mislead, so it is left blank.",
-      gd_how_body:"<b>Method</b>: within this stock's <b>own history</b>, find every moment resembling the present — same ≥30% drawdown from the high, same drop to the range low or oversold — then tabulate what <b>actually</b> happened afterwards.<br><br><b>Why not machine learning</b>: a single stock has only 3–15 such setups per decade. At that sample size any model overfits noise and produces numbers that look good but mean nothing. Conditional frequency is the only honest approach here, and every figure traces back to a specific date in the table above.<br><br><b>Guards against self-deception</b>: (1) samples are ≥120 trading days apart, or one rally gets counted twice and inflates the odds; (2) only setups with a full forward year are counted; (3) fewer than 3 samples → no probability shown; (4) highs/lows are used, so the range is what was actually reachable.<br><br><b>What this is not</b>: <b>these are historical frequencies, not forecasts.</b> That the pattern paid off before does not mean it will now, and a dozen samples carry limited statistical weight. For a company whose fundamentals have changed, the historical pattern is more likely to break. Treat it as context for what this kind of level has felt like historically — not as a buy signal.",
+      tab_ov:"Overview", tab_co:"Company & Business", tab_cf:"Cash Flow & Risk", tab_nw:"News & Positioning",
       tv_title:"TradingView Chart (live)", tv_link:"Open TradingView overview ↗",
       fund_glance:"Fundamentals at a Glance", val_pct:"Valuation History Percentile", roe_trend:"ROE Multi-Year Trend",
       co_profile:"Company Profile", co_mgmt:"Insider Transactions",
@@ -541,19 +452,33 @@
       col_dist:"Dist Supp%", col_support:"Key Support", col_break:"Breakdown", col_pos52:"52w Pos%",
       col_ret1m:"1M Ret%", col_rethy:"6M Ret%", col_turnover:"Turnover", col_volratio:"Vol Ratio", col_kdj:"KDJ",
       col_pe:"P/E TTM (pctile)", col_pb:"P/B", col_eps:"EPS", col_roe:"ROE",
-      col_rev_yoy:"Rev YoY%", col_np_yoy:"Net Profit YoY%", col_growth_q:"Growth Quality",
-      col_buy_zone:"Ref. Buy Level", col_guid:"Odds (historical)",
       th_sort:"Click to sort · drag to reorder columns", star_col:"Watchlist",
       p_trend:"Trend", p_momentum:"Momentum", p_breadth:"Breadth", p_capital:"Capital", p_fund:"Fund.",
       prosperity_total:"Prosperity", selected_paren:"(selected)",
       tag_strong:"✅ Strong Left", tag_weak:"⚠️ Tech-strong, Weak Fund.", tag_watch:"🔎 Watch", tag_dip:"🪸 Deep-Dip",
-      tag_consol:"🧊 Strong Left · Basing",
+      tag_coil:"🚀 Coiled to Launch",
       kdj_gold:"Golden X", kdj_dead:"Dead X", kdj_ob:"Overbought", kdj_os:"Oversold", kdj_neutral:"Neutral",
-      col_dom:"Mkt Position",
-      dom_tip:"Market-cap rank & share within the EastMoney industry (dominance proxy; no free product-level market-share source) · 👑 = #1 with ≥15% share",
-      qoq_tip:"Four numbers = single-quarter YoY growth for the last 4 quarters (old→new; all positive = growing every quarter). Main figure = latest-period YoY.",
+      kdj_bull:"Bullish", kdj_bear:"Bearish",
+      col_dom:"Mkt Position", col_nittm:"Parent NI YoY (4Q)", col_nipttm:"Revenue YoY (4Q)", col_growq:"Growth Quality",
+      qoq_tip:"Four numbers = single-quarter YoY growth for the last 4 quarters (old→new; all positive = growing every quarter). Second line = TTM or latest-cumulative YoY.",
+      dom_tip:"Market-cap rank & share within the EastMoney industry (a dominance proxy; no free product-level market-share source) · 👑 = #1 with ≥15% share",
+      growq_tip:"Cross-check of 4-year annual parent-NI trend × last 4 single-quarter YoY: sustained growth vs one-off spike",
       date_sel_title:"Browse past scan days",
       hist_banner_a:"Viewing historical snapshot ", hist_banner_b:" — scores are as of that day; K-line details & deep profiles are only available for the latest day. Pick the latest date to return.",
+      plan_title:"🎯 Trade Plan", plan_beta:"backtested",
+      plan_entry:"Entry zone", plan_entry_support:"scale in on pullback to support", plan_entry_market:"support lost · scale in at market",
+      plan_entry_none:"no defined support · scale in with caution",
+      plan_entry_breakout:"buy on a volume breakout above the range high · wait until then", plan_measured:"measured move",
+      plan_box:"Consolidation range", plan_note_breakout:"⚠️ 🚀 Coiled names are breakout trades: entry = volume push above the range high; a drop back below the range low = failed breakout (stop). Targets are classic measured moves from the box height — not backtested win rates.",
+      plan_stop:"Stop loss", plan_stop_note:"exit if broken",
+      plan_rr:"Reward/Risk", plan_hold:"Window", plan_days:"d",
+      plan_target_steady:"Conservative", plan_target_base:"Base target", plan_target_stretch:"Stretch target",
+      plan_prob:"win rate", plan_med_days:"median", plan_days_u:"d to hit",
+      plan_ladder:"Full target ladder (expand)", plan_gain:"Target gain", plan_price_l:"Price",
+      plan_sample_a:"Sample: ", plan_sample_b:" similar support-touch events on this stock (2y) + ",
+      plan_sample_c:" pooled events as prior (Bayesian shrinkage)",
+      plan_stopped:"touched stop in 60d", plan_no_events:"Too few historical events on this stock — probabilities lean on the pooled prior; treat with extra caution",
+      plan_note:"⚠️ Win rate = historical frequency of \"target hit before stop\" within a 60-trading-day window; backtest statistics, not a guarantee. Scale in and honor stops. Note A-share price limits may affect actual fills.",
       tone_pos:"Bullish", tone_neg:"Bearish", tone_neutral:"Neutral",
       sig_channel:"Near rising-channel lower band", sig_pivot:"Near prior low", sig_ma_prefix:"Pullback to ",
       c_support:"Key support", c_dist:"Dist to support", c_break:"Breakdown ref",
@@ -571,6 +496,8 @@
       no_seg:"No business-segment data", seg_total:"total", of_rev:"of revenue", gm_l:"gross margin", yoy_l:"YoY",
       no_rev:"No revenue data", rev_annual:"Annual revenue", rev_net:"Net profit", rev_yoy:"YoY growth", rev_qtr:"Quarterly revenue",
       no_echarts:"Could not load ECharts (needs internet); cannot draw chart.", no_cash:"No cash-flow data", no_notes:"No auto notes",
+      noprof:"No deep profile for this name (profiles are generated daily for final candidates only, and some names lack annual-report data).",
+      no_kline:"No daily detail data for this name.", no_roe:"No ROE trend data",
       cf_ocf:"Operating CF", cf_fcf:"Free CF", cf_capex:"Capex", cf_acq:"Acquisitions", cf_div:"Dividends", cf_ni:"Net profit",
       no_risk:"No risk-metric data", risk_ratios:"Solvency / Profitability / Audit",
       rk_debt:"Debt ratio", rk_curr:"Current ratio", rk_quick:"Quick ratio", rk_gm:"Gross margin", rk_roe:"ROE", rk_audit:"Audit opinion",
@@ -594,12 +521,12 @@
   function t(k){ const d=T[LANG]; return (d && d[k]!=null) ? d[k] : (T.zh[k]!=null?T.zh[k]:k); }
   // 数据枚举值的显示翻译 (底层值保持中文, 只翻译展示)
   function tagText(tag){ if(!tag) return dash;
-    if(tag.indexOf("吸筹")>=0) return t("tag_consol");   // 必须在"强左侧"之前判断(该标签含"强左侧"字样)
     if(tag.indexOf("强左侧")>=0) return t("tag_strong");
     if(tag.indexOf("基本面弱")>=0) return t("tag_weak");
     if(tag.indexOf("深跌抄底")>=0) return t("tag_dip");
+    if(tag.indexOf("蓄势待发")>=0) return t("tag_coil");
     if(tag.indexOf("观察")>=0) return t("tag_watch"); return tag; }
-  const KDJ_MAP={ "金叉":"kdj_gold","死叉":"kdj_dead","超买":"kdj_ob","超卖":"kdj_os","中性":"kdj_neutral" };
+  const KDJ_MAP={ "金叉":"kdj_gold","死叉":"kdj_dead","超买":"kdj_ob","超卖":"kdj_os","中性":"kdj_neutral","偏多":"kdj_bull","偏空":"kdj_bear" };
   function kdjText(s){ if(!s||s==="—") return s; if(LANG==="zh") return s;
     return s.split("/").map(x=>KDJ_MAP[x]?t(KDJ_MAP[x]):x).join("/"); }
   const RATE_MAP={ "强力买入":"rate_sb","买入":"rate_b","持有":"rate_h","卖出":"rate_s","强力卖出":"rate_ss","跑赢":"rate_up","跑输":"rate_down" };
@@ -616,15 +543,33 @@
   const SUPP_EN={"通道下轨":"Channel lower","前低":"Prior low","布林下轨":"Boll. lower"};
   function supportDispText(s){ if(s==null) return s; if(LANG==="zh") return s;
     s=String(s); for(const k in SUPP_EN){ if(s.indexOf(k)===0) return s.replace(k,SUPP_EN[k]); } return s; }
+  // 近四季增速的口径角标 + 增长持续性
+  const BASIS_EN={"TTM":"TTM","单季":"Q","年度":"FY","累计":"cum."};
+  function basisText(s){ if(!s) return ""; return LANG==="en" ? (BASIS_EN[s]||s) : s; }
+  const GROWQ = {
+    "🟢 可持续":{en:"🟢 Sustainable", cls:"tag-strong"},
+    "🟡 待观察":{en:"🟡 Watch",       cls:"tag-watch"},
+    "🔴 一次性":{en:"🔴 One-off",     cls:"tag-warn"},
+    "持续增长":{en:"Sustained",    cls:"tag-strong"},
+    "拐点向上":{en:"Turning up",   cls:"tag-coil"},
+    "单季脉冲":{en:"One-off spike",cls:"tag-warn"},
+    "增速回落":{en:"Decelerating", cls:"tag-watch"},
+    "增长下滑":{en:"Declining",    cls:"tag-warn"},
+    "数据不足":{en:"No data",      cls:"tag-watch"},
+  };
+  function growthQualityCell(v, c){
+    if(!v) return `<span>${dash}</span>`;
+    const m=GROWQ[v]||{en:v,cls:"tag-watch"};
+    const tip = (c && c.growth_quality_note) ? c.growth_quality_note : t("growq_tip");   // 每股给判定理由
+    return `<span class="badge ${m.cls}" title="${escH(tip)}">${escH(LANG==="en"?m.en:v)}</span>`;
+  }
   // 列 key -> 翻译键
   const COL_I18N={ code:"col_code",name:"col_name",industry:"col_industry",tag:"col_tag",streak:"col_streak",
-    dominance_disp:"col_dom",
+    dominance_disp:"col_dom",ni_ttm_yoy:"col_nittm",rev_ttm_yoy:"col_nipttm",growth_quality:"col_growq",
     final_score:"col_final",tech_score:"col_tech",fund_score:"col_fund",price:"col_price",spark:"col_spark",
     dist_support_pct:"col_dist",support_disp:"col_support",breakdown_price:"col_break",pos_52w_pct:"col_pos52",
     ret_1m_pct:"col_ret1m",ret_half_year_pct:"col_rethy",turnover:"col_turnover",volume_ratio:"col_volratio",
-    kdj_tag:"col_kdj",pe_disp:"col_pe",pb:"col_pb",eps:"col_eps",roe:"col_roe",
-    revenue_yoy:"col_rev_yoy",netprofit_yoy:"col_np_yoy",growth_quality:"col_growth_q",
-    guid_buy_high:"col_buy_zone",guid_disp:"col_guid" };
+    kdj_tag:"col_kdj",pe_disp:"col_pe",pb:"col_pb",eps:"col_eps",roe:"col_roe" };
   function colLabel(c){ const k=COL_I18N[c.key]; return (k? t(k) : c.label); }
   function applyStaticI18n(){
     document.documentElement.lang = (LANG==="en")?"en":"zh-CN";
@@ -640,7 +585,7 @@
   }
   function applyLang(){
     applyStaticI18n();
-    syncWeightUI(); syncAdvUI(); if(typeof buildRanges==="function") buildRanges(); renderIndustryChart(); render(); updateStrip();
+    syncWeightUI(); syncAdvUI(); renderIndustryChart(); render(); updateStrip();
     if(curC && !$("#drawer").classList.contains("translate-x-full")) openDetail(curC, true);
   }
   // ========================================================================
@@ -666,10 +611,10 @@
   }
   function tagClass(tag){
     if(!tag) return "tag-watch";
-    if(tag.indexOf("吸筹")>=0) return "tag-consol";      // 同上, 须先于"强左侧"
     if(tag.indexOf("强左侧")>=0) return "tag-strong";
     if(tag.indexOf("基本面弱")>=0) return "tag-warn";
     if(tag.indexOf("深跌抄底")>=0) return "tag-dip";
+    if(tag.indexOf("蓄势待发")>=0) return "tag-coil";
     return "tag-watch";
   }
   function supportCell(v){
@@ -711,12 +656,17 @@
     try{ localStorage.setItem(THEME_KEY, themeMode); }catch(e){}
   }
   applyTheme();
+  function redrawAfterTheme(){
+    renderIndustryChart();
+    // 抽屉开着时, 里面的 ECharts 图与 TradingView iframe 还是旧主题, 重开一次刷新
+    if(curC && !$("#drawer").classList.contains("translate-x-full")) openDetail(curC, true);
+  }
   $("#themeBtn").onclick = ()=>{           // 点击循环: 黑夜 -> 白天 -> 跟随系统
     themeMode = themeMode==="dark" ? "light" : (themeMode==="light" ? "auto" : "dark");
-    applyTheme(); renderIndustryChart();
+    applyTheme(); redrawAfterTheme();
   };
   if(mqLight){                             // 跟随系统模式下, 系统切换主题时实时联动
-    const onMq = ()=>{ if(themeMode==="auto"){ applyTheme(); renderIndustryChart(); } };
+    const onMq = ()=>{ if(themeMode==="auto"){ applyTheme(); redrawAfterTheme(); } };
     if(mqLight.addEventListener) mqLight.addEventListener("change", onMq);
     else if(mqLight.addListener) mqLight.addListener(onMq);
   }
@@ -729,19 +679,10 @@
   function renderOverview(){
     const meta = DATA.meta||{};
     $("#updatedAt").textContent = meta.updated_at || dash;
-    const scEl=$("#ovScanned");
-    scEl.textContent = isNum(meta.n_scanned)?meta.n_scanned:dash;
-    // 扫描数缺失几乎总是"那轮管线没跑完", 直接把原因挂上去, 而不是留个哑巴横杠
-    if(!isNum(meta.n_scanned)){
-      // 警示标记放在**数值**上而不是标签上: 标签带 data-i18n, 语言切换会重刷 textContent,
-      // 把加上去的图标冲掉(实测如此)。数值节点没有 i18n 绑定, 才留得住。
-      scEl.innerHTML = `${dash} <span style="font-size:14px;color:#fbbf24;vertical-align:middle">⚠</span>`;
-      scEl.title = meta.run_status_note || "该轮未记录扫描总数";
-      scEl.style.cursor="help";
-    }
+    $("#ovScanned").textContent = isNum(meta.n_scanned)?meta.n_scanned:dash;
     $("#ovHit").textContent = isNum(meta.n_hit)?meta.n_hit:(DATA.candidates.length||dash);
     $("#ovInds").textContent = (meta.selected_industries||[]).length || dash;
-    $("#ovDate").textContent = meta.run_date || dash;
+    $("#ovDate").textContent = meta.data_date || meta.run_date || dash;
   }
   renderOverview();
 
@@ -780,16 +721,13 @@
           itemStyle:{borderColor:(document.body.classList.contains("light")?"#eef2f8":"#0b1220"),borderWidth:2,gapWidth:2}, data }]
       });
     } else {
-      const arr = inds.slice(0,12).slice().reverse();
+      const arr = inds.slice(0,15).slice().reverse();
       const names = arr.map(d=>d.industry);
       const scores = arr.map(d=> isNum(d.prosperity_score)? +d.prosperity_score.toFixed(1) : 0);
       const colors = arr.map(d=> d.selected? "#16a34a" : C.base);
-      // 轴下沿: 取最低分再留 6 分余量(向下取整到5的倍数), 但不低于0
-      const _lo = Math.min(...scores.filter(v=>isNum(v)&&v>0));
-      const xMin = Math.max(0, Math.floor((_lo-6)/5)*5);
       indChart.setOption({
         backgroundColor:"transparent",
-        grid:{left:92,right:52,top:6,bottom:6,containLabel:false},
+        grid:{left:100,right:44,top:10,bottom:20},
         tooltip:{trigger:"axis", axisPointer:{type:"shadow"},
           formatter:(p)=>{ const i=arr[p[0].dataIndex];
             const row=(lab,v)=>`${lab}：<b>${isNum(v)?v.toFixed(0):"—"}</b>`;
@@ -797,26 +735,10 @@
               `${t("prosperity_total")}：<b>${isNum(i.prosperity_score)?i.prosperity_score.toFixed(1):"—"}</b><br/>`+
               [row(t("p_trend"),i.trend),row(t("p_momentum"),i.momentum),row(t("p_breadth"),i.breadth),row(t("p_capital"),i.capital),row(t("p_fund"),i.fundamental)].join("　");
           }},
-        // 景气分是"横截面百分位", 前12名几乎都挤在 70~100 —— 从0起画满宽条的话
-        // 97 和 76 看起来一样长, 整个视觉区被浪费。改用点图(棒棒糖):
-        // 点不靠长度编码大小, 所以坐标轴可以从数据下沿起, 差异一眼可见, 且不误导。
-        xAxis:{type:"value", min:xMin, max:100, interval:(100-xMin)/4,
-               axisLabel:{color:C.axis,fontSize:11}, axisLine:{show:false}, axisTick:{show:false},
-               splitLine:{lineStyle:{color:C.grid,type:"dashed"}}},
-        yAxis:{type:"category", data:names, axisLabel:{color:C.label,fontSize:12},
-               axisLine:{show:false}, axisTick:{show:false}},
-        series:[
-          // 连接线(细): 从轴起点到该行业分数, 只做引导, 视觉上退到后面
-          {type:"bar", barWidth:2, silent:true, z:1,
-           itemStyle:{color:C.grid, borderRadius:2},
-           data:scores.map(v=>v)},
-          // 数据点: 大小一致的圆点, 入选=绿, 其余=中性蓝
-          {type:"scatter", symbolSize:11, z:3,
-           data:scores.map((v,i)=>({value:v, itemStyle:{color:colors[i],
-             borderColor:(document.body.classList.contains("light")?"#fff":"#0f1626"), borderWidth:2}})),
-           label:{show:true,position:"right",color:C.label,fontSize:11.5,distance:8,
-                  formatter:p=>p.value}}
-        ]
+        xAxis:{type:"value", max:100, axisLabel:{color:C.axis}, splitLine:{lineStyle:{color:C.grid}}},
+        yAxis:{type:"category", data:names, axisLabel:{color:C.label}},
+        series:[{type:"bar", data:scores.map((v,i)=>({value:v,itemStyle:{color:colors[i]}})),
+          barWidth:"62%", label:{show:true,position:"right",color:C.label,formatter:"{c}"}}]
       });
     }
     indChart.off("click");
@@ -828,7 +750,7 @@
   $("#segTree").onclick=()=>{ indKind="treemap"; $("#segTree").classList.add("on"); $("#segBar").classList.remove("on"); renderIndustryChart(); };
 
   // ---------- 主表列 ----------
-  const COLORDER_KEY = "ashare_colorder_v3";   // v3: 新增 市场地位 列, 重置旧的自定义列序
+  const COLORDER_KEY = "ashare_colorder_v3";   // v3: 新增 市场地位/近四季增速/增长持续性 列并重排, 重置旧的自定义列序
   let COLS = DATA.columns && DATA.columns.length ? DATA.columns.slice() : [
     {key:"code",label:"代码"},{key:"name",label:"名称"},{key:"industry",label:"所属板块"},
     {key:"tag",label:"结论标签"},{key:"streak",label:"连续上榜"},{key:"final_score",label:"综合分"},
@@ -839,36 +761,16 @@
   const NUMERIC = new Set(["final_score","tech_score","fund_score","tech_norm","prosperity_score","price","dist_support_pct",
     "breakdown_price","pos_52w_pct","ret_1m_pct","ret_half_year_pct","avg_amt20_yi","dividend_yield","pb","eps","roe",
     "streak","upside_pct","target_price","analyst_count","atr_pct","max_dd_pct","beta","boll_low","volume_ratio","turnover",
-    "revenue_yoy","netprofit_yoy","ni_ttm_yoy","rev_ttm_yoy","dom_share","dominance_disp"]);
-  // 应用用户保存的列顺序。注意: 新版本新增的列不在旧的 saved 里, 若简单地把未知列排到
-  // 末尾(999), 新列会被甩到宽表最右侧、屏幕外, 用户以为"没生效"。这里改为: 已保存的列
-  // 按保存顺序排, 新列插回它在默认顺序(DATA.columns)中的相邻位置。
+    "ni_ttm_yoy","rev_ttm_yoy","dom_share","dominance_disp"]);
   try{ const saved=JSON.parse(localStorage.getItem(COLORDER_KEY)||"null");
-    if(Array.isArray(saved)&&saved.length){
-      const def = COLS.slice();                                  // 默认顺序(含新列)
-      const savedSet = new Set(saved);
-      const ordered = saved.map(k=>def.find(c=>c.key===k)).filter(Boolean);   // 老列按老顺序
-      def.forEach((col, i)=>{                                    // 新列插回默认相邻位
-        if(savedSet.has(col.key)) return;
-        let at = ordered.length;
-        for(let j=i-1;j>=0;j--){                                 // 找它前面最近的已排列
-          const p = ordered.findIndex(c=>c.key===def[j].key);
-          if(p>=0){ at = p+1; break; }
-        }
-        ordered.splice(at, 0, col);
-      });
-      if(ordered.length) COLS = ordered;
-    } }catch(e){}
+    if(Array.isArray(saved)&&saved.length){ COLS.sort((a,b)=>{ let ia=saved.indexOf(a.key), ib=saved.indexOf(b.key); return (ia<0?999:ia)-(ib<0?999:ib); }); } }catch(e){}
 
   const LS_KEY = "ashare_filters_v2";
   let state = {search:"", ind:"", tag:"", sortKey:"final_score", sortDir:"desc",
               weights:{t:50,f:30,p:20}, favOnly:false,
-              minScore:0, maxDist:30, minRoe:-10, minUp:-80,
-              minRev:-50, minNp:-50, maxPe:150, gq:"",
-              rng:{}};   // 精细区间筛选 {字段: {min, max}}, 见 buildRanges()
+              minScore:0, maxDist:30, minRoe:-10, minUp:-80};
   try{ Object.assign(state, JSON.parse(localStorage.getItem(LS_KEY)||"{}")); }catch(e){}
   if(!state.weights) state.weights={t:50,f:30,p:20};
-  if(!state.rng || typeof state.rng!=="object") state.rng={};
 
   // ---------- 自选 ----------
   const FAV_KEY="ashare_favs_v1";
@@ -877,13 +779,18 @@
     try{ localStorage.setItem(FAV_KEY, JSON.stringify(Array.from(favs))); }catch(e){}
     render(); updateStrip(); }
 
-  // 行业下拉
-  (function(){
+  // 行业下拉 (刷新数据后需重建, 否则新板块进不了下拉)
+  function rebuildIndOptions(){
     const set = Array.from(new Set(DATA.candidates.map(c=>c.industry).filter(Boolean))).sort();
     const sel = $("#filterInd");
+    while(sel.options.length>1) sel.remove(1);   // 保留"全部板块"占位
     set.forEach(n=>{ const o=document.createElement("option"); o.value=n; o.textContent=n; sel.appendChild(o); });
     ensureIndOption(state.ind);   // 上次保存的筛选板块可能不在候选里
-    sel.value = state.ind||""; $("#filterTag").value = state.tag||""; $("#search").value = state.search||"";
+    sel.value = state.ind||"";
+  }
+  (function(){
+    rebuildIndOptions();
+    $("#filterTag").value = state.tag||""; $("#search").value = state.search||"";
     $("#favOnly").checked = !!state.favOnly;
   })();
 
@@ -954,26 +861,19 @@
   function cellHTML(c, key){
     const v = (key==="final_score") ? getVal(c,key) : c[key];
     switch(key){
-      case "tag": {
-        const base=`<span class="badge ${tagClass(v)}">${v?escH(tagText(v)):dash}</span>`;
-        // 蓄势是持续状态: 今天差一点没达标, 不代表这只票已离开该位置 -> 保留近日痕迹
-        if(!String(v||"").startsWith("🚀") && (c.brk_recent_days||0)>0){
-          const tip=`最近 ${c.brk_recent_days} 轮曾达到 🚀蓄势待发（最近一次 ${c.brk_last_date||"—"}）。蓄势是持续状态，今日未达标不代表已离开该位置。`;
-          return base+` <span class="badge" title="${tip}" style="background:rgba(56,189,248,.14);color:#7dd3fc;border:1px solid rgba(56,189,248,.4)">🚀${c.brk_recent_days}</span>`;
-        }
-        return base;
-      }
+      case "tag": return `<span class="badge ${tagClass(v)}">${v?escH(tagText(v)):dash}</span>`;
       case "kdj_tag": return `<span>${v?escH(kdjText(v)):dash}</span>`;
       case "streak": return streakCell(c.streak);
       case "spark": return sparkSVG(c.spark);
       case "dist_support_pct": return supportCell(v);
       case "upside_pct": return upsideCell(v);
       case "ret_1m_pct": case "ret_half_year_pct": return signPctCell(v);
-      case "revenue_yoy": case "netprofit_yoy": {
-        // v2.1: 主数字下加 最近4个单季同比 (旧→新, 末位加粗), 一眼看出是否逐季都在增长
-        const ser = (key==="revenue_yoy") ? c.rev_qoq : c.ni_qoq;
+      case "ni_ttm_yoy": case "rev_ttm_yoy": {
+        const isRev = (key==="rev_ttm_yoy");
+        const ser = isRev ? c.rev_qoq : c.ni_qoq;      // 最近4个单季同比 (旧→新)
+        const b = isRev ? c.rev_basis : c.ni_basis;    // 头条口径 (TTM/累计), 两列各标各的
         const labels = Array.isArray(c.ni_q_labels)? c.ni_q_labels : [];
-        if(Array.isArray(ser) && ser.some(x=>isNum(x))){
+        if(Array.isArray(ser) && ser.some(isNum)){
           const nums = ser.map((x,i)=>{
             if(!isNum(x)) return `<span class="text-slate-600">·</span>`;
             const cls = x>0?"pos":(x<0?"neg":"");
@@ -982,36 +882,19 @@
             return `<span class="${cls} ${bold}">${x>0?"+":""}${txt}</span>`;
           }).join('<span class="text-slate-600 mx-0.5">›</span>');
           const tip = t("qoq_tip") + " " + ser.map((x,i)=>`${labels[i]||""} ${isNum(x)?(x>0?"+":"")+x.toFixed(1)+"%":"—"}`).join("  ");
-          return `<div class="num leading-tight whitespace-nowrap" title="${escH(tip)}">${signPctCell(v)}<div class="text-[10px]">${nums}<span class="text-slate-500 ml-0.5">%</span></div></div>`;
+          const yoyLine = isNum(v)
+            ? `<div class="text-[10px] text-slate-500">${t("yoy_l")} ${v>0?"+":""}${v.toFixed(1)}%${b?" · "+escH(basisText(b)):""}</div>` : "";
+          return `<div class="num leading-tight whitespace-nowrap" title="${escH(tip)}">${nums}<span class="text-[10px] text-slate-500 ml-0.5">%</span>${yoyLine}</div>`;
         }
-        return signPctCell(v);
+        if(!isNum(v)) return `<span class="num">${dash}</span>`;   // 无逐季数据: 回退单个同比数字
+        const basis = b ? `<span class="text-[10px] text-slate-500 ml-0.5">${escH(basisText(b))}</span>` : "";
+        return signPctCell(v)+basis;
       }
+      case "growth_quality": return growthQualityCell(v, c);
       case "dominance_disp": {
         if(v==null||v==="") return `<span>${dash}</span>`;
         const gold = String(v).indexOf("👑")>=0;
         return `<span class="num ${gold?"font-semibold":""}" style="${gold?"color:#fbbf24":""}" title="${t("dom_tip")}">${escH(v)}</span>`;
-      }
-      case "guid_buy_high": {
-        if(!isNum(v)) return dash;
-        const lo=c.guid_buy_low;
-        const txt = (isNum(lo)&&lo<v) ? `${lo.toFixed(2)}~${v.toFixed(2)}` : v.toFixed(2);
-        return `<span title="上沿=关键支撑位; 下沿=按历史同类形态的中位回撤再让一档">${txt}</span>`;
-      }
-      case "guid_disp": {
-        if(!v) return `<span class="muted" title="历史同类形态样本不足(<3次)或数据未通过体检, 不给频率">${dash}</span>`;
-        const n=c.guid_n||0, p50=c.guid_p50, mae=c.guid_med_mae;
-        const strong = isNum(p50)&&p50>=0.5;
-        const tip=`基于该股自身历史 ${n} 次"同样大回撤+跌到低位"的形态; 期间最大回撤中位 ${isNum(mae)?mae.toFixed(0)+"%":"—"}。这是历史频率, 不是未来预测。`;
-        return `<span style="color:${strong?"#4ade80":"var(--fg)"}" title="${tip}">${v}</span>`;
-      }
-      case "growth_quality": {
-        if(!v) return dash;
-        // 🟢可持续 / 🟡待观察 / 🔴一次性 —— 悬浮显示判断理由与分数
-        const sc = isNum(c.growth_quality_score) ? c.growth_quality_score.toFixed(0) : "";
-        const note = c.growth_quality_note || "";
-        const tip = (sc?`${sc}分`:"") + (note?` · ${note}`:"");
-        const col = v.indexOf("🟢")>=0 ? "#4ade80" : (v.indexOf("🔴")>=0 ? "#f87171" : "#fbbf24");
-        return `<span style="color:${col};white-space:nowrap" title="${escH(tip)}">${escH(v)}</span>`;
       }
       case "pos_52w_pct": return `<span class="num">${pct(v,1)}</span>`;
       case "avg_amt20_yi": return `<span class="num">${isNum(v)?(v>=1000?(v/1000).toFixed(1)+"B":v.toFixed(0)+"M"):dash}</span>`;
@@ -1036,35 +919,12 @@
     if(state.search){ const q=state.search.toLowerCase();
       rows = rows.filter(c=> (c.code||"").toLowerCase().includes(q) || (c.name||"").toLowerCase().includes(q)); }
     if(state.ind) rows = rows.filter(c=> c.industry===state.ind);
-    if(state.tag){
-      // 选 🚀 时把"近N轮曾达标"的一并带出 —— 蓄势是持续状态, 不是当天事件
-      if(state.tag.startsWith("🚀"))
-        rows = rows.filter(c=> String(c.tag||"").startsWith("🚀") || (c.brk_recent_days||0)>0);
-      else rows = rows.filter(c=> c.tag===state.tag);
-    }
+    if(state.tag) rows = rows.filter(c=> c.tag===state.tag);
     if(state.favOnly) rows = rows.filter(c=> favs.has(c.code));
     if(state.minScore>0) rows = rows.filter(c=> isNum(getVal(c,"final_score")) && getVal(c,"final_score")>=state.minScore);
     if(state.maxDist<30) rows = rows.filter(c=> isNum(c.dist_support_pct) && Math.abs(c.dist_support_pct)<=state.maxDist);
     if(state.minRoe>-10) rows = rows.filter(c=> isNum(c.roe) && c.roe>=state.minRoe);
     if(state.minUp>-80) rows = rows.filter(c=> isNum(c.max_dd_pct) && c.max_dd_pct>=state.minUp);
-    // 成长/估值组合条件 (缺数据的标的在该条件启用时被排除, 避免"—"混进结果)
-    if(state.minRev>-50) rows = rows.filter(c=> isNum(c.revenue_yoy) && c.revenue_yoy>=state.minRev);
-    if(state.minNp>-50)  rows = rows.filter(c=> isNum(c.netprofit_yoy) && c.netprofit_yoy>=state.minNp);
-    if(state.maxPe<150)  rows = rows.filter(c=> isNum(c.pe_ttm) && c.pe_ttm>0 && c.pe_ttm<=state.maxPe);
-    if(state.gq)         rows = rows.filter(c=> (c.growth_quality||"").indexOf(state.gq)>=0);
-    // 精细区间筛选: 逐个字段做 min/max 夹逼 ("与"关系)。缺数据(—)在该条件启用时排除,
-    // 否则"PE 20-40"会把没有PE的股票也留下, 结果不可信。
-    Object.keys(state.rng||{}).forEach(k=>{
-      const r = state.rng[k] || {};
-      if(r.min==null && r.max==null) return;
-      rows = rows.filter(c=>{
-        const v = getVal(c,k);
-        if(!isNum(v)) return false;
-        if(r.min!=null && v < r.min) return false;
-        if(r.max!=null && v > r.max) return false;
-        return true;
-      });
-    });
     const k=state.sortKey, dir=state.sortDir==="asc"?1:-1;
     rows.sort((a,b)=>{
       let x=getVal(a,k), y=getVal(b,k);
@@ -1107,13 +967,7 @@
     const avg=a=>a.length? (a.reduce((s,x)=>s+x,0)/a.length):null;
     const inds=new Set(cs.map(c=>c.industry).filter(Boolean)).size;
     const U=(n)=>LANG==="en"?"":" 只", G=(n)=>LANG==="en"?"":" 个";
-    // 🚀 常驻显示(即使今日 0 只) —— 用户每天首要关注它, 不能因为没命中就整个消失,
-    // 那样无法区分"今天没有"和"功能坏了"。括号内为近10轮曾达标的只数。
-    const brkNow = DATA.candidates.filter(c=>String(c.tag||"").startsWith("🚀")).length;
-    const brkRec = DATA.candidates.filter(c=>(c.brk_recent_days||0)>0
-                     && !String(c.tag||"").startsWith("🚀")).length;
     const items=[
-      ["🚀 蓄势待发", brkNow+U()+(brkRec?`（近日 ${brkRec}）`:""), brkNow?"#7dd3fc":"var(--muted)"],
       [t("strip_strong"), strong+U(), "#4ade80"],
       [t("strip_avgdist"), isNum(avg(dists))?avg(dists).toFixed(2)+"%":dash, "#38bdf8"],
       [t("strip_avgup"), isNum(avg(ups))?avg(ups).toFixed(1)+"%":dash, "#f59e0b"],
@@ -1129,84 +983,19 @@
   $("#filterInd").onchange = e=>{ state.ind=e.target.value; persist(); render(); };
   $("#filterTag").onchange = e=>{ state.tag=e.target.value; persist(); render(); };
   $("#favOnly").onchange = e=>{ state.favOnly=e.target.checked; persist(); render(); };
-  $("#advBtn").onclick = ()=>{ $("#advPanel").classList.toggle("hidden");
-                               $("#rangePanel").classList.toggle("hidden"); };
-  $("#fGq").onchange = e=>{ state.gq=e.target.value; persist(); render(); };
+  $("#advBtn").onclick = ()=> $("#advPanel").classList.toggle("hidden");
   const RANGE_DEFS=[
     ["fScore","minScore",v=>v.toFixed(0),0],
     ["fDist","maxDist",v=>"±"+v+"%",30],
     ["fRoe","minRoe",v=>v+"%",-10],
     ["fUp","minUp",v=>v+"%",-80],
-    ["fRev","minRev",v=>v+"%",-50],
-    ["fNp","minNp",v=>v+"%",-50],
-    ["fPe","maxPe",v=>"≤"+v,150],
   ];
   function rangeLabel(key,fmt,off){ return (state[key]===off)? t("unlimited") : fmt(state[key]); }
-  function syncAdvUI(){ RANGE_DEFS.forEach(([id,key,fmt,off])=>{ $("#"+id).value=state[key]; $("#"+id+"V").textContent=rangeLabel(key,fmt,off); });
-    if($("#fGq")) $("#fGq").value = state.gq||""; }
+  function syncAdvUI(){ RANGE_DEFS.forEach(([id,key,fmt,off])=>{ $("#"+id).value=state[key]; $("#"+id+"V").textContent=rangeLabel(key,fmt,off); }); }
   RANGE_DEFS.forEach(([id,key,fmt,off])=>{
     $("#"+id).addEventListener("input", ()=>{ state[key]=+$("#"+id).value; $("#"+id+"V").textContent=rangeLabel(key,fmt,off); persist(); render(); });
   });
   syncAdvUI();
-
-  // ---------- 精细区间筛选 (每个数值指标 min–max) ----------
-  // 主表里能排序的数值列 + 几个不在主表但有用的分数, 都给一对 min/max 输入框。
-  const RNG_EXTRA=[
-    {key:"pe_ttm",              i18n:null,         label:"市盈率TTM"},
-    {key:"growth_quality_score",i18n:null,         label:"增速质量分"},
-    {key:"consol_score",        i18n:null,         label:"横盘吸筹分"},
-    {key:"dip_score",           i18n:null,         label:"深跌分"},
-    {key:"max_dd_pct",          i18n:null,         label:"最大回撤%"},
-    {key:"prosperity_score",    i18n:null,         label:"行业景气分"},
-  ];
-  function rngFields(){
-    const out=[], seen=new Set();
-    COLS.forEach(c=>{                       // 主表里的数值列, 用户看到什么就能筛什么
-      if(!NUMERIC.has(c.key) || seen.has(c.key)) return;
-      seen.add(c.key); out.push({key:c.key, label:colLabel(c)});
-    });
-    RNG_EXTRA.forEach(e=>{ if(seen.has(e.key)) return;
-      seen.add(e.key); out.push({key:e.key, label:(e.i18n? t(e.i18n): e.label)}); });
-    return out;
-  }
-  function rngActive(){ return Object.keys(state.rng||{})
-      .filter(k=>{ const r=state.rng[k]||{}; return r.min!=null || r.max!=null; }); }
-  function syncRngCount(){
-    const n=rngActive().length, el=$("#rngCount");
-    if(el) el.textContent = n? (LANG==="en"? `${n} active` : `${n} 个条件生效`) : "";
-  }
-  function buildRanges(){
-    const wrap=$("#rangeGrid"); if(!wrap) return;
-    // 本地转义: escH 定义在本函数之后(const, 有暂时性死区), 这里不能用它
-    const esc = s => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
-                       .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-    const inp="width:4.5rem;padding:2px 4px;font-size:12px;border-radius:4px;"
-             +"background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.3);color:inherit";
-    wrap.innerHTML = rngFields().map(f=>{
-      const r=state.rng[f.key]||{};
-      const v=x=>(x==null?"":x);
-      return `<div class="flex items-center gap-1">`
-        +`<span class="text-xs text-slate-400 flex-1 truncate" title="${esc(f.label)}">${esc(f.label)}</span>`
-        +`<input class="rng" data-k="${f.key}" data-b="min" type="number" step="any" `
-        +`placeholder="${LANG==="en"?"min":"最小"}" value="${v(r.min)}" style="${inp}"/>`
-        +`<span class="text-xs text-slate-500">–</span>`
-        +`<input class="rng" data-k="${f.key}" data-b="max" type="number" step="any" `
-        +`placeholder="${LANG==="en"?"max":"最大"}" value="${v(r.max)}" style="${inp}"/></div>`;
-    }).join("");
-    wrap.querySelectorAll("input.rng").forEach(el=>{
-      el.addEventListener("input", ()=>{
-        const k=el.dataset.k, b=el.dataset.b;
-        const raw=el.value.trim(), num=raw===""?null:parseFloat(raw);
-        state.rng[k]=state.rng[k]||{};
-        state.rng[k][b]=(num==null||isNaN(num))?null:num;
-        if(state.rng[k].min==null && state.rng[k].max==null) delete state.rng[k];
-        persist(); syncRngCount(); render();
-      });
-    });
-    syncRngCount();
-  }
-  $("#rngClear").onclick = ()=>{ state.rng={}; persist(); buildRanges(); render(); };
-  buildRanges();
 
   // ---------- 导出CSV ----------
   $("#exportBtn").onclick = ()=>{
@@ -1232,98 +1021,6 @@
     profCharts[key]=ch; return ch;
   }
   function disposeProf(){ Object.keys(profCharts).forEach(k=>{ if(profCharts[k]){ profCharts[k].dispose(); profCharts[k]=null; } }); }
-
-  // ---------- ⑤ 盈利指引页签 ----------
-  // 数据来自模块7: 在该股自身长历史里找"同样大回撤+跌到低位"的时刻, 统计其后一年的真实结果。
-  // 展示原则: 样本不足就明说不给概率; 每个数字都能在下方样本表里追溯到具体日期。
-  function renderGdTab(){
-    const c=curC||{}; const g=(DATA.guidance||{})[c.code]||{};
-    const samples=g.guid_samples||[]; const n=g.guid_n||0;
-    const empty=$("#dGdEmpty"), body=$("#dGdBody");
-    if(!n || !samples.length){
-      empty.textContent = g.guid_note ? `${t("gd_none")}（${g.guid_note}）` : t("gd_none");
-      empty.classList.remove("hidden"); body.classList.add("hidden"); return;
-    }
-    empty.classList.add("hidden"); body.classList.remove("hidden");
-    const C=tc(), pct=v=>isNum(v)?`${v>0?"+":""}${v.toFixed(1)}%`:dash;
-
-    // --- 买入区间 ---
-    const lo=g.guid_buy_low, hi=g.guid_buy_high;
-    $("#dGdZone").textContent = isNum(hi) ? (isNum(lo)&&lo<hi ? `${CUR}${lo.toFixed(2)} ~ ${CUR}${hi.toFixed(2)}` : `${CUR}${hi.toFixed(2)}`) : dash;
-    $("#dGdZoneNote").textContent = t("gd_zone_note");
-
-    // --- 四个关键统计 ---
-    const kpi=[[t("gd_n"), `${n}`+(g.guid_same_ind?`（${t("gd_sameind")}${g.guid_same_ind}）`:""), "var(--text)"],
-               [t("gd_tier"), g.guid_tier||dash, "#38bdf8"],
-               [t("gd_vol"), isNum(g.guid_vol_ann)?g.guid_vol_ann.toFixed(0)+"%":dash, "var(--text)"],
-               [t("gd_medgain"), pct(g.guid_med_gain), "#f87171"],
-               [t("gd_medmae"), pct(g.guid_med_mae), "#4ade80"],
-               [t("gd_win"), isNum(g.guid_win_rate)?`${(g.guid_win_rate*100).toFixed(0)}%`:dash, "var(--text)"]];
-    $("#dGdKpi").innerHTML = kpi.map(([k,v,col])=>
-      `<div class="card p-3"><div class="ovlabel">${escH(k)}</div>
-       <div class="ovnum text-[19px] font-bold mt-1" style="color:${col}">${escH(v)}</div></div>`).join("");
-
-    // --- 图1: 各目标涨幅的历史频率 (概率是0-100的量, 从0起画条是正确的) ---
-    const probs=(g.guid_probs||[]).slice().reverse();
-    const ch1=pcInit("#dGdProbChart","gdProb");
-    ch1.setOption({backgroundColor:"transparent",
-      grid:{left:62,right:66,top:8,bottom:8},
-      tooltip:{trigger:"axis",axisPointer:{type:"shadow"},
-        formatter:p=>{const d=probs[p[0].dataIndex];
-          return `${t("gd_prob_title")}<br/><b>+${d.target}%</b>：${(d.prob*100).toFixed(0)}%（${d.hits}/${n} 次）`;}},
-      xAxis:{type:"value",max:100,axisLabel:{formatter:"{value}%",color:C.axis,fontSize:11},
-             splitLine:{lineStyle:{color:C.grid,type:"dashed"}},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:"category",data:probs.map(d=>`+${d.target}%`),
-             axisLabel:{color:C.label,fontSize:12},axisLine:{show:false},axisTick:{show:false}},
-      series:[{type:"bar",barWidth:"46%",
-        itemStyle:{color:"#38bdf8",borderRadius:[0,4,4,0]},
-        data:probs.map(d=>+(d.prob*100).toFixed(0)),
-        label:{show:true,position:"right",distance:7,fontSize:11.5,color:C.label,
-               formatter:p=>`${p.value}%  (${probs[p.dataIndex].hits}/${n})`}}]});
-
-    // --- 图2: 每一次样本的实际结果 (以买入价为0轴, 左红=最深跌 右绿=最高涨) ---
-    const sm=samples.slice().reverse();
-    const ch2=pcInit("#dGdSampChart","gdSamp");
-    ch2.setOption({backgroundColor:"transparent",
-      grid:{left:86,right:56,top:26,bottom:8},
-      legend:{top:0,right:8,itemWidth:9,itemHeight:9,textStyle:{color:C.label,fontSize:11},
-              data:[t("gd_c_mae"),t("gd_c_gain"),t("gd_c_ret")]},
-      tooltip:{trigger:"axis",axisPointer:{type:"shadow"},
-        formatter:p=>{const d=sm[p[0].dataIndex];
-          return `<b>${d.name||d.code||d.date||""}</b>`+
-                 (d.industry?`　<span style="color:var(--muted)">${d.industry}</span>`:"")+
-                 (isNum(d.vol_ann)?`　波动${d.vol_ann.toFixed(0)}%`:"")+`<br/>`+
-                 `${t("gd_c_gain")}：<b style="color:#f87171">${pct(d.max_gain_pct)}</b><br/>`+
-                 `${t("gd_c_mae")}：<b style="color:#4ade80">${pct(d.mae_pct)}</b><br/>`+
-                 `${t("gd_c_ret")}：<b>${pct(d.ret_1y_pct)}</b>`;}},
-      xAxis:{type:"value",axisLabel:{formatter:"{value}%",color:C.axis,fontSize:11},
-             splitLine:{lineStyle:{color:C.grid,type:"dashed"}},axisLine:{show:false},axisTick:{show:false}},
-      yAxis:{type:"category",data:sm.map(d=>(d.name||d.code||d.date||"")),
-             axisLabel:{color:C.label,fontSize:11},axisLine:{show:false},axisTick:{show:false}},
-      series:[
-        {name:t("gd_c_mae"),type:"bar",stack:"o",barWidth:"52%",
-         itemStyle:{color:"rgba(74,222,128,.75)",borderRadius:[4,0,0,4]},
-         data:sm.map(d=>d.mae_pct)},
-        {name:t("gd_c_gain"),type:"bar",stack:"o",barWidth:"52%",
-         itemStyle:{color:"rgba(248,113,113,.8)",borderRadius:[0,4,4,0]},
-         data:sm.map(d=>d.max_gain_pct)},
-        {name:t("gd_c_ret"),type:"scatter",symbolSize:9,z:5,
-         itemStyle:{color:C.label,borderColor:(document.body.classList.contains("light")?"#fff":"#0f1626"),borderWidth:2},
-         data:sm.map((d,i)=>[d.ret_1y_pct,i])}
-      ]});
-
-    // --- 样本明细表 ---
-    const th=[t("gd_c_date"),t("gd_c_entry"),t("gd_c_gain"),t("gd_c_mae"),t("gd_c_ret")];
-    $("#dGdTable").innerHTML =
-      `<table class="w-full"><thead><tr>${th.map((x,i)=>
-        `<th class="${i?'text-right':'text-left'}">${escH(x)}</th>`).join("")}</tr></thead><tbody>`+
-      samples.map(d=>`<tr>
-        <td>${escH(d.name||d.code||d.date||"")}${d.industry?`<span style="color:var(--muted)"> · ${escH(d.industry)}</span>`:""}</td>
-        <td class="num">${isNum(d.similarity)?(d.similarity*100).toFixed(0)+"%":(d.entry!=null?CUR+d.entry:dash)}</td>
-        <td class="num" style="color:#f87171">${pct(d.max_gain_pct)}</td>
-        <td class="num" style="color:#4ade80">${pct(d.mae_pct)}</td>
-        <td class="num">${pct(d.ret_1y_pct)}</td></tr>`).join("")+`</tbody></table>`;
-  }
   function fm(v){ if(!isNum(v)) return dash; const a=Math.abs(v), s=v<0?"-":""; return a>=1000? `${s}$${(a/1000).toFixed(1)}B` : `${s}$${a.toFixed(0)}M`; }
   const escH = s => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
@@ -1406,7 +1103,6 @@
     if(id==="tabCo") renderCoTab();
     else if(id==="tabCf") renderCfTab();
     else if(id==="tabNw") renderNwTab();
-    else if(id==="tabGd") renderGdTab();
   }
   document.querySelectorAll('#dTabs .segbtn').forEach(b=>{ b.onclick=()=>switchTab(b.dataset.tab); });
   let roeGran="y", cashGran="y";
@@ -1653,50 +1349,6 @@
     } else { $("#dBlock").innerHTML=`<div class="text-slate-500 text-sm">${t("block_none")}</div>`; $("#dBlockSum").textContent=""; }
   }
 
-  // ---- 实时行情 (客户端经公共CORS代理拉 Yahoo chart 端点; 仅价格类实时数据可得) ----
-  const CORS_PROXIES = [
-    u => "https://corsproxy.io/?url="+encodeURIComponent(u),
-    u => "https://api.codetabs.com/v1/proxy/?quest="+encodeURIComponent(u),
-  ];
-  async function fetchLiveQuote(code){
-    if(!code) return;
-    const body=$("#dLiveBody"), btn=$("#liveBtn");
-    const ysym = String(code).replace(/\./g,"-");   // BRK.B -> BRK-B (Yahoo)
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ysym)}?range=1d&interval=1d`;
-    btn.disabled=true; const old=btn.textContent; btn.textContent=t("live_loading");
-    body.innerHTML=`<span class="text-slate-400">${t("live_loading")}</span>`;
-    let meta=null;
-    for(const mk of CORS_PROXIES){
-      try{
-        const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),9000);
-        const r=await fetch(mk(url),{signal:ctrl.signal}); clearTimeout(to);
-        if(!r.ok) continue;
-        const j=await r.json();
-        meta=j && j.chart && j.chart.result && j.chart.result[0] && j.chart.result[0].meta;
-        if(meta) break;
-      }catch(e){ /* try next proxy */ }
-    }
-    btn.disabled=false; btn.textContent=old;
-    if(!meta){ body.innerHTML=`<span class="text-amber-400">${t("live_fail")}</span>`; return; }
-    const price=meta.regularMarketPrice, prev=meta.chartPreviousClose||meta.previousClose;
-    const chg=(isNum(price)&&isNum(prev)&&prev)?(price/prev-1)*100:null;
-    const cur=meta.currency==="USD"?"$":(meta.currency||"");
-    const tm=meta.regularMarketTime?new Date(meta.regularMarketTime*1000).toLocaleString():"";
-    const chgCol=isNum(chg)?(chg>=0?"#ef4444":"#16a34a"):"";   // 涨红跌绿
-    const item=(lab,val)=>`<span class="mr-4 whitespace-nowrap"><span class="text-slate-400">${lab}</span> <b class="text-slate-100">${val}</b></span>`;
-    body.innerHTML=
-      `<div class="text-sm flex flex-wrap items-center gap-y-1">`+
-        `<span class="mr-4 whitespace-nowrap"><span class="badge tag-strong">${t("live_tag")}</span> `+
-          `<b class="text-lg text-slate-100">${cur}${isNum(price)?price.toFixed(2):dash}</b> `+
-          (isNum(chg)?`<b style="color:${chgCol}">${chg>0?"+":""}${chg.toFixed(2)}%</b>`:"")+`</span>`+
-        item(t("live_high"), cur+(isNum(meta.regularMarketDayHigh)?meta.regularMarketDayHigh.toFixed(2):dash))+
-        item(t("live_low"), cur+(isNum(meta.regularMarketDayLow)?meta.regularMarketDayLow.toFixed(2):dash))+
-        item(t("live_52w"), cur+(isNum(meta.fiftyTwoWeekLow)?meta.fiftyTwoWeekLow.toFixed(2):dash)+" ~ "+cur+(isNum(meta.fiftyTwoWeekHigh)?meta.fiftyTwoWeekHigh.toFixed(2):dash))+
-        item(t("live_vol"), isNum(meta.regularMarketVolume)?meta.regularMarketVolume.toLocaleString():dash)+
-        `<span class="text-xs text-slate-500 w-full mt-1">${t("live_src")}${tm}</span>`+
-      `</div>`;
-  }
-
   function mountTV(code){
     const theme = document.body.classList.contains("light")?"light":"dark";
     const sym = encodeURIComponent(tvEmbedSym(code));
@@ -1704,6 +1356,53 @@
     $("#tvWrap").innerHTML = `<iframe src="${src}" style="width:100%;height:100%;border:0" allowtransparency="true" scrolling="no" loading="lazy"></iframe>`;
     $("#tvLink").href = `https://www.tradingview.com/symbols/${encodeURIComponent(tvSym(code))}/`;
   }
+  // ---- 🎯 买卖点建议 (Trade Plan) ----
+  function renderPlan(c){
+    const wrap=$("#dPlanWrap"), p=c.plan;
+    if(!p){ wrap.classList.add("hidden"); return; }
+    wrap.classList.remove("hidden");
+    const en=(LANG==="en");
+    $("#dPlanMeta").textContent = `${t("plan_beta")} · ${t("plan_hold")} ${p.horizon_days}${t("plan_days")}`;
+    const cellP=(lab,val,sub,col)=>`<div class="card p-2"><div class="text-[11px] text-slate-400">${lab}</div><div class="text-sm font-semibold mt-0.5" style="color:${col||'var(--text)'}">${val}</div>${sub?`<div class="text-[10px] text-slate-500 mt-0.5">${sub}</div>`:""}</div>`;
+    const entrySub = p.entry_mode==="support" ? t("plan_entry_support")
+                   : p.entry_mode==="breakout" ? t("plan_entry_breakout")
+                   : (p.entry_mode==="market" ? t("plan_entry_market") : t("plan_entry_none"));
+    const rrTxt = isNum(p.rr)? (en? `${p.rr} : 1` : `${p.rr} : 1`) : dash;
+    $("#dPlanGrid").innerHTML = [
+      cellP(t("plan_entry"), `${CUR}${f(p.entry_low)} ~ ${CUR}${f(p.entry_high)}`, entrySub, "#38bdf8"),
+      cellP(t("plan_stop"), `${CUR}${f(p.stop_price)} (-${f(p.stop_loss_pct,1)}%)`, t("plan_stop_note"), "#f87171"),
+      cellP(t("plan_rr"), rrTxt, isNum(p.stopped_rate_pct)? `${t("plan_stopped")} ${p.stopped_rate_pct.toFixed(0)}%`:"", "#c084fc"),
+      cellP(t("plan_hold"), `≤ ${p.horizon_days} ${t("plan_days")}`, "", ""),
+    ].join("");
+    const tgtRow=(lab,tg,col)=>{
+      if(!tg || !isNum(tg.gain_pct)) return "";
+      const days = tg.days_med!=null? ` · ${t("plan_med_days")} ${tg.days_med}${t("plan_days_u")}` : "";
+      const probPart = isNum(tg.prob_pct)
+        ? `${t("plan_prob")} <b style="color:${col}">${tg.prob_pct.toFixed(0)}%</b>${days}`
+        : `<span class="text-slate-500">${t("plan_measured")}</span>`;
+      const bar = isNum(tg.prob_pct)
+        ? `<div class="barbg"><div class="barfill" style="width:${Math.max(3,Math.min(100,tg.prob_pct))}%;background:${col}"></div></div>` : "";
+      return `<div><div class="flex justify-between text-xs mb-1"><span class="text-slate-300">${lab} <b style="color:${col}">+${f(tg.gain_pct,1)}%</b> → ${CUR}${f(tg.price)}</span><span class="text-slate-400">${probPart}</span></div>${bar}</div>`;
+    };
+    const tg=p.targets||{}, isBreakout = p.entry_mode==="breakout";
+    $("#dPlanLadder").innerHTML =
+      tgtRow(t("plan_target_steady"), tg.steady, "#4ade80")+
+      tgtRow(t("plan_target_base"), tg.base, "#38bdf8")+
+      tgtRow(t("plan_target_stretch"), tg.stretch, "#fbbf24")+
+      (isBreakout ? "" :
+      `<details class="mt-1"><summary class="text-xs text-slate-400 cursor-pointer">${t("plan_ladder")}</summary><table class="w-full text-xs mt-1"><thead><tr><th class="text-left">${t("plan_gain")}</th><th class="text-right">${t("plan_price_l")}</th><th class="text-right">${t("plan_prob")}</th></tr></thead><tbody>`+
+      (p.ladder||[]).filter(l=>isNum(l.prob_pct)).map(l=>`<tr><td>+${f(l.gain_pct,0)}%</td><td class="num">${CUR}${f(l.price)}</td><td class="num">${l.prob_pct.toFixed(0)}%</td></tr>`).join("")+
+      `</tbody></table></details>`);
+    if(isBreakout){
+      const box = (isNum(p.box_lo)&&isNum(p.box_hi)) ? `${t("plan_box")} ${CUR}${f(p.box_lo)} ~ ${CUR}${f(p.box_hi)}<br>` : "";
+      $("#dPlanNote").innerHTML = box + t("plan_note_breakout");
+    } else {
+      let sample = `${t("plan_sample_a")}${p.n_events}${t("plan_sample_b")}${p.pool_events}${t("plan_sample_c")}`;
+      if(p.n_events<5) sample += `<br><span class="text-amber-400">${t("plan_no_events")}</span>`;
+      $("#dPlanNote").innerHTML = sample + `<br>${t("plan_note")}`;
+    }
+  }
+
   function openDetail(c, keepGran){
     curC = c; if(!keepGran) resetGran(); curP = (DATA.profiles||{})[c.code] || null;
     disposeProf();
@@ -1713,6 +1412,7 @@
     const sep1=(LANG==="en")?" / ":" / ", pOpen=(LANG==="en")?" (":"（", pClose=(LANG==="en")?")":"）";
     $("#dSub").textContent = `${c.industry||"—"} · ${t("cur_price")} ${CUR}${f(c.price)} · ${t("composite")} ${f(getVal(c,"final_score"),1)}${pOpen}${t("of_tech")} ${f(c.tech_score,2)}${sep1}${t("of_fund")} ${f(c.fund_score,0)}${sep1}${t("of_prosp")} ${f(c.prosperity_score,0)}${pClose}`;
     $("#dConclusion").textContent = ((LANG==="en"&&c.conclusion_en)?c.conclusion_en:c.conclusion) || "—";
+    renderPlan(c);
 
     const chips=[];
     if(c.sig_channel) chips.push([t("sig_channel"),"tag-strong"]);
@@ -1728,7 +1428,7 @@
     // 风控 / 分析师 卡片
     const rcell=(lab,val,col)=>`<div class="card p-2"><div class="text-[11px] text-slate-400">${lab}</div><div class="text-sm font-semibold mt-0.5" style="${col?`color:${col}`:'color:var(--text)'}">${val}</div></div>`;
     const ddCol = isNum(c.max_dd_pct)? (c.max_dd_pct<=-40?"#f87171":"#fbbf24") : "";
-    const ppl = c.analyst_count!=null ? (LANG==="en"?` (${c.analyst_count.toFixed(0)})`:` (${c.analyst_count.toFixed(0)}人)`) : "";
+    const ppl = isNum(c.analyst_count) ? (LANG==="en"?` (${c.analyst_count.toFixed(0)})`:` (${c.analyst_count.toFixed(0)}人)`) : "";
     $("#dRisk").innerHTML = [
       rcell(t("r_beta"), f(c.beta,2), "#c084fc"),
       rcell(t("r_vol"), isNum(c.atr_pct)?c.atr_pct.toFixed(2)+"%":dash),
@@ -1743,9 +1443,10 @@
     const cell=(lab,val)=>`<div class="card p-3"><div class="text-xs text-slate-400">${lab}</div><div class="text-base font-semibold text-slate-100 mt-1">${val}</div></div>`;
     const pctileZ = (LANG==="en")?"pctile":"分位", yoyw=(LANG==="en")?"YoY ":"同比";
     $("#dFund").innerHTML = [
-      cell(t("fc_pe"), c.pe_disp || f(c.pe_ttm,1)),
+      cell(t("fc_pe"), escH(c.pe_disp || f(c.pe_ttm,1))),
       cell(t("fc_pe_med"), f(c.pe_industry_median,1)),
-      cell(t("fc_pb")+(isNum(c.pb_pct)?(LANG==="en"?` (${c.pb_pct.toFixed(0)}% ${pctileZ})`:`（${c.pb_pct.toFixed(0)}%分位）`):""), f(c.pb,2)),
+      cell(t("fc_pb")+(isNum(c.pb_pct)?(LANG==="en"?` (${c.pb_pct.toFixed(0)}% ${pctileZ})`:`（${c.pb_pct.toFixed(0)}%分位）`):""),
+           isNum(c.pb)&&c.pb<0 ? `${f(c.pb,2)}<span class="text-[10px] text-amber-400 ml-1">${LANG==="en"?"neg. equity":"负净资产"}</span>` : f(c.pb,2)),
       cell("EPS"+(isNum(c.eps_yoy)?(LANG==="en"?` (${yoyw}${c.eps_yoy>0?'+':''}${c.eps_yoy.toFixed(1)}%)`:`（同比${c.eps_yoy>0?'+':''}${c.eps_yoy.toFixed(1)}%）`):""), f(c.eps,2)),
       cell(t("fc_roe"), isNum(c.roe)?c.roe.toFixed(1)+"%":dash),
       cell(t("fc_rev"), isNum(c.revenue_yoy)?(c.revenue_yoy>0?'+':'')+c.revenue_yoy.toFixed(1)+"%":dash),
@@ -1895,6 +1596,7 @@
       DATA=nd; LIVE_DATA=nd;
       $("#histBanner").classList.add("hidden");
       recomputeScores(); renderOverview(); applyStaticI18n();
+      rebuildIndOptions();
       renderIndustryChart(); updateStrip(); render();
       if(!$("#drawer").classList.contains("translate-x-full")) closeDrawer();
       initHistory();
@@ -1906,11 +1608,11 @@
 
   // ---------- 历史快照回看 (docs/history/day_<date>.json) ----------
   let LIVE_DATA = DATA;                 // 最新一天的完整数据 (含K线/档案)
-  let VIEW_DATE = null;                 // 当前实际展示的日期 (失败回退用)
-  let histSeq = 0;                      // 快速连点防乱序
+  let VIEW_DATE = null;                 // 当前实际展示的日期 (失败回退用, 避免下拉与表格脱节)
+  let histSeq = 0;                      // 快速连点时只认最后一次请求 (防乱序覆盖)
   function applyData(nd){
     DATA=nd;
-    recomputeScores(); renderOverview(); applyStaticI18n();
+    recomputeScores(); renderOverview(); applyStaticI18n(); rebuildIndOptions();
     renderIndustryChart(); updateStrip(); render();
     if(!$("#drawer").classList.contains("translate-x-full")) closeDrawer();
   }
@@ -1939,14 +1641,14 @@
       const r=await fetch("history/day_"+encodeURIComponent(d)+".json?_="+Date.now(), {cache:"no-store"});
       if(!r.ok) throw new Error("HTTP "+r.status);
       const j=await r.json();
-      if(seq!==histSeq) return;
+      if(seq!==histSeq) return;          // 已被更新的选择取代, 丢弃过期响应
       j.details={}; j.profiles={};       // 历史快照不带K线/档案 (瘦身)
       applyData(j);
       VIEW_DATE=d;
       bn.textContent = "📅 "+t("hist_banner_a")+d+t("hist_banner_b");
       bn.classList.remove("hidden");
     }catch(err){
-      if(seq===histSeq && VIEW_DATE) e.target.value=VIEW_DATE;
+      if(seq===histSeq && VIEW_DATE) e.target.value=VIEW_DATE;   // 回到"实际在看"的日期
     }
   };
   initHistory();

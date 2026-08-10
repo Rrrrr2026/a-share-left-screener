@@ -63,14 +63,14 @@ CREATE TABLE IF NOT EXISTS profile(
     run_date TEXT, code TEXT, profile_json TEXT,
     PRIMARY KEY(run_date, code)
 );
-CREATE TABLE IF NOT EXISTS guidance(
-    run_date TEXT, code TEXT, guidance_json TEXT,
+CREATE TABLE IF NOT EXISTS trade_plan(
+    run_date TEXT, code TEXT, plan_json TEXT,
     PRIMARY KEY(run_date, code)
 );
 CREATE TABLE IF NOT EXISTS run_log(
     run_date TEXT PRIMARY KEY, started_at TEXT, finished_at TEXT,
     n_scanned INTEGER, n_hit INTEGER, selected_industries TEXT,
-    status TEXT, message TEXT
+    status TEXT, message TEXT, data_date TEXT
 );
 """
 
@@ -89,7 +89,7 @@ def init_db():
 
 
 def _migrate(conn):
-    """给老库补新列(不丢历史)。SQLite 无 ADD COLUMN IF NOT EXISTS, 手动判断。"""
+    """给老库补新列(不丢历史)。"""
     want = {
         "tech_scan": [("support_label", "TEXT"), ("support_price", "REAL"),
                       ("dist_support_pct", "REAL"), ("breakdown_price", "REAL"),
@@ -101,26 +101,26 @@ def _migrate(conn):
                       ("sig_vol", "TEXT"), ("boll_low", "REAL"), ("fib_382", "REAL"),
                       ("fib_500", "REAL"), ("fib_618", "REAL"),
                       ("dip", "INTEGER"), ("dip_score", "REAL"), ("dip_confirm", "TEXT"),
-                      ("consol", "INTEGER"), ("consol_score", "REAL"), ("consol_note", "TEXT"),
-                      ("breakout", "INTEGER"), ("breakout_score", "REAL"),
-                      ("breakout_note", "TEXT")],
+                      ("supp_touches", "INTEGER"), ("trend_ok", "INTEGER"), ("rs_60", "REAL"),
+                      ("coil", "INTEGER"), ("coil_score", "REAL"), ("coil_confirm", "TEXT"),
+                      ("box_hi", "REAL"), ("box_lo", "REAL")],
         "fundamental": [("target_price", "REAL"), ("analyst_rating", "TEXT"),
                         ("analyst_count", "REAL"), ("upside_pct", "REAL"),
                         ("roe_trend_q_json", "TEXT"),
-                        ("growth_quality", "TEXT"), ("growth_quality_score", "REAL"),
-                        ("growth_quality_note", "TEXT"),
-                        # v2.1: 近四季单季同比×4 + 市场地位
-                        ("ni_ttm_yoy", "REAL"), ("ni_basis", "TEXT"), ("ni_qoq_json", "TEXT"),
-                        ("ni_q_labels_json", "TEXT"),
-                        ("rev_ttm_yoy", "REAL"), ("rev_basis", "TEXT"), ("rev_qoq_json", "TEXT"),
+                        ("fcf_yield", "REAL"), ("sector_yf", "TEXT"),
+                        ("ni_ttm_yoy", "REAL"), ("ni_parent_ttm_yoy", "REAL"),
+                        ("ni_basis", "TEXT"), ("ni_parent_basis", "TEXT"),
+                        ("growth_quality", "TEXT"),
                         ("dominance_disp", "TEXT"), ("dom_rank", "INTEGER"),
-                        ("dom_n", "INTEGER"), ("dom_share", "REAL")],
+                        ("dom_n", "INTEGER"), ("dom_share", "REAL"),
+                        ("ni_qoq_json", "TEXT"), ("ni_parent_qoq_json", "TEXT"),
+                        ("ni_q_labels_json", "TEXT"),
+                        # A股: 第二增速列为 营收 (美股为归母; A股批量口径本身即归母)
+                        ("rev_ttm_yoy", "REAL"), ("rev_basis", "TEXT"), ("rev_qoq_json", "TEXT")],
         "final_rank": [("conclusion_en", "TEXT"),
                        ("dip", "INTEGER"), ("dip_score", "REAL"), ("dip_confirm", "TEXT"),
-                       ("consol", "INTEGER"), ("consol_score", "REAL"), ("consol_note", "TEXT"),
-                       ("breakout", "INTEGER"), ("breakout_score", "REAL"),
-                       ("breakout_note", "TEXT"),
-                       ("prob_json", "TEXT"), ("prob_n", "REAL"), ("prob_summary", "TEXT")],
+                       ("coil", "INTEGER"), ("coil_score", "REAL"), ("coil_confirm", "TEXT")],
+        "run_log": [("data_date", "TEXT")],
     }
     for table, cols in want.items():
         have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -129,11 +129,11 @@ def _migrate(conn):
                 try:
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {typ}")
                 except Exception as e:
-                    log.debug("migrate %s.%s 失败: %s", table, name, e)
+                    log.debug("migrate %s.%s: %s", table, name, e)
 
 
 _RUN_TABLES = ("industry_score", "tech_scan", "fundamental",
-               "final_rank", "stock_detail", "profile", "guidance", "run_log")
+               "final_rank", "stock_detail", "profile", "trade_plan", "run_log")
 
 
 def clear_run(run_date: str):
@@ -201,17 +201,18 @@ def save_fundamental(run_date: str, code: str, f: dict):
         "pe_ttm", "pe_pct", "pe_industry_median", "pe_vs_industry", "pb", "pb_pct",
         "dividend_yield", "eps", "eps_yoy", "roe", "revenue_yoy", "netprofit_yoy",
         "gross_margin", "debt_ratio",
-        "growth_quality", "growth_quality_score", "growth_quality_note",
-        "breakout", "breakout_score", "breakout_note",
-        "ni_ttm_yoy", "ni_basis", "rev_ttm_yoy", "rev_basis",
-        "dominance_disp", "dom_rank", "dom_n", "dom_share",
-        "target_price", "analyst_rating", "analyst_count", "upside_pct")}
+        "target_price", "analyst_rating", "analyst_count", "upside_pct",
+        "fcf_yield", "sector_yf",
+        "ni_ttm_yoy", "ni_parent_ttm_yoy", "ni_basis", "ni_parent_basis", "growth_quality",
+        "rev_ttm_yoy", "rev_basis",
+        "dominance_disp", "dom_rank", "dom_n", "dom_share")}
     row.update({
         "run_date": run_date, "code": code,
         "roe_trend_json": json.dumps(f.get("roe_trend", []), ensure_ascii=False),
         "roe_trend_q_json": json.dumps(f.get("roe_trend_q", []), ensure_ascii=False),
         "fund_flags_json": json.dumps(f.get("fund_flags", []), ensure_ascii=False),
         "ni_qoq_json": json.dumps(f.get("ni_qoq", []), ensure_ascii=False),
+        "ni_parent_qoq_json": json.dumps(f.get("ni_parent_qoq", []), ensure_ascii=False),
         "ni_q_labels_json": json.dumps(f.get("ni_q_labels", []), ensure_ascii=False),
         "rev_qoq_json": json.dumps(f.get("rev_qoq", []), ensure_ascii=False),
     })
@@ -236,20 +237,45 @@ def save_profile(run_date: str, code: str, profile: dict):
     }])
 
 
-def save_guidance(run_date: str, code: str, guidance: dict):
-    _upsert("guidance", [{
+def backfill_profiles_from_latest(run_date: str, codes: list) -> int:
+    """把库里"最近一个有档案的run_date"的档案复制到今天 (F10限频时的回落方案;
+    公司简介/年报结构变化很慢, 旧一两天的档案远好于四个页签全空)。已有今日档案的跳过。"""
+    if not codes:
+        return 0
+    n = 0
+    with get_conn() as conn:
+        for code in codes:
+            row = conn.execute(
+                "SELECT profile_json FROM profile WHERE code=? AND run_date<? "
+                "ORDER BY run_date DESC LIMIT 1", (code, run_date)).fetchone()
+            if not row:
+                continue
+            have = conn.execute(
+                "SELECT 1 FROM profile WHERE code=? AND run_date=?",
+                (code, run_date)).fetchone()
+            if have:
+                continue
+            conn.execute(
+                "INSERT OR REPLACE INTO profile(run_date, code, profile_json) VALUES(?,?,?)",
+                (run_date, code, row["profile_json"]))
+            n += 1
+    return n
+
+
+def save_trade_plan(run_date: str, code: str, plan: dict):
+    _upsert("trade_plan", [{
         "run_date": run_date, "code": code,
-        "guidance_json": json.dumps(guidance, ensure_ascii=False),
+        "plan_json": json.dumps(plan, ensure_ascii=False),
     }])
 
 
 def log_run(run_date, started_at, finished_at, n_scanned, n_hit,
-            selected_industries, status, message=""):
+            selected_industries, status, message="", data_date=None):
     _upsert("run_log", [{
         "run_date": run_date, "started_at": started_at, "finished_at": finished_at,
         "n_scanned": n_scanned, "n_hit": n_hit,
         "selected_industries": json.dumps(selected_industries, ensure_ascii=False),
-        "status": status, "message": message,
+        "status": status, "message": message, "data_date": data_date or run_date,
     }])
 
 
@@ -284,39 +310,6 @@ def recent_appearance_counts(run_dates: list[str]) -> dict:
             f"SELECT code, COUNT(DISTINCT run_date) c FROM final_rank "
             f"WHERE run_date IN ({qs}) GROUP BY code", run_dates).fetchall()
     return {r["code"]: r["c"] for r in rows}
-
-
-def recent_breakouts(run_dates: list[str]) -> dict:
-    """近N轮里出现过 🚀 蓄势待发 的股票 -> {code: {days, first, last}}。
-
-    为什么需要跨日: **蓄势是一个持续状态, 不是当天发生的事件** —— 一只票可能磨底
-    数周, 期间每天都算"蓄势"。但综合分在阈值上下浮动会让标签忽隐忽现, 只看当天快照
-    就会漏掉昨天还在、今天差 0.01 分的票。故保留最近若干轮的命中记录一并展示。
-    """
-    if not run_dates:
-        return {}
-    qs = ",".join("?" * len(run_dates))
-    with get_conn() as conn:
-        try:
-            rows = conn.execute(
-                f"SELECT code, COUNT(DISTINCT run_date) days, MIN(run_date) first, "
-                f"MAX(run_date) last FROM final_rank "
-                f"WHERE run_date IN ({qs}) AND breakout=1 GROUP BY code",
-                run_dates).fetchall()
-        except Exception:          # 老库还没有 breakout 列
-            return {}
-    return {r["code"]: {"days": r["days"], "first": r["first"], "last": r["last"]}
-            for r in rows}
-
-
-def recent_run_dates_any(limit: int = 10) -> list[str]:
-    """最近若干个**有数据**的 run_date。不依赖 run_log ——
-    管线中途崩溃时不会写 run_log, 但 final_rank 里是有数据的, 用它才不会漏。"""
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT DISTINCT run_date FROM final_rank ORDER BY run_date DESC LIMIT ?",
-            (limit,)).fetchall()
-    return [r["run_date"] for r in rows]
 
 
 def fetch_run_log(run_date: str) -> dict | None:

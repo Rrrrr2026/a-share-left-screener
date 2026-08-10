@@ -35,7 +35,11 @@ def rsi(close: pd.Series, n: int = 14) -> pd.Series:
     up = diff.clip(lower=0).rolling(n).mean()
     dn = (-diff.clip(upper=0)).rolling(n).mean()
     rs = up / dn.replace(0, np.nan)
-    return 100 - 100 / (1 + rs)
+    out = 100 - 100 / (1 + rs)
+    # 窗口内无下跌日时 dn=0 -> rs=NaN, 数学极限应为 100 (无上涨日则两者皆0, 视为中性50)
+    out = out.mask((dn == 0) & (up > 0), 100.0)
+    out = out.mask((dn == 0) & (up == 0), 50.0)
+    return out
 
 
 def find_pivot_lows(low: pd.Series, window: int):
@@ -71,15 +75,19 @@ def kdj(high: pd.Series, low: pd.Series, close: pd.Series,
     return k, d, j
 
 
-def kdj_tag(k: float, d: float, j: float) -> str:
-    """KDJ 金叉/死叉 + 超买/超卖 中文标签。"""
+def kdj_tag(k: float, d: float, j: float,
+            k_prev: float | None = None, d_prev: float | None = None) -> str:
+    """KDJ 标签: 金叉/死叉 只在真正发生交叉时给 (需传入前一根K/D);
+    未交叉的持续状态标 偏多/偏空, 附加 超买/超卖。"""
     if any(v is None or (isinstance(v, float) and np.isnan(v)) for v in (k, d, j)):
         return "—"
     parts = []
+    has_prev = not any(v is None or (isinstance(v, float) and np.isnan(v))
+                       for v in (k_prev, d_prev))
     if k > d:
-        parts.append("金叉")
+        parts.append("金叉" if (has_prev and k_prev <= d_prev) else "偏多")
     elif k < d:
-        parts.append("死叉")
+        parts.append("死叉" if (has_prev and k_prev >= d_prev) else "偏空")
     if j >= 90 or k >= 80:
         parts.append("超买")
     elif j <= 10 or k <= 20:
