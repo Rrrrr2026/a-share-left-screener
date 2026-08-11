@@ -322,7 +322,12 @@ def run(full_market: bool, use_cache: bool):
     # ---------------- 模块6: 个股深度档案 (阶段C) ----------------
     # 仅对最终展示的候选生成: 简介/主营构成/营收增速/现金流+漏洞/风险/新闻/两融/龙虎榜/大宗
     # 注: akshare 部分东财接口用 py_mini_racer(V8) 解密, 多线程会崩 -> 单线程串行。
-    prof_targets = final_records[:show_n] + dip_tail + coil_tail
+    # 深度档案只为可操作标签生成 (用户指定: 仅 强左侧 + 蓄势待发) —
+    # 观察/基本面弱 占榜单大头但很少被点开, 砍掉后阶段C耗时降 ~2/3, 限频压力大减
+    _prof_pool = final_records[:show_n] + dip_tail + coil_tail
+    prof_targets = [fr for fr in _prof_pool
+                    if ("强左侧" in (fr.get("tag") or "")) or ("蓄势待发" in (fr.get("tag") or ""))]
+    log.info("深度档案范围: 强左侧+蓄势待发 %d 只 (榜单共 %d)", len(prof_targets), len(_prof_pool))
     # 时间预算: 东财F10被限频时单只档案可能要几分钟, 无预算会让整轮永远跑不完、
     # 计划任务被1/4小时上限杀掉 → 网站断更(2026-07/08 两度发生的根因)。
     # 预算内尽量拉新档案; 超时/失败的股票回落到库里最近一天的档案(公司简介/年报数据变化很慢)。
