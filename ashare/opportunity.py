@@ -74,11 +74,12 @@ def compute_components(candidates: list, bench_close=None) -> dict:
 
 
 def load_history_components(history_dir: str, exclude_date: str | None = None) -> list:
-    """从 history/day_*.json 读取往日组件 (排除当天自身)。"""
+    """从 history/day_*.json 读取"该日之前"的组件 —— 严格只用过去 (含当日重算历史
+    快照的场景也不能偷看未来, 否则回看视图里的温度带前视偏差)。"""
     out = []
     for fp in sorted(glob.glob(os.path.join(history_dir, "day_*.json"))):
         d = os.path.basename(fp)[4:14]
-        if exclude_date and d == exclude_date:
+        if exclude_date and d >= exclude_date:
             continue
         try:
             with open(fp, encoding="utf-8") as f:
@@ -101,10 +102,15 @@ def _pctile(value, history_vals) -> float | None:
 
 
 def temperature(components: dict, history: list) -> dict:
-    """当日组件 vs 历史 → 温度(0-100) + 判定。history 为往日组件 dict 列表。"""
-    pctiles, wsum, acc = {}, 0.0, 0.0
+    """当日组件 vs 历史 → 温度(0-100) + 判定。history 为往日组件 dict 列表。
+    每个组件按自身有效样本数把关: 样本不足的组件不给分位、不进加权
+    (N=1-2 时的 P100/P0 是噪音, 不能顶着全量样本天数的名义误导使用者)。"""
+    pctiles, n_by, wsum, acc = {}, {}, 0.0, 0.0
     for k, w in WEIGHTS.items():
-        p = _pctile(components.get(k), [h.get(k) for h in history])
+        vals = [h.get(k) for h in history]
+        n_k = sum(1 for v in vals if v is not None)
+        n_by[k] = n_k
+        p = _pctile(components.get(k), vals) if n_k >= MIN_HISTORY else None
         pctiles[k] = round(p, 0) if p is not None else None
         if p is not None:
             acc += w * p
@@ -126,6 +132,7 @@ def temperature(components: dict, history: list) -> dict:
         "verdict": verdict,
         "components": components,
         "pctiles": pctiles,
+        "n_by_component": n_by,
         "n_history": n_hist,
         "reliable": n_hist >= MIN_HISTORY,
     }

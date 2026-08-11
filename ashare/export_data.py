@@ -169,6 +169,9 @@ def build_payload(run_date: str | None = None) -> dict:
         from . import opportunity as opp
         from . import datasource as _ds
         _bench = _ds.fetch_benchmark_close()
+        if _bench is not None and not _bench.empty and run_date and "date" in _bench.columns:
+            # as-of 截断: 为历史日期重算快照时, 指数回撤必须只用该日之前的数据
+            _bench = _bench[_bench["date"].astype(str).str[:10] <= run_date]
         _bc = _bench["close"] if (_bench is not None and not _bench.empty) else None
         comps = opp.compute_components(candidates, _bc)
         hist = opp.load_history_components(HISTORY_DIR, exclude_date=run_date)

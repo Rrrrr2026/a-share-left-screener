@@ -393,7 +393,7 @@
       opp_note:"温度 = 当日榜单质量(强左侧/蓄势数量、计划盈亏比与胜率、贴支撑占比、沪深300回撤深度)相对自身历史的加权百分位。优质左侧机会在时间上扎堆出现——温度高(历史前20%)时才值得下重手，平庸日子请留好子弹。这是相对排位，不是对未来的预测。",
       // 建议仓位 (¼凯利)
       plan_pos:"建议仓位", plan_pos_u:"总资金", plan_kelly_l:"¼凯利",
-      plan_pos_tip:"¼凯利公式：仓位 = (胜率−(1−胜率)/盈亏比)÷4，用基准目标的回测胜率与盈亏比推算；胜率有估计误差，故只用四分之一凯利，且封顶25%。仅供参考，不构成投资建议。",
+      plan_pos_tip:"¼凯利：先算单笔风险预算 = (胜率−(1−胜率)/盈亏比)÷4（封顶10%），再换算仓位 = 风险预算÷止损幅（封顶25%）。胜率有估计误差，故只用四分之一凯利。仅供参考，不构成投资建议。", plan_risk_l:"单笔风险",
       plan_pos_breakout:"突破确认后再上仓位", plan_pos_skip:"赔率不足·不建议重仓",
       plan_title:"🎯 买卖点建议", plan_beta:"历史回测",
       plan_entry:"建议买入区", plan_entry_support:"等回踩支撑区分批买", plan_entry_market:"已失守支撑·现价分批",
@@ -509,7 +509,7 @@
       opp_pctile:"pctile",
       opp_note:"Temperature = today's board quality (strong-left/coiled counts, plan R/R & win rates, near-support share, CSI300 drawdown) as a weighted percentile vs its own history. Great left-side entries cluster in time — swing big only when the reading is historically hot (top 20%); keep your powder dry on mediocre days. A relative ranking, not a forecast.",
       plan_pos:"Position size", plan_pos_u:"of capital", plan_kelly_l:"¼-Kelly",
-      plan_pos_tip:"¼-Kelly: size = (p − (1−p)/b) ÷ 4 using the base target's backtested win rate p and reward/risk b; win rates carry estimation error, hence quarter-Kelly, capped at 25%. Reference only, not investment advice.",
+      plan_pos_tip:"¼-Kelly: risk budget = (p − (1−p)/b) ÷ 4 (cap 10%), then position = risk budget ÷ stop distance (cap 25%). Win rates carry estimation error, hence quarter-Kelly. Reference only, not investment advice.", plan_risk_l:"risk/trade",
       plan_pos_breakout:"size up after breakout confirms", plan_pos_skip:"edge too thin · no big bet",
       plan_title:"🎯 Trade Plan", plan_beta:"backtested",
       plan_entry:"Entry zone", plan_entry_support:"scale in on pullback to support", plan_entry_market:"support lost · scale in at market",
@@ -631,7 +631,7 @@
   }
   function applyLang(){
     applyStaticI18n();
-    syncWeightUI(); syncAdvUI(); renderIndustryChart(); render(); updateStrip();
+    syncWeightUI(); syncAdvUI(); renderIndustryChart(); render(); updateStrip(); renderOverview();
     if(curC && !$("#drawer").classList.contains("translate-x-full")) openDetail(curC, true);
   }
   // ========================================================================
@@ -1454,12 +1454,16 @@
       const base=(p.targets||{}).base||{};
       const pw = isNum(base.prob_pct)? base.prob_pct/100 : null;
       const b = (isNum(base.gain_pct)&&isNum(p.stop_loss_pct)&&p.stop_loss_pct>0)? base.gain_pct/p.stop_loss_pct : null;
+      // ¼凯利给的是"单笔风险预算"(亏时只损止损幅, 不是全仓); 仓位 = 风险预算÷止损幅, 封顶25%
       let kelly = (pw!=null&&b!=null)? (pw - (1-pw)/b) : null;
-      if(kelly!=null){
-        const q = Math.min(0.25, kelly/4);
-        posCell = (q>0.005)
-          ? cellP(t("plan_pos"), `≤ ${(q*100).toFixed(0)}% ${t("plan_pos_u")}`, `${t("plan_kelly_l")} · ${t("plan_prob")} ${base.prob_pct.toFixed(0)}% × ${isNum(p.rr)?p.rr:f(b,1)}:1`, q>=0.10?"#4ade80":"#38bdf8")
-          : cellP(t("plan_pos"), t("plan_pos_skip"), `${t("plan_kelly_l")} ≤ 0`, "#94a3b8");
+      if(kelly!=null && kelly>0){
+        const risk = Math.min(0.10, kelly/4);
+        const pos = Math.min(0.25, risk/(p.stop_loss_pct/100));
+        posCell = cellP(t("plan_pos"), `≤ ${(pos*100).toFixed(0)}% ${t("plan_pos_u")}`,
+          `${t("plan_risk_l")} ≤${(risk*100).toFixed(1)}% · ${t("plan_kelly_l")} · ${base.prob_pct.toFixed(0)}%×${isNum(p.rr)?p.rr:f(b,1)}:1`,
+          pos>=0.15?"#4ade80":"#38bdf8");
+      } else if(kelly!=null){
+        posCell = cellP(t("plan_pos"), t("plan_pos_skip"), `${t("plan_kelly_l")} ≤ 0`, "#94a3b8");
       } else {
         posCell = cellP(t("plan_pos"), dash, "", "");
       }
