@@ -163,6 +163,19 @@ def build_payload(run_date: str | None = None) -> dict:
     for pr in db.fetch_table("profile", run_date):
         profiles[pr["code"]] = _loads(pr["profile_json"], default={})
 
+    # 机会温度计: 当日榜单质量 vs 自身历史的分位 (指导"今天该不该重仓")
+    opp_result = None
+    try:
+        from . import opportunity as opp
+        from . import datasource as _ds
+        _bench = _ds.fetch_benchmark_close()
+        _bc = _bench["close"] if (_bench is not None and not _bench.empty) else None
+        comps = opp.compute_components(candidates, _bc)
+        hist = opp.load_history_components(HISTORY_DIR, exclude_date=run_date)
+        opp_result = opp.temperature(comps, hist)
+    except Exception as e:
+        log.warning("机会温度计计算失败: %s", e)
+
     payload = {
         "meta": {
             "run_date": run_date,
@@ -172,6 +185,7 @@ def build_payload(run_date: str | None = None) -> dict:
             "n_hit": len(candidates),   # 与主表展示条数一致
             "selected_industries": selected_inds,
             "disclaimer": DISCLAIMER,
+            "opp": opp_result,
         },
         "industries": industries_sorted,
         "candidates": candidates,

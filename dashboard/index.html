@@ -115,7 +115,27 @@
     <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_date">数据日期</div><div id="ovDate" class="text-2xl font-bold text-white mt-1">—</div></div>
   </section>
   <!-- 派生统计条 -->
-  <section id="ovStrip" class="flex flex-wrap gap-2 mb-5"></section>
+  <section id="ovStrip" class="flex flex-wrap gap-2 mb-3"></section>
+
+  <!-- 🌡️ 机会温度计 -->
+  <section id="oppCard" class="card p-4 mb-5 hidden" style="border-color:rgba(251,146,60,.35)">
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+      <h4 class="sec-title" data-i18n="opp_title">🌡️ 机会温度计 — 今天该不该重仓？</h4>
+      <span id="oppMeta" class="text-xs text-slate-400"></span>
+    </div>
+    <div class="flex items-center gap-4 flex-wrap">
+      <div class="flex items-center gap-3 flex-none">
+        <div id="oppScore" class="text-4xl font-bold" style="min-width:86px">—</div>
+        <div id="oppVerdict" class="badge" style="font-size:14px;padding:4px 12px">—</div>
+      </div>
+      <div class="flex-1 min-w-[240px]">
+        <div class="barbg" style="height:10px"><div id="oppBar" class="barfill" style="width:2%;height:10px"></div></div>
+        <div class="flex justify-between text-[10px] text-slate-500 mt-0.5"><span data-i18n="opp_s0">0 观望</span><span data-i18n="opp_s40">40 正常试仓</span><span data-i18n="opp_s60">60 加大试仓</span><span data-i18n="opp_s80">80 重仓分批</span><span>100</span></div>
+      </div>
+    </div>
+    <div id="oppChips" class="flex flex-wrap gap-2 mt-2"></div>
+    <div id="oppNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
+  </section>
 
   <!-- 行业景气榜 -->
   <section class="card p-4 mb-5">
@@ -361,6 +381,20 @@
       date_sel_title:"回看历史扫描结果",
       hist_banner_a:"正在查看历史快照 ", hist_banner_b:" — 该日榜单为当日打分, K线明细与深度档案仅最新一天提供；在日期框选回最新日期即可返回。",
       // 买卖点建议
+      // 机会温度计
+      opp_title:"🌡️ 机会温度计 — 今天该不该重仓？",
+      opp_s0:"0 观望", opp_s40:"40 正常试仓", opp_s60:"60 加大试仓", opp_s80:"80 重仓分批",
+      opp_v_deploy:"🔥 重仓分批", opp_v_lean:"👍 加大试仓", opp_v_normal:"➖ 正常试仓",
+      opp_v_hold:"🧊 观望留子弹", opp_v_na:"样本不足",
+      opp_days_a:"历史样本 ", opp_days_b:" 天", opp_low_sample:"（样本积累中，温度仅供参考）",
+      opp_c_n_strong:"强左侧数", opp_c_n_coil:"蓄势数", opp_c_avg_rr:"平均盈亏比",
+      opp_c_avg_win:"平均胜率", opp_c_near_support:"贴支撑占比", opp_c_idx_dd:"指数回撤",
+      opp_pctile:"分位",
+      opp_note:"温度 = 当日榜单质量(强左侧/蓄势数量、计划盈亏比与胜率、贴支撑占比、沪深300回撤深度)相对自身历史的加权百分位。优质左侧机会在时间上扎堆出现——温度高(历史前20%)时才值得下重手，平庸日子请留好子弹。这是相对排位，不是对未来的预测。",
+      // 建议仓位 (¼凯利)
+      plan_pos:"建议仓位", plan_pos_u:"总资金", plan_kelly_l:"¼凯利",
+      plan_pos_tip:"¼凯利公式：仓位 = (胜率−(1−胜率)/盈亏比)÷4，用基准目标的回测胜率与盈亏比推算；胜率有估计误差，故只用四分之一凯利，且封顶25%。仅供参考，不构成投资建议。",
+      plan_pos_breakout:"突破确认后再上仓位", plan_pos_skip:"赔率不足·不建议重仓",
       plan_title:"🎯 买卖点建议", plan_beta:"历史回测",
       plan_entry:"建议买入区", plan_entry_support:"等回踩支撑区分批买", plan_entry_market:"已失守支撑·现价分批",
       plan_entry_none:"无明确支撑位·现价分批需谨慎",
@@ -465,6 +499,18 @@
       growq_tip:"Cross-check of 4-year annual parent-NI trend × last 4 single-quarter YoY: sustained growth vs one-off spike",
       date_sel_title:"Browse past scan days",
       hist_banner_a:"Viewing historical snapshot ", hist_banner_b:" — scores are as of that day; K-line details & deep profiles are only available for the latest day. Pick the latest date to return.",
+      opp_title:"🌡️ Opportunity Thermometer — deploy big today?",
+      opp_s0:"0 hold", opp_s40:"40 normal", opp_s60:"60 lean in", opp_s80:"80 deploy",
+      opp_v_deploy:"🔥 Deploy in size", opp_v_lean:"👍 Lean in", opp_v_normal:"➖ Normal probes",
+      opp_v_hold:"🧊 Hold fire", opp_v_na:"Insufficient history",
+      opp_days_a:"history ", opp_days_b:" days", opp_low_sample:" (still accumulating; treat as reference)",
+      opp_c_n_strong:"Strong-left", opp_c_n_coil:"Coiled", opp_c_avg_rr:"Avg R/R",
+      opp_c_avg_win:"Avg win rate", opp_c_near_support:"Near support", opp_c_idx_dd:"Index drawdown",
+      opp_pctile:"pctile",
+      opp_note:"Temperature = today's board quality (strong-left/coiled counts, plan R/R & win rates, near-support share, CSI300 drawdown) as a weighted percentile vs its own history. Great left-side entries cluster in time — swing big only when the reading is historically hot (top 20%); keep your powder dry on mediocre days. A relative ranking, not a forecast.",
+      plan_pos:"Position size", plan_pos_u:"of capital", plan_kelly_l:"¼-Kelly",
+      plan_pos_tip:"¼-Kelly: size = (p − (1−p)/b) ÷ 4 using the base target's backtested win rate p and reward/risk b; win rates carry estimation error, hence quarter-Kelly, capped at 25%. Reference only, not investment advice.",
+      plan_pos_breakout:"size up after breakout confirms", plan_pos_skip:"edge too thin · no big bet",
       plan_title:"🎯 Trade Plan", plan_beta:"backtested",
       plan_entry:"Entry zone", plan_entry_support:"scale in on pullback to support", plan_entry_market:"support lost · scale in at market",
       plan_entry_none:"no defined support · scale in with caution",
@@ -683,6 +729,38 @@
     $("#ovHit").textContent = isNum(meta.n_hit)?meta.n_hit:(DATA.candidates.length||dash);
     $("#ovInds").textContent = (meta.selected_industries||[]).length || dash;
     $("#ovDate").textContent = meta.data_date || meta.run_date || dash;
+    renderOpp(meta.opp);
+  }
+  // ---------- 🌡️ 机会温度计 ----------
+  function renderOpp(o){
+    const card=$("#oppCard");
+    if(!o || !isNum(o.score)){ card.classList.add("hidden"); return; }
+    card.classList.remove("hidden");
+    const s=o.score;
+    const col = s>=80?"#f87171":(s>=60?"#fbbf24":(s>=40?"#60a5fa":"#64748b"));
+    const V = {deploy:["opp_v_deploy","tag-warn"], lean_in:["opp_v_lean","tag-coil"],
+               normal:["opp_v_normal","tag-watch"], hold_fire:["opp_v_hold","tag-watch"]};
+    const v = V[o.verdict]||["opp_v_na","tag-watch"];
+    $("#oppScore").textContent = s;
+    $("#oppScore").style.color = col;
+    $("#oppVerdict").textContent = t(v[0]);
+    $("#oppVerdict").className = "badge "+v[1];
+    $("#oppVerdict").style.fontSize="14px"; $("#oppVerdict").style.padding="4px 12px";
+    const bar=$("#oppBar"); bar.style.width=Math.max(2,Math.min(100,s))+"%"; bar.style.background=col;
+    $("#oppMeta").textContent = t("opp_days_a")+(o.n_history||0)+t("opp_days_b")+(o.reliable?"":t("opp_low_sample"));
+    const C=o.components||{}, P=o.pctiles||{};
+    const fmtv = (k,val)=>{
+      if(!isNum(val)) return dash;
+      if(k==="avg_win"||k==="near_support"||k==="idx_dd") return val.toFixed(1)+"%";
+      if(k==="avg_rr") return val.toFixed(2);
+      return String(val);
+    };
+    $("#oppChips").innerHTML = ["n_strong","n_coil","avg_rr","avg_win","near_support","idx_dd"].map(k=>{
+      const pc = P[k];
+      const hot = isNum(pc) && pc>=75;
+      return `<span class="badge ${hot?"tag-warn":"tag-watch"}" title="${t("opp_c_"+k)} ${t("opp_pctile")} ${isNum(pc)?pc.toFixed(0):dash}%">${t("opp_c_"+k)} ${fmtv(k,C[k])}${isNum(pc)?` <span class="text-[10px] opacity-70">P${pc.toFixed(0)}</span>`:""}</span>`;
+    }).join("");
+    $("#oppNote").textContent = t("opp_note");
   }
   renderOverview();
 
@@ -1368,11 +1446,30 @@
                    : p.entry_mode==="breakout" ? t("plan_entry_breakout")
                    : (p.entry_mode==="market" ? t("plan_entry_market") : t("plan_entry_none"));
     const rrTxt = isNum(p.rr)? (en? `${p.rr} : 1` : `${p.rr} : 1`) : dash;
+    // ¼凯利建议仓位: 用基准目标的胜率p与盈亏比b, 仓位=(p-(1-p)/b)/4, 封顶25%
+    let posCell;
+    if(p.entry_mode==="breakout"){
+      posCell = cellP(t("plan_pos"), dash, t("plan_pos_breakout"), "");
+    } else {
+      const base=(p.targets||{}).base||{};
+      const pw = isNum(base.prob_pct)? base.prob_pct/100 : null;
+      const b = (isNum(base.gain_pct)&&isNum(p.stop_loss_pct)&&p.stop_loss_pct>0)? base.gain_pct/p.stop_loss_pct : null;
+      let kelly = (pw!=null&&b!=null)? (pw - (1-pw)/b) : null;
+      if(kelly!=null){
+        const q = Math.min(0.25, kelly/4);
+        posCell = (q>0.005)
+          ? cellP(t("plan_pos"), `≤ ${(q*100).toFixed(0)}% ${t("plan_pos_u")}`, `${t("plan_kelly_l")} · ${t("plan_prob")} ${base.prob_pct.toFixed(0)}% × ${isNum(p.rr)?p.rr:f(b,1)}:1`, q>=0.10?"#4ade80":"#38bdf8")
+          : cellP(t("plan_pos"), t("plan_pos_skip"), `${t("plan_kelly_l")} ≤ 0`, "#94a3b8");
+      } else {
+        posCell = cellP(t("plan_pos"), dash, "", "");
+      }
+      posCell = posCell.replace('<div class="card p-2">', `<div class="card p-2" title="${escH(t("plan_pos_tip"))}">`);
+    }
     $("#dPlanGrid").innerHTML = [
       cellP(t("plan_entry"), `${CUR}${f(p.entry_low)} ~ ${CUR}${f(p.entry_high)}`, entrySub, "#38bdf8"),
       cellP(t("plan_stop"), `${CUR}${f(p.stop_price)} (-${f(p.stop_loss_pct,1)}%)`, t("plan_stop_note"), "#f87171"),
       cellP(t("plan_rr"), rrTxt, isNum(p.stopped_rate_pct)? `${t("plan_stopped")} ${p.stopped_rate_pct.toFixed(0)}%`:"", "#c084fc"),
-      cellP(t("plan_hold"), `≤ ${p.horizon_days} ${t("plan_days")}`, "", ""),
+      posCell,
     ].join("");
     const tgtRow=(lab,tg,col)=>{
       if(!tg || !isNum(tg.gain_pct)) return "";
