@@ -1490,6 +1490,59 @@ def fetch_profit_reports(n_periods: int = 12) -> dict:
     return result
 
 
+def _parse_cn_amount(s) -> float | None:
+    """'272.43亿'/'5,230.50万'/'-3.2亿' -> 元; 解析失败返回 None。"""
+    if s is None:
+        return None
+    t = str(s).replace(",", "").strip()
+    if not t or t in ("--", "False", "None", "nan"):
+        return None
+    mult = 1.0
+    if t.endswith("亿"):
+        mult, t = 1e8, t[:-1]
+    elif t.endswith("万"):
+        mult, t = 1e4, t[:-1]
+    try:
+        return float(t) * mult
+    except Exception:
+        return None
+
+
+def fetch_single_q_ths(code: str) -> dict:
+    """同花顺利润表(按单季度): 官方口径的单季 归母净利润/营业总收入 —
+    直接是披露的单季数, 不需要累计差分, 且经重述调整、与市面软件一致。
+    返回 {"periods": [...升序], "ni_parent_q": [...元], "rev_q": [...元]}; 失败 {}。
+    注: THS 接口用 py_mini_racer 算 cookie, 多线程会崩 -> 只能单线程调用。"""
+    key = _cache_key("thsq", code, dt.date.today().isoformat())
+    c = _cache_load(key)
+    if c is not None:
+        return c if isinstance(c, dict) else {}
+    out = {}
+    try:
+        raw = call_with_retry(_ak().stock_financial_benefit_ths,
+                              symbol=code, indicator="按单季度")
+        if raw is not None and len(raw):
+            rows = []
+            for _, r in raw.iterrows():
+                p = str(r.get("报告期", ""))[:10]
+                ni = _parse_cn_amount(r.get("*归属于母公司所有者的净利润"))
+                rev = _parse_cn_amount(r.get("*营业总收入"))
+                if len(p) == 10 and (ni is not None or rev is not None):
+                    rows.append((p, ni, rev))
+            rows.sort(key=lambda t: t[0])
+            rows = rows[-16:]           # 近16个单季足够 (同比×4 + TTM×2年)
+            if rows:
+                out = {"periods": [p for (p, _, _) in rows],
+                       "ni_parent_q": [n for (_, n, _) in rows],
+                       "rev_q": [v for (_, _, v) in rows]}
+    except Exception as e:
+        log.debug("fetch_single_q_ths %s 失败: %s", code, e)
+        out = {}
+    if out:
+        _cache_save(key, out)
+    return out
+
+
 def prefetch_quarterly_reports():
     """在基本面阶段前显式预热 (避免并发首调用打爆接口)。"""
     global _YJBB_MAP
@@ -1522,13 +1575,41 @@ def _single_quarters(periods: list, cums: list) -> list:
 
 
 def get_quarterly_series(code: str) -> dict:
-    """从批量业绩表取单只股票的季度序列:
-    {"periods": [...], "ni_q": [单季归母...], "rev_q": [单季营收...],
-     "ni_cum": [...], "rev_cum": [...], "fy_ni": [年报归母...], "fy_dates": [...]}"""
+    """单只股票的季度序列 (单季口径):
+    首选 同花顺按单季度官方数 (fetch_single_q_ths, 精确、经重述调整);
+    兜底 东财业绩表累计差分 (缺季有防护但精度略逊)。
+    返回 {"periods": [...], "ni_q": [...], "rev_q": [...],
+          "ni_cum": [...], "rev_cum": [...], "fy_ni": [...], "fy_dates": [...], "src": "ths"|"yjbb"}"""
     global _YJBB_MAP
     if _YJBB_MAP is None:
         prefetch_quarterly_reports()
     d = (_YJBB_MAP or {}).get(code)
+    ths = fetch_single_q_ths(code) if _THS_OK.get(code, False) else {}   # 默认False: 未预取的不碰THS(线程安全)
+    if ths.get("periods"):
+        periods = ths["periods"]
+        ni_q, rev_q = ths["ni_parent_q"], ths["rev_q"]
+        cum_by = {p: v for p, v in zip(d["periods"], d["ni_cum"])} if d else {}
+        rev_cum_by = {p: v for p, v in zip(d["periods"], d["rev_cum"])} if d else {}
+        # 年报归母 (年度趋势): 优先东财累计年报; THS只有单季则按年求和(4季齐才算)
+        fy_dates, fy_ni = [], []
+        if d:
+            for p, v in zip(d["periods"], d["ni_cum"]):
+                if p[5:7] == "12" and v is not None:
+                    fy_dates.append(p)
+                    fy_ni.append(v)
+        else:
+            by_year = {}
+            for p, v in zip(periods, ni_q):
+                if v is not None:
+                    by_year.setdefault(p[:4], []).append(v)
+            for y in sorted(by_year):
+                if len(by_year[y]) == 4:
+                    fy_dates.append(f"{y}-12-31")
+                    fy_ni.append(sum(by_year[y]))
+        return {"periods": periods, "ni_q": ni_q, "rev_q": rev_q,
+                "ni_cum": [cum_by.get(p) for p in periods],
+                "rev_cum": [rev_cum_by.get(p) for p in periods],
+                "fy_dates": fy_dates, "fy_ni": fy_ni, "src": "ths"}
     if not d:
         return {}
     periods = d["periods"]
@@ -1537,5 +1618,31 @@ def get_quarterly_series(code: str) -> dict:
     fy = [(p, v) for p, v in zip(periods, d["ni_cum"]) if p[5:7] == "12" and v is not None]
     return {"periods": periods, "ni_q": ni_q, "rev_q": rev_q,
             "ni_cum": d["ni_cum"], "rev_cum": d["rev_cum"],
-            "fy_dates": [p for (p, _) in fy], "fy_ni": [v for (_, v) in fy]}
+            "fy_dates": [p for (p, _) in fy], "fy_ni": [v for (_, v) in fy], "src": "yjbb"}
+
+
+# THS 预取标记: 只有预取过(单线程)的代码才在并发阶段用 THS 缓存, 未预取的直接走兜底,
+# 避免并发线程触发 THS 首次网络调用 (py_mini_racer 多线程会硬崩)
+_THS_OK: dict = {}
+
+
+def prefetch_single_q_ths(codes: list, budget_sec: int = 600) -> int:
+    """单线程串行预取 THS 单季数据 (带时间预算); 命中当日缓存的秒回。
+    返回成功只数。并发阶段 get_quarterly_series 只读缓存, 不再打网络。"""
+    t0 = time.time()
+    n = 0
+    for code in codes:
+        if time.time() - t0 > budget_sec:
+            log.warning("THS单季预取超预算, 已取 %d/%d, 其余走业绩表差分兜底", n, len(codes))
+            break
+        try:
+            ok = bool(fetch_single_q_ths(code).get("periods"))
+        except Exception:
+            ok = False
+        _THS_OK[code] = ok
+        if ok:
+            n += 1
+    for code in codes:
+        _THS_OK.setdefault(code, False)
+    return n
 

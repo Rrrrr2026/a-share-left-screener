@@ -232,6 +232,12 @@ def run(full_market: bool, use_cache: bool):
     # 预热全市场季度业绩批量缓存 (近四季归母/营收同比×4 的数据源), 避免并发首调用
     n_qr = ds.prefetch_quarterly_reports()
     log.info("季度业绩批量缓存: 覆盖 %d 只", n_qr)
+    # THS官方单季数预取 (单线程, py_mini_racer不能进线程池; 预算10分钟, 超时走差分兜底)
+    try:
+        n_ths = ds.prefetch_single_q_ths([rd[0]["code"] for rd in top_hits], budget_sec=600)
+        log.info("THS单季官方数预取: %d/%d 只", n_ths, len(top_hits))
+    except Exception as e:
+        log.warning("THS单季预取失败(全部走业绩表差分兜底): %s", e)
 
     def _fund_stock(rd):
         rec, detail = rd
