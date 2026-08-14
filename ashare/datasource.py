@@ -40,6 +40,28 @@ os.makedirs(_CACHE_DIR, exist_ok=True)
 _BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 
+_TLS_HTTP = threading.local()
+
+
+def _http():
+    """线程本地长连接会话 (keep-alive)。
+    2026-08-14 事故: 全市场扫描每次请求都新开socket, 关闭后在 TIME_WAIT 里躺
+    ~2分钟, 连跑几轮把 Windows 临时端口耗尽 (WSAENOBUFS 10055), 浏览器等其它
+    程序都连不上网。复用连接后 socket 用量从"每请求1个"降到"每线程几个"。"""
+    import requests
+    s = getattr(_TLS_HTTP, "sess", None)
+    if s is None:
+        s = requests.Session()
+        try:
+            from requests.adapters import HTTPAdapter
+            ad = HTTPAdapter(pool_connections=8, pool_maxsize=16)
+            s.mount("https://", ad)
+            s.mount("http://", ad)
+        except Exception:
+            pass
+        _TLS_HTTP.sess = s
+    return s
+
 
 def _install_ua_patch():
     try:
@@ -273,8 +295,8 @@ def _em_get(path: str, params: dict, timeout: int = 8):
     headers = {"User-Agent": _BROWSER_UA, "Referer": "https://quote.eastmoney.com/"}
     for h in live:
         try:
-            r = requests.get(f"https://{h}{path}", params=params,
-                             headers=headers, timeout=timeout)
+            r = _http().get(f"https://{h}{path}", params=params,
+                            headers=headers, timeout=timeout)
             if r.status_code != 200 or not r.text.strip().startswith("{"):
                 raise ValueError(f"bad body {r.status_code}")
             j = r.json()
@@ -577,10 +599,9 @@ def _tencent_symbol(code: str) -> str:
 
 def _tencent_chunk(sym: str, start: str, end: str) -> list:
     """取一段日线(前复权)。返回 [[date,open,close,high,low,volume], ...]。"""
-    import requests
     p = {"param": f"{sym},day,{start},{end},640,qfq"}
-    r = requests.get(_TENCENT_KLINE, params=p,
-                     headers={"User-Agent": _BROWSER_UA}, timeout=25)
+    r = _http().get(_TENCENT_KLINE, params=p,
+                    headers={"User-Agent": _BROWSER_UA}, timeout=25)
     j = r.json()
     if j.get("msg") == "param error":
         return []
