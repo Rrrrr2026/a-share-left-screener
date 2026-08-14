@@ -221,18 +221,26 @@ def fetch_spot_snapshot(force: bool = False) -> pd.DataFrame | None:
             return c
     # 顺序: 东财直连(多主机, 最稳) -> akshare东财 -> 新浪。
     # 直连放第一位是因为 akshare 写死的主机在本机被挡, 而其余东财主机可达。
+    # 2026-08-14 事故: 限频把分页截断在 1086 行, 部分列表被当全量缓存+扫描 ->
+    # 当日榜单只覆盖 1/5 市场。全A应有 5000+ 行, 低于下限视为截断源, 继续换源。
+    MIN_ROWS = 4000
     df = _spot_from_em_direct()
-    if df is None or df.empty:
-        log.info("东财直连快照不可用, 尝试 akshare 东财 ...")
+    if df is None or len(df) < MIN_ROWS:
+        log.info("东财直连快照不可用/截断(%s行), 尝试 akshare 东财 ...",
+                 "0" if df is None else len(df))
         df = _spot_from_em()
-    if df is None or df.empty:
-        log.info("东财快照不可用, 尝试新浪快照 ...")
+    if df is None or len(df) < MIN_ROWS:
+        log.info("东财快照不可用/截断, 尝试新浪快照 ...")
         df = _spot_from_sina()
     if df is None or df.empty:
         log.error("全部快照源均失败 -> 股票池为空, 本轮无法扫描。"
                   "请检查网络/代理是否放行 push2.eastmoney.com")
         return None
     df["code"] = df["code"].astype(str).str.zfill(6)
+    if len(df) < MIN_ROWS:
+        log.warning("所有源都只拿到截断快照(%d行): 本轮硬着头皮用, 但不缓存, 下次重取",
+                    len(df))
+        return df
     _cache_save(key, df)
     return df
 
