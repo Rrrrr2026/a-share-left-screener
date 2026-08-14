@@ -134,8 +134,10 @@ def run(full_market: bool, use_cache: bool):
                 seen.add(code)
                 universe.append((code, name, ind_name))
         log.info("候选池: 全行业成分股 %d 只 (行业数 %d)", len(universe), len(ind_to_codes))
-        # 行业成分接口大面积失败会让扫描面悄悄缩水: 覆盖过低时并入全市场池补齐
-        if 0 < len(universe) < 1000:
+        # 行业成分接口大面积失败会让扫描面悄悄缩水: 覆盖过低时并入全市场池补齐。
+        # 全A正常 ~5200 只; 2026-08-14 限频事故只拿到 1086 只、恰好躲过旧阈值 1000 ->
+        # 阈值提到 3000, 任何明显缩水都并入全市场池
+        if 0 < len(universe) < 3000:
             log.warning("行业成分覆盖偏低(%d只), 并入全市场池补齐 ...", len(universe))
             have = {c for (c, _, _) in universe}
             for (c, n, i) in _full_market_universe():
