@@ -370,6 +370,11 @@ def run(full_market: bool, use_cache: bool):
     ex.write_dashboard_js(run_date)
     ex.write_csv(run_date)
     ex.write_history_snapshot(run_date)
+    try:
+        from ashare import backtest as bt
+        bt.run_backtest()
+    except Exception as e:
+        log.warning("信号回测失败(不影响榜单与发布): %s", e)
     log.info("✅ 全部完成。请双击打开 dashboard/index.html")
 
 

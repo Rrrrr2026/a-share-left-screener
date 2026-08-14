@@ -7,6 +7,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="dashboard_data.js"></script>
+<script src="backtest_data.js"></script>
 <style>
   :root{
     --bg:#0b1220; --card:#111a2e; --border:#1e2a44; --text:#e5e7eb; --dim:#9fb4d6; --muted:#7e93b8;
@@ -135,6 +136,29 @@
     </div>
     <div id="oppChips" class="flex flex-wrap gap-2 mt-2"></div>
     <div id="oppNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
+  </section>
+
+  <!-- 📊 信号回测 -->
+  <section id="btCard" class="card p-4 mb-5 hidden" style="border-color:rgba(52,211,153,.35)">
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+      <h4 class="sec-title" data-i18n="bt_title">📊 信号回测 — 过去发出的建议，真实走成了什么样？</h4>
+      <span id="btMeta" class="text-xs text-slate-400"></span>
+    </div>
+    <div id="btStats" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3"></div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div>
+        <div class="text-xs text-slate-400 mb-1" data-i18n="bt_seg_title">按标签（已了结信号）</div>
+        <div class="overflow-x-auto"><table class="w-full text-[13px]" id="btTagTbl"></table></div>
+      </div>
+      <div>
+        <div class="text-xs text-slate-400 mb-1" data-i18n="bt_dim_title">按市场温度 / 成长质量（胜率）</div>
+        <div id="btDims" class="flex flex-wrap gap-2"></div>
+        <div class="text-xs text-slate-400 mt-3 mb-1" data-i18n="bt_reco_title">📈 回测优选 — 今日候选中，历史同类信号战绩达标的</div>
+        <div id="btRecos" class="flex flex-wrap gap-2"></div>
+        <div id="btRecent" class="mt-3"></div>
+      </div>
+    </div>
+    <div id="btNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
   </section>
 
   <!-- 行业景气榜 -->
@@ -391,6 +415,22 @@
       opp_c_avg_win:"平均胜率", opp_c_near_support:"贴支撑占比", opp_c_idx_dd:"指数回撤",
       opp_pctile:"分位",
       opp_note:"温度 = 当日榜单质量(强左侧/蓄势数量、计划盈亏比与胜率、贴支撑占比、沪深300回撤深度)相对自身历史的加权百分位。优质左侧机会在时间上扎堆出现——温度高(历史前20%)时才值得下重手，平庸日子请留好子弹。这是相对排位，不是对未来的预测。",
+      // 信号回测
+      bt_title:"📊 信号回测 — 过去发出的建议，真实走成了什么样？",
+      bt_days:" 天快照", bt_hz:"持有窗口 ", bt_hz2:" 交易日",
+      bt_n:"完整窗口已了结", bt_n_open:"持仓/窗口未满", bt_fill:"触发率",
+      bt_win:"先赚10%胜率", bt_win_sub:"止损前先到 +10%",
+      bt_ret:"平均净收益", bt_ret_sub:"每笔·含成本",
+      bt_days_med:"中位持有", bt_days_sub:"交易日",
+      bt_seg_title:"按标签（已了结信号）", bt_dim_title:"按市场温度 / 成长质量（胜率）",
+      bt_col_tag:"标签", bt_col_n:"已了结", bt_col_win:"胜率+10%", bt_col_r5:"曾达+5%",
+      bt_col_ret:"平均收益", bt_col_d:"天数", bt_low_n:"样本少",
+      bt_opp_hot:"🔥 高温日", bt_opp_mid:"➖ 常温日", bt_opp_cold:"🧊 低温日",
+      bt_g_G:"🟢 可持续", bt_g_M:"🟡 待观察", bt_g_W:"🔴 一次性",
+      bt_reco_title:"📈 回测优选 — 今日候选中，历史同类信号战绩达标的",
+      bt_reco_tip:"同类历史信号收缩后胜率", bt_reco_none:"今日暂无达标段位（样本随每日运行自动积累）",
+      bt_recent:"最近了结", bt_open_pos:"进行中",
+      bt_note:"回测 = 把历史每日快照里当天发出的买卖点建议（回踩买入区/突破买点、止损、目标），与其后真实行情逐日对照：观察窗内先到 +10% 记为胜，先破止损记为负，同日双触发按先止损保守计，T+1 成交当日不判离场，一字涨停买不进、一字跌停顺延到次日开盘才卖出，含交易成本。胜率只统计观察窗完整走完的信号——已了结但窗口未满的一并剔除，否则「快出结果的交易」会被优先计入、胜率被截尾偏差推高。同一股票同一时间只计一次信号。样本仅覆盖近几周单一市场环境、信号按日聚集彼此相关，有效样本小于名义数量；胜率是历史频率而非未来保证，「回测优选」只是把今天候选对到历史战绩达标的信号类型上，仍需人工复核。",
       // 建议仓位 (¼凯利)
       plan_pos:"建议仓位", plan_pos_u:"总资金", plan_kelly_l:"¼凯利",
       plan_pos_tip:"¼凯利：先算单笔风险预算 = (胜率−(1−胜率)/盈亏比)÷4（封顶10%），再换算仓位 = 风险预算÷止损幅（封顶25%）。胜率有估计误差，故只用四分之一凯利。仅供参考，不构成投资建议。", plan_risk_l:"单笔风险",
@@ -508,6 +548,22 @@
       opp_c_avg_win:"Avg win rate", opp_c_near_support:"Near support", opp_c_idx_dd:"Index drawdown",
       opp_pctile:"pctile",
       opp_note:"Temperature = today's board quality (strong-left/coiled counts, plan R/R & win rates, near-support share, CSI300 drawdown) as a weighted percentile vs its own history. Great left-side entries cluster in time — swing big only when the reading is historically hot (top 20%); keep your powder dry on mediocre days. A relative ranking, not a forecast.",
+      // Signal backtest
+      bt_title:"📊 Signal Backtest — how did past calls actually play out?",
+      bt_days:"-day snapshots", bt_hz:"holding window ", bt_hz2:" trading days",
+      bt_n:"Resolved (full window)", bt_n_open:"open/window not full", bt_fill:"Fill rate",
+      bt_win:"+10% win rate", bt_win_sub:"hit +10% before stop",
+      bt_ret:"Avg net return", bt_ret_sub:"per trade, incl. costs",
+      bt_days_med:"Median hold", bt_days_sub:"trading days",
+      bt_seg_title:"By tag (resolved signals)", bt_dim_title:"By market temp / growth quality (win rate)",
+      bt_col_tag:"Tag", bt_col_n:"Resolved", bt_col_win:"Win +10%", bt_col_r5:"Reached +5%",
+      bt_col_ret:"Avg return", bt_col_d:"Days", bt_low_n:"low n",
+      bt_opp_hot:"🔥 Hot days", bt_opp_mid:"➖ Mid days", bt_opp_cold:"🧊 Cold days",
+      bt_g_G:"🟢 Sustainable", bt_g_M:"🟡 Watch", bt_g_W:"🔴 One-off",
+      bt_reco_title:"📈 Backtest picks — today's candidates whose signal type has a proven record",
+      bt_reco_tip:"Shrunk win rate of similar past signals", bt_reco_none:"No segment qualifies yet (sample grows with each daily run)",
+      bt_recent:"Recently resolved", bt_open_pos:"open",
+      bt_note:"Backtest = replay each day's published entry/stop/target advice against actual subsequent prices: reaching +10% before the stop within the window counts as a win, hitting the stop first counts as a loss, same-day double-trigger conservatively counts as a stop; T+1 means no same-day exits, sealed limit-up days can't be bought and sealed limit-down days defer the stop exit to the next open; costs included. Win rates only count signals whose full observation window has elapsed — early-resolved trades inside unfinished windows are excluded too, otherwise fast resolvers would be over-counted (censoring bias). One episode per stock at a time. The sample covers a few recent weeks in one regime and signals cluster by day, so effective sample sizes are smaller than nominal; win rates are historical frequencies, not guarantees. 'Backtest picks' map today's candidates onto signal types with a qualifying record — still review manually.",
       plan_pos:"Position size", plan_pos_u:"of capital", plan_kelly_l:"¼-Kelly",
       plan_pos_tip:"¼-Kelly: risk budget = (p − (1−p)/b) ÷ 4 (cap 10%), then position = risk budget ÷ stop distance (cap 25%). Win rates carry estimation error, hence quarter-Kelly. Reference only, not investment advice.", plan_risk_l:"risk/trade",
       plan_pos_breakout:"size up after breakout confirms", plan_pos_skip:"edge too thin · no big bet",
@@ -730,6 +786,7 @@
     $("#ovInds").textContent = (meta.selected_industries||[]).length || dash;
     $("#ovDate").textContent = meta.data_date || meta.run_date || dash;
     renderOpp(meta.opp);
+    setTimeout(renderBacktest, 0);   // 延后一拍: 首次调用时表格区的工具函数(const)尚未初始化
   }
   // ---------- 🌡️ 机会温度计 ----------
   function renderOpp(o){
@@ -762,6 +819,51 @@
     }).join("");
     $("#oppNote").textContent = t("opp_note");
   }
+  // ---------- 📊 信号回测 ----------
+  function btOpen(code){
+    const c=(DATA.candidates||[]).find(x=>x.code===code);
+    if(c) openDetail(c);
+  }
+  function renderBacktest(){
+    const B = window.__BT__;
+    const card = $("#btCard");
+    if(!card) return;
+    if(!B || !B.agg || !B.agg.pool || !B.agg.pool.n_resolved){ card.classList.add("hidden"); return; }
+    card.classList.remove("hidden");
+    const P=B.agg.pool, M=B.meta||{};
+    const pct=(x,d)=>isNum(x)?(x*100).toFixed(d==null?0:d)+"%":dash;
+    $("#btMeta").textContent = `${M.first_day} → ${M.last_day} · ${M.n_days}${t("bt_days")} · ${t("bt_hz")}${M.horizon}${t("bt_hz2")}`;
+    const stat=(lab,val,sub,col)=>`<div class="rounded-lg p-2.5" style="background:rgba(148,163,184,.07)"><div class="text-[11px] text-slate-400">${lab}</div><div class="text-xl font-bold ${col||"text-white"}">${val}</div>${sub?`<div class="text-[10px] text-slate-500">${sub}</div>`:""}</div>`;
+    $("#btStats").innerHTML =
+      stat(t("bt_n"), P.n_resolved, `${t("bt_n_open")} ${P.n_open||0}`) +
+      stat(t("bt_fill"), pct(P.fill_rate)) +
+      stat(t("bt_win"), pct(P.win10), t("bt_win_sub"), P.win10>=0.6?"text-emerald-300":"text-amber-300") +
+      stat(t("bt_ret"), (P.avg_ret>0?"+":"")+pct(P.avg_ret,1), t("bt_ret_sub"), P.avg_ret>0?"text-emerald-300":"text-rose-300") +
+      stat(t("bt_days_med"), isNum(P.med_days)?P.med_days:dash, t("bt_days_sub"));
+    const rows = Object.entries(B.agg.by_tag||{}).sort((a,b)=>(b[1].n_resolved||0)-(a[1].n_resolved||0));
+    const th=`<tr class="text-slate-400 text-[11px]"><th class="text-left py-1">${t("bt_col_tag")}</th><th class="text-right">${t("bt_col_n")}</th><th class="text-right">${t("bt_col_win")}</th><th class="text-right">${t("bt_col_r5")}</th><th class="text-right">${t("bt_col_ret")}</th><th class="text-right">${t("bt_col_d")}</th></tr>`;
+    $("#btTagTbl").innerHTML = th + rows.map(([k,s])=>{
+      const low=(s.n_resolved||0)<12;
+      const wc=!isNum(s.win10)?"":(s.win10>=(B.agg.p0||0)?"text-emerald-300":"text-rose-300");
+      const rc=!isNum(s.avg_ret)?"":(s.avg_ret>0?"text-emerald-300":"text-rose-300");
+      return `<tr class="border-t border-slate-700/40 ${low?"opacity-60":""}"><td class="py-1"><span class="badge ${tagClass(k)}">${escH(tagText(k))}</span>${low?` <span class="text-[10px] text-slate-500">${t("bt_low_n")}</span>`:""}</td><td class="text-right">${s.n_resolved||0}</td><td class="text-right ${wc}">${pct(s.win10)}</td><td class="text-right">${pct(s.reach5)}</td><td class="text-right ${rc}">${isNum(s.avg_ret)?((s.avg_ret>0?"+":"")+pct(s.avg_ret,1)):dash}</td><td class="text-right">${isNum(s.med_days)?s.med_days:dash}</td></tr>`;
+    }).join("");
+    const dim=(lab,s)=> (s&&s.n_resolved)?`<span class="badge tag-watch" title="n=${s.n_resolved}">${lab} ${pct(s.win10)} <span class="text-[10px] opacity-70">n${s.n_resolved}</span></span>`:"";
+    const O=B.agg.by_opp||{}, G=B.agg.by_growth||{};
+    $("#btDims").innerHTML =
+      [dim(t("bt_opp_hot"),O.hot), dim(t("bt_opp_mid"),O.mid), dim(t("bt_opp_cold"),O.cold),
+       dim(t("bt_g_G"),G.G), dim(t("bt_g_M"),G.M), dim(t("bt_g_W"),G.W)].filter(Boolean).join("");
+    const rec=(B.recos||[]).slice(0,14);
+    $("#btRecos").innerHTML = rec.length? rec.map(r=>`<span class="badge tag-strong cursor-pointer" onclick="btOpen('${escH(r.code)}')" title="${t("bt_reco_tip")} ${pct(r.seg_win_post)} · n=${r.seg_n}">${escH(r.code)} ${escH(String(r.name||"").slice(0,10))} <b>${pct(r.seg_win_post)}</b></span>`).join("") : `<span class="text-xs text-slate-500">${t("bt_reco_none")}</span>`;
+    const rc2=(B.recent||[]).slice(0,10);
+    $("#btRecent").innerHTML = rc2.length? `<div class="text-xs text-slate-400 mb-1">${t("bt_recent")}</div><div class="flex flex-wrap gap-2">`+rc2.map(e=>{
+      const ic=e.status==="won"?"✅":(e.status==="stopped"?"⛔":"⏳");
+      const rr=isNum(e.ret)?((e.ret>0?"+":"")+(e.ret*100).toFixed(1)+"%"):dash;
+      return `<span class="badge ${(e.ret>0)?"tag-strong":"tag-warn"}" title="${e.sig_date||""} → ${e.exit_date||""}">${ic} ${escH(e.code)} ${rr}</span>`;
+    }).join("")+`</div>` : "";
+    $("#btNote").textContent = t("bt_note");
+  }
+  window.btOpen = btOpen;
   renderOverview();
 
   // ---------- 行业景气榜 ----------
@@ -939,7 +1041,11 @@
   function cellHTML(c, key){
     const v = (key==="final_score") ? getVal(c,key) : c[key];
     switch(key){
-      case "tag": return `<span class="badge ${tagClass(v)}">${v?escH(tagText(v)):dash}</span>`;
+      case "tag": {
+        const bt = (window.__BT__&&window.__BT__.today)? window.__BT__.today[c.code] : null;
+        const star = (bt&&bt.reco)? ` <span title="${t("bt_reco_tip")} ${isNum(bt.seg_win_post)?(bt.seg_win_post*100).toFixed(0):"—"}% · n=${bt.seg_n}" class="cursor-help">📈</span>` : "";
+        return `<span class="badge ${tagClass(v)}">${v?escH(tagText(v)):dash}</span>${star}`;
+      }
       case "kdj_tag": return `<span>${v?escH(kdjText(v)):dash}</span>`;
       case "streak": return streakCell(c.streak);
       case "spark": return sparkSVG(c.spark);
