@@ -58,6 +58,10 @@ def _tqdm():
 
 
 def run(full_market: bool, use_cache: bool):
+    # 全局socket兜底超时: 任何库(akshare内部等)没设超时的阻塞读, 60秒后抛异常
+    # 走重试, 而不是永远挂死。2026-08-13/17/18/19 连续四天 13:30 任务卡死在
+    # 某个无超时的网络读上, 4小时被调度器杀掉、留下孤儿进程, 当天不出榜。
+    socket.setdefaulttimeout(60)
     tqdm = _tqdm()
     run_date = dt.date.today().isoformat()
     started = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
