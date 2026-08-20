@@ -161,6 +161,16 @@
     <div id="btNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
   </section>
 
+  <!-- 💎 错杀候选 (高度关注) -->
+  <section id="csCard" class="card p-4 mb-5 hidden" style="border-color:rgba(250,204,21,.45)">
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+      <h4 class="sec-title" data-i18n="cs_title">💎 错杀候选 — 高质量·情绪性下跌·高度关注</h4>
+      <span id="csMeta" class="text-xs text-slate-400"></span>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full text-[13px]" id="csTbl"></table></div>
+    <div id="csNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
+  </section>
+
   <!-- 行业景气榜 -->
   <section class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
@@ -199,6 +209,7 @@
         <select id="filterInd"><option value="">全部板块</option></select>
         <select id="filterTag">
           <option value="">全部标签</option>
+          <option value="__cuosha__">💎 错杀候选</option>
           <option value="✅ 强左侧">✅ 强左侧</option>
           <option value="⚠️ 技术好但基本面弱">⚠️ 技术好但基本面弱</option>
           <option value="🪸 深跌抄底">🪸 深跌抄底</option>
@@ -254,6 +265,8 @@
     <!-- ① 总览 -->
     <div id="tabOv" class="dtab">
       <div id="dConclusion" class="card p-3 text-[13px] leading-relaxed text-slate-200 mb-3"></div>
+      <!-- 💎 错杀检测 -->
+      <div id="dCuosha" class="card p-3 mb-3 hidden" style="border-color:rgba(250,204,21,.4)"></div>
       <!-- 🎯 买卖点建议 (Trade Plan) -->
       <div id="dPlanWrap" class="card p-4 mb-3 hidden" style="border-color:rgba(56,189,248,.35)">
         <div class="flex items-center justify-between flex-wrap gap-1 mb-2">
@@ -430,6 +443,15 @@
       bt_reco_title:"📈 回测优选 — 今日候选中，历史同类信号战绩达标的",
       bt_reco_tip:"同类历史信号收缩后胜率", bt_reco_none:"今日暂无达标段位（样本随每日运行自动积累）",
       bt_recent:"最近了结", bt_open_pos:"进行中",
+      bt_cs:"💎 错杀≥60", bt_cselig:"过门槛<60", bt_noncs:"其它",
+      // 错杀候选
+      cs_title:"💎 错杀候选 — 高质量·情绪性下跌·高度关注",
+      cs_filter:"💎 错杀候选", cs_popup_title:"错杀检测",
+      cs_meta_a:"共 ", cs_meta_b:" 只达标（错杀分≥60）· 显示前20",
+      cs_col_stock:"股票", cs_col_ind:"行业", cs_col_score:"错杀分",
+      cs_col_dd:"距52周高点", cs_col_expl:"板块解释", cs_col_g:"近两季增速",
+      cs_col_up:"修复空间", cs_col_tag:"标签",
+      cs_note:"错杀分 = 背离度40（跌得深 × 单季利润仍在增长）+ 板块归因25（跌幅可由行业中位跌幅解释的比例，越高越像情绪/资金面驱动）+ 质量护城河25（成长档位/ROE/行业营收排名/自身PE历史分位低位）+ 企稳迹象10（贴支撑/RSI/多次踩不破）。修复空间只回补「超出板块的那部分跌幅」，不预测板块本身修复。⚠️ 财报有滞后：下跌可能反映尚未公布的恶化，此处结论是「无可见基本面恶化」而非「确认错杀」，重仓前请人工核查公告与下跌原因。回测卡中的「💎错杀」分段会用真实胜率持续验证这套打分。",
       bt_note:"回测 = 把历史每日快照里当天发出的买卖点建议（回踩买入区/突破买点、止损、目标），与其后真实行情逐日对照：观察窗内先到 +10% 记为胜，先破止损记为负，同日双触发按先止损保守计，T+1 成交当日不判离场，一字涨停买不进、一字跌停顺延到次日开盘才卖出，含交易成本。胜率只统计观察窗完整走完的信号——已了结但窗口未满的一并剔除，否则「快出结果的交易」会被优先计入、胜率被截尾偏差推高。同一股票同一时间只计一次信号。样本仅覆盖近几周单一市场环境、信号按日聚集彼此相关，有效样本小于名义数量；胜率是历史频率而非未来保证，「回测优选」只是把今天候选对到历史战绩达标的信号类型上，仍需人工复核。",
       // 建议仓位 (¼凯利)
       plan_pos:"建议仓位", plan_pos_u:"总资金", plan_kelly_l:"¼凯利",
@@ -563,6 +585,15 @@
       bt_reco_title:"📈 Backtest picks — today's candidates whose signal type has a proven record",
       bt_reco_tip:"Shrunk win rate of similar past signals", bt_reco_none:"No segment qualifies yet (sample grows with each daily run)",
       bt_recent:"Recently resolved", bt_open_pos:"open",
+      bt_cs:"💎 Mispriced ≥60", bt_cselig:"Gate-passed <60", bt_noncs:"Others",
+      // Mispriced candidates
+      cs_title:"💎 Mispriced — quality names in emotional selloffs · high attention",
+      cs_filter:"💎 Mispriced", cs_popup_title:"Mispricing check",
+      cs_meta_a:"", cs_meta_b:" qualified (score ≥60) · top 20 shown",
+      cs_col_stock:"Stock", cs_col_ind:"Industry", cs_col_score:"Score",
+      cs_col_dd:"From 52w high", cs_col_expl:"Sector-explained", cs_col_g:"Recent-2Q growth",
+      cs_col_up:"Repair upside", cs_col_tag:"Tag",
+      cs_note:"Score = divergence 40 (deep drop × still-growing single-quarter profit) + sector attribution 25 (share of the drop explained by the industry median — higher looks emotional/flow-driven) + moat 25 (growth tier / ROE / industry revenue rank / low own-history PE percentile) + stabilization 10 (near support / RSI / repeated holds). Repair upside only refills the drop in excess of the sector, without betting on the sector itself recovering. ⚠️ Financials lag: a selloff can reflect deterioration not yet reported — this reads 'no visible deterioration', not 'confirmed mispricing'; check filings/news before sizing up. The backtest card's 💎 segment keeps validating this score with realized win rates.",
       bt_note:"Backtest = replay each day's published entry/stop/target advice against actual subsequent prices: reaching +10% before the stop within the window counts as a win, hitting the stop first counts as a loss, same-day double-trigger conservatively counts as a stop; T+1 means no same-day exits, sealed limit-up days can't be bought and sealed limit-down days defer the stop exit to the next open; costs included. Win rates only count signals whose full observation window has elapsed — early-resolved trades inside unfinished windows are excluded too, otherwise fast resolvers would be over-counted (censoring bias). One episode per stock at a time. The sample covers a few recent weeks in one regime and signals cluster by day, so effective sample sizes are smaller than nominal; win rates are historical frequencies, not guarantees. 'Backtest picks' map today's candidates onto signal types with a qualifying record — still review manually.",
       plan_pos:"Position size", plan_pos_u:"of capital", plan_kelly_l:"¼-Kelly",
       plan_pos_tip:"¼-Kelly: risk budget = (p − (1−p)/b) ÷ 4 (cap 10%), then position = risk budget ÷ stop distance (cap 25%). Win rates carry estimation error, hence quarter-Kelly. Reference only, not investment advice.", plan_risk_l:"risk/trade",
@@ -680,7 +711,7 @@
     document.querySelectorAll("[data-i18n-ph]").forEach(el=>{ el.placeholder=t(el.dataset.i18nPh); });
     document.querySelectorAll("[data-i18n-title]").forEach(el=>{ el.title=t(el.dataset.i18nTitle); });
     // 标签下拉: 值保持中文, 只翻译显示文字
-    Array.from($("#filterTag").options).forEach(o=>{ if(o.value) o.textContent=tagText(o.value); else o.textContent=t("all_tags"); });
+    Array.from($("#filterTag").options).forEach(o=>{ if(o.value==="__cuosha__") o.textContent=t("cs_filter"); else if(o.value) o.textContent=tagText(o.value); else o.textContent=t("all_tags"); });
     // 板块下拉的"全部板块"占位
     const fi=$("#filterInd"); if(fi.options[0]) fi.options[0].textContent=t("all_inds");
     if($("#langBtn")) $("#langBtn").textContent = (LANG==="en")?"中文":"EN";
@@ -787,6 +818,7 @@
     $("#ovDate").textContent = meta.data_date || meta.run_date || dash;
     renderOpp(meta.opp);
     setTimeout(renderBacktest, 0);   // 延后一拍: 首次调用时表格区的工具函数(const)尚未初始化
+    setTimeout(renderCuosha, 0);
   }
   // ---------- 🌡️ 机会温度计 ----------
   function renderOpp(o){
@@ -849,10 +881,11 @@
       return `<tr class="border-t border-slate-700/40 ${low?"opacity-60":""}"><td class="py-1"><span class="badge ${tagClass(k)}">${escH(tagText(k))}</span>${low?` <span class="text-[10px] text-slate-500">${t("bt_low_n")}</span>`:""}</td><td class="text-right">${s.n_resolved||0}</td><td class="text-right ${wc}">${pct(s.win10)}</td><td class="text-right">${pct(s.reach5)}</td><td class="text-right ${rc}">${isNum(s.avg_ret)?((s.avg_ret>0?"+":"")+pct(s.avg_ret,1)):dash}</td><td class="text-right">${isNum(s.med_days)?s.med_days:dash}</td></tr>`;
     }).join("");
     const dim=(lab,s)=> (s&&s.n_resolved)?`<span class="badge tag-watch" title="n=${s.n_resolved}">${lab} ${pct(s.win10)} <span class="text-[10px] opacity-70">n${s.n_resolved}</span></span>`:"";
-    const O=B.agg.by_opp||{}, G=B.agg.by_growth||{};
+    const O=B.agg.by_opp||{}, G=B.agg.by_growth||{}, CS=B.agg.by_cuosha||{};
     $("#btDims").innerHTML =
       [dim(t("bt_opp_hot"),O.hot), dim(t("bt_opp_mid"),O.mid), dim(t("bt_opp_cold"),O.cold),
-       dim(t("bt_g_G"),G.G), dim(t("bt_g_M"),G.M), dim(t("bt_g_W"),G.W)].filter(Boolean).join("");
+       dim(t("bt_g_G"),G.G), dim(t("bt_g_M"),G.M), dim(t("bt_g_W"),G.W),
+       dim(t("bt_cs"),CS.cs), dim(t("bt_cselig"),CS.elig), dim(t("bt_noncs"),CS.other)].filter(Boolean).join("");
     const rec=(B.recos||[]).slice(0,14);
     $("#btRecos").innerHTML = rec.length? rec.map(r=>`<span class="badge tag-strong cursor-pointer" onclick="btOpen('${escH(r.code)}')" title="${t("bt_reco_tip")} ${pct(r.seg_win_post)} · n=${r.seg_n}">${escH(r.code)} ${escH(String(r.name||"").slice(0,10))} <b>${pct(r.seg_win_post)}</b></span>`).join("") : `<span class="text-xs text-slate-500">${t("bt_reco_none")}</span>`;
     const rc2=(B.recent||[]).slice(0,10);
@@ -862,6 +895,30 @@
       return `<span class="badge ${(e.ret>0)?"tag-strong":"tag-warn"}" title="${e.sig_date||""} → ${e.exit_date||""}">${ic} ${escH(e.code)} ${rr}</span>`;
     }).join("")+`</div>` : "";
     $("#btNote").textContent = t("bt_note");
+  }
+  // ---------- 💎 错杀候选 ----------
+  function renderCuosha(){
+    const card=$("#csCard"); if(!card) return;
+    const hits=(DATA.candidates||[]).filter(c=>isNum(c.cuosha_score)).sort((a,b)=>b.cuosha_score-a.cuosha_score);
+    if(!hits.length){ card.classList.add("hidden"); return; }
+    card.classList.remove("hidden");
+    $("#csMeta").textContent = `${t("cs_meta_a")}${hits.length}${t("cs_meta_b")}`;
+    const th=`<tr class="text-slate-400 text-[11px]"><th class="text-left py-1">#</th><th class="text-left">${t("cs_col_stock")}</th><th class="text-left">${t("cs_col_ind")}</th><th class="text-right">${t("cs_col_score")}</th><th class="text-right">${t("cs_col_dd")}</th><th class="text-right">${t("cs_col_expl")}</th><th class="text-right">${t("cs_col_g")}</th><th class="text-right">${t("cs_col_up")}</th><th class="text-left pl-3">${t("cs_col_tag")}</th></tr>`;
+    $("#csTbl").innerHTML = th + hits.slice(0,20).map((c,i)=>{
+      const qoq=(c.ni_qoq||[]).filter(isNum);
+      const g=qoq.length? qoq.slice(-2).reduce((a,b)=>a+b,0)/Math.min(2,qoq.length) : null;
+      return `<tr class="border-t border-slate-700/40 hover:bg-slate-700/20 cursor-pointer" onclick="btOpen('${escH(c.code)}')">`+
+        `<td class="py-1.5 text-slate-500">${i+1}</td>`+
+        `<td><b>${escH(c.name||"")}</b> <span class="font-mono text-xs text-slate-400">${escH(c.code)}</span></td>`+
+        `<td class="text-slate-400 text-xs">${escH(c.industry||dash)}</td>`+
+        `<td class="text-right font-bold text-amber-300" title="${escH(c.cuosha_note||"")}">${c.cuosha_score}</td>`+
+        `<td class="text-right text-rose-300">${isNum(c.cuosha_dd)?c.cuosha_dd.toFixed(0)+"%":dash}</td>`+
+        `<td class="text-right text-sky-300">${isNum(c.cuosha_expl)?c.cuosha_expl+"%":dash}</td>`+
+        `<td class="text-right ${g>0?"text-emerald-300":"text-slate-400"}">${isNum(g)?(g>0?"+":"")+g.toFixed(0)+"%":dash}</td>`+
+        `<td class="text-right ${c.cuosha_upside>0?"text-emerald-300 font-semibold":"text-slate-500"}">${(c.cuosha_upside>0)?"+"+c.cuosha_upside+"%":dash}</td>`+
+        `<td class="pl-3"><span class="badge ${tagClass(c.tag)}">${escH(tagText(c.tag))}</span></td></tr>`;
+    }).join("");
+    $("#csNote").textContent = t("cs_note");
   }
   window.btOpen = btOpen;
   renderOverview();
@@ -1044,7 +1101,8 @@
       case "tag": {
         const bt = (window.__BT__&&window.__BT__.today)? window.__BT__.today[c.code] : null;
         const star = (bt&&bt.reco)? ` <span title="${t("bt_reco_tip")} ${isNum(bt.seg_win_post)?(bt.seg_win_post*100).toFixed(0):"—"}% · n=${bt.seg_n}" class="cursor-help">📈</span>` : "";
-        return `<span class="badge ${tagClass(v)}">${v?escH(tagText(v)):dash}</span>${star}`;
+        const gem = c.cuosha_score? ` <span title="${t("cs_col_score")} ${c.cuosha_score} · ${escH(c.cuosha_note||"")}" class="cursor-help">💎</span>` : "";
+        return `<span class="badge ${tagClass(v)}">${v?escH(tagText(v)):dash}</span>${gem}${star}`;
       }
       case "kdj_tag": return `<span>${v?escH(kdjText(v)):dash}</span>`;
       case "streak": return streakCell(c.streak);
@@ -1103,7 +1161,8 @@
     if(state.search){ const q=state.search.toLowerCase();
       rows = rows.filter(c=> (c.code||"").toLowerCase().includes(q) || (c.name||"").toLowerCase().includes(q)); }
     if(state.ind) rows = rows.filter(c=> c.industry===state.ind);
-    if(state.tag) rows = rows.filter(c=> c.tag===state.tag);
+    if(state.tag==="__cuosha__") rows = rows.filter(c=> c.cuosha_score);
+    else if(state.tag) rows = rows.filter(c=> c.tag===state.tag);
     if(state.favOnly) rows = rows.filter(c=> favs.has(c.code));
     if(state.minScore>0) rows = rows.filter(c=> isNum(getVal(c,"final_score")) && getVal(c,"final_score")>=state.minScore);
     if(state.maxDist<30) rows = rows.filter(c=> isNum(c.dist_support_pct) && Math.abs(c.dist_support_pct)<=state.maxDist);
@@ -1620,6 +1679,13 @@
     $("#dSub").textContent = `${c.industry||"—"} · ${t("cur_price")} ${CUR}${f(c.price)} · ${t("composite")} ${f(getVal(c,"final_score"),1)}${pOpen}${t("of_tech")} ${f(c.tech_score,2)}${sep1}${t("of_fund")} ${f(c.fund_score,0)}${sep1}${t("of_prosp")} ${f(c.prosperity_score,0)}${pClose}`;
     $("#dConclusion").textContent = ((LANG==="en"&&c.conclusion_en)?c.conclusion_en:c.conclusion) || "—";
     renderPlan(c);
+    const csEl=$("#dCuosha");
+    if(csEl){
+      if(isNum(c.cuosha_score)){
+        csEl.classList.remove("hidden");
+        csEl.innerHTML = `<div class="flex items-center gap-2 flex-wrap mb-1"><b class="text-amber-300">💎 ${t("cs_popup_title")}</b><span class="badge tag-warn">${t("cs_col_score")} ${c.cuosha_score}</span>${(c.cuosha_upside>0)?`<span class="badge tag-strong">${t("cs_col_up")} +${c.cuosha_upside}%</span>`:""}</div><div class="text-xs text-slate-400 leading-relaxed">${escH(c.cuosha_note||"")}</div>`;
+      } else csEl.classList.add("hidden");
+    }
 
     const chips=[];
     if(c.sig_channel) chips.push([t("sig_channel"),"tag-strong"]);

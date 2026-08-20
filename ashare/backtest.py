@@ -420,6 +420,8 @@ def build_and_run(snaps: list[dict], prices: dict) -> list[dict]:
                 "final_score": c.get("final_score"), "fund_score": c.get("fund_score"),
                 "opp": _opp_bucket(snap.get("opp_score")),
                 "industry": c.get("industry"),
+                "cuosha": ("cs" if c.get("cuosha_score")
+                           else ("elig" if c.get("cuosha_eligible") else "other")),
                 **{k: r.get(k) for k in ("status", "fill_date", "fill_px", "exit_date",
                                           "exit_px", "ret", "days", "complete",
                                           "max_gain", "max_dd")},
@@ -469,7 +471,8 @@ def aggregate(episodes: list[dict]) -> dict:
     res_all = _stats_pool(episodes)
     p0 = (sum(1 for e in res_all if e["status"] == "won") / len(res_all)) if res_all else 0.4
     out = {"pool": _seg_stats(episodes, p0), "p0": round(p0, 3),
-           "by_tag": {}, "by_growth": {}, "by_combo": {}, "by_mode": {}, "by_opp": {}}
+           "by_tag": {}, "by_growth": {}, "by_combo": {}, "by_mode": {}, "by_opp": {},
+           "by_cuosha": {}}
     def _group(keyf):
         g = {}
         for e in episodes:
@@ -487,6 +490,10 @@ def aggregate(episodes: list[dict]) -> dict:
         out["by_mode"][k] = _seg_stats(eps, p0)
     for k, eps in _group(lambda e: e["opp"]).items():
         out["by_opp"][k] = _seg_stats(eps, p0)
+    # 三段: 达标(cs) / 过门槛未达标(elig) / 其它 —— elig 组固定了准入门槛的
+    # 选择效应(深回撤+基本面前40%), cs vs elig 才是对打分本身的检验
+    for k, eps in _group(lambda e: e.get("cuosha") or "other").items():
+        out["by_cuosha"][k] = _seg_stats(eps, p0)
     return out
 
 
@@ -535,6 +542,13 @@ def run_backtest(write_js: bool = True) -> dict | None:
     if len(snaps) < 3:
         log.info("快照不足 3 天, 跳过回测")
         return None
+    # 给每天的快照候选重算错杀分 (输入字段快照里都有), 供 by_cuosha 分段验证
+    try:
+        from . import cuosha
+        for s in snaps:
+            cuosha.annotate(s["cands"])
+    except Exception as e:
+        log.warning("错杀标注失败(回测继续): %s", e)
     codes = sorted({c["code"] for s in snaps for c in s["cands"] if c.get("code")})
     start = (dt.date.fromisoformat(snaps[0]["as_of"])
              - dt.timedelta(days=FETCH_START_PAD_DAYS)).isoformat()

@@ -163,6 +163,14 @@ def build_payload(run_date: str | None = None) -> dict:
     for pr in db.fetch_table("profile", run_date):
         profiles[pr["code"]] = _loads(pr["profile_json"], default={})
 
+    # 错杀检测: 高质量+情绪性下跌 打分 (字段随快照沉淀, 回测可分段验证)
+    try:
+        from . import cuosha
+        n_cs = cuosha.annotate(candidates)
+        log.info("错杀候选: %d 只", n_cs)
+    except Exception as e:
+        log.warning("错杀检测失败: %s", e)
+
     # 机会温度计: 当日榜单质量 vs 自身历史的分位 (指导"今天该不该重仓")
     opp_result = None
     try:
