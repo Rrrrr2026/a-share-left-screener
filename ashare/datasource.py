@@ -1464,7 +1464,7 @@ def _report_periods(n: int = 12) -> list:
     periods = []
     y, q_ends = today.year, [(3, 31), (6, 30), (9, 30), (12, 31)]
     cand = []
-    for yy in range(y - 4, y + 1):
+    for yy in range(y - 6, y + 1):      # 往回6年: 优质股筛选要"4个完整年度同比"(需5个年报)
         for (m, d) in q_ends:
             cand.append(dt.date(yy, m, d))
     cand = [c for c in cand if c <= today]
@@ -1499,10 +1499,12 @@ def fetch_profit_reports(n_periods: int = 12) -> dict:
             d = out.setdefault(code, {})
             ni = r.get("净利润-净利润")
             rev = r.get("营业总收入-营业总收入")
-            d[pd_date] = (
-                None if ni is None or (isinstance(ni, float) and np.isnan(ni)) else float(ni),
-                None if rev is None or (isinstance(rev, float) and np.isnan(rev)) else float(rev),
-            )
+            roe = r.get("净资产收益率")
+
+            def _f(v):
+                return None if v is None or (isinstance(v, float) and np.isnan(v)) else float(v)
+
+            d[pd_date] = (_f(ni), _f(rev), _f(roe))
         time.sleep(0.3)
     result = {}
     for code, dd in out.items():
@@ -1511,6 +1513,7 @@ def fetch_profit_reports(n_periods: int = 12) -> dict:
             "periods": periods,
             "ni_cum": [dd[p][0] for p in periods],
             "rev_cum": [dd[p][1] for p in periods],
+            "roe_cum": [dd[p][2] for p in periods],
         }
     # 有报告期抓取失败时不缓存: 缺期会让单季拆解/TTM出现空洞,
     # 宁可下次重试, 也不能把不完整的批量数据钉一整天

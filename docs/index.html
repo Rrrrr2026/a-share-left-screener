@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="dashboard_data.js"></script>
 <script src="backtest_data.js"></script>
+<script src="quality_data.js"></script>
 <style>
   :root{
     --bg:#0b1220; --card:#111a2e; --border:#1e2a44; --text:#e5e7eb; --dim:#9fb4d6; --muted:#7e93b8;
@@ -169,6 +170,16 @@
     </div>
     <div class="overflow-x-auto"><table class="w-full text-[13px]" id="csTbl"></table></div>
     <div id="csNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
+  </section>
+
+  <!-- 👑 优质公司推荐 -->
+  <section id="qlCard" class="card p-4 mb-5 hidden" style="border-color:rgba(52,211,153,.5)">
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+      <h4 class="sec-title" data-i18n="ql_title">👑 优质公司 · 每日推荐 — 连续增长·龙头·高ROE·低估值</h4>
+      <span id="qlMeta" class="text-xs text-slate-400"></span>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full text-[13px]" id="qlTbl"></table></div>
+    <div id="qlNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
   </section>
 
   <!-- 行业景气榜 -->
@@ -447,6 +458,15 @@
       // 错杀候选
       cs_title:"💎 错杀候选 — 高质量·情绪性下跌·高度关注",
       cs_filter:"💎 错杀候选", cs_popup_title:"错杀检测",
+      // 优质公司
+      ql_title:"👑 优质公司 · 每日推荐 — 连续增长·龙头·高ROE·低估值",
+      ql_meta_a:"全市场筛 ", ql_meta_b:" 只 · 入池 ", ql_meta_c:" · 👑门槛全过 ", ql_meta_d:" 只",
+      ql_col_stock:"股票", ql_col_ind:"行业", ql_col_score:"评分", ql_col_gates:"硬性门槛",
+      ql_col_q4:"近四季净利同比", ql_col_y4:"年度净利同比", ql_col_dom:"行业地位", ql_col_rd:"研发%",
+      ql_g_q4:"四季连增", ql_g_y4:"年度连增", ql_g_beat:"超预期×4", ql_g_roe:"ROE≥15",
+      ql_g_pe:"PE<31", ql_g_dom:"龙头≤3", ql_accel:"最近单季同比 ≥ 年度同比: 增长仍在加速",
+      ql_rd_na:"豁免",
+      ql_note:"从全市场约5000只做客观条件筛选（非投资建议）：硬性门槛 = 近四个单季营收+归母净利同比全部为正 · 近四个完整年度营收+净利同比全部为正 · 最近年度加权ROE≥15% · PE-TTM<31 · 行业营收前3。评分另计研发强度（金融业豁免）、增长加速、更低估值、更大份额。👑=门槛全过；不足10只全过时，其余按「差在哪一条」列出，✗ 标出未达标项。A股缺少干净的一致预期数据，「超市场预期」以「增长仍在加速」近似（美股版用真实EPS超预期）。财报有滞后，买前请人工研究基本面与公告。",
       cs_meta_a:"共 ", cs_meta_b:" 只达标（错杀分≥60）· 显示前20",
       cs_col_stock:"股票", cs_col_ind:"行业", cs_col_score:"错杀分",
       cs_col_dd:"距52周高点", cs_col_expl:"板块解释", cs_col_g:"近两季增速",
@@ -589,6 +609,15 @@
       // Mispriced candidates
       cs_title:"💎 Mispriced — quality names in emotional selloffs · high attention",
       cs_filter:"💎 Mispriced", cs_popup_title:"Mispricing check",
+      // Quality compounders
+      ql_title:"👑 Quality Compounders · Daily Picks — sustained growth · leaders · high ROE · fair PE",
+      ql_meta_a:"Screened ", ql_meta_b:" · pool ", ql_meta_c:" · 👑 all gates ", ql_meta_d:"",
+      ql_col_stock:"Stock", ql_col_ind:"Industry", ql_col_score:"Score", ql_col_gates:"Hard gates",
+      ql_col_q4:"4Q profit YoY", ql_col_y4:"Annual profit YoY", ql_col_dom:"Position", ql_col_rd:"R&D%",
+      ql_g_q4:"4Q up", ql_g_y4:"Years up", ql_g_beat:"Beat ×4", ql_g_roe:"ROE≥15",
+      ql_g_pe:"PE<31", ql_g_dom:"Top-3", ql_accel:"Latest quarter YoY ≥ annual YoY: still accelerating",
+      ql_rd_na:"exempt",
+      ql_note:"An objective screen over ~5,000 listed companies (not investment advice). Hard gates: last four single quarters with revenue AND net profit YoY all positive · last four full fiscal years both rising · latest annual ROE ≥15% · PE-TTM <31 · top-3 revenue in industry. Score adds R&D intensity (financials exempt), acceleration, cheaper valuation, larger share. 👑 = all gates passed; when fewer than 10 pass everything, the rest are listed with the failed gate marked ✗. A-share lacks clean consensus data, so 'beating expectations' is approximated by 'still accelerating' (the US version uses real EPS surprises). Financials lag — research before buying.",
       cs_meta_a:"", cs_meta_b:" qualified (score ≥60) · top 20 shown",
       cs_col_stock:"Stock", cs_col_ind:"Industry", cs_col_score:"Score",
       cs_col_dd:"From 52w high", cs_col_expl:"Sector-explained", cs_col_g:"Recent-2Q growth",
@@ -819,6 +848,7 @@
     renderOpp(meta.opp);
     setTimeout(renderBacktest, 0);   // 延后一拍: 首次调用时表格区的工具函数(const)尚未初始化
     setTimeout(renderCuosha, 0);
+    setTimeout(renderQuality, 0);
   }
   // ---------- 🌡️ 机会温度计 ----------
   function renderOpp(o){
@@ -919,6 +949,45 @@
         `<td class="pl-3"><span class="badge ${tagClass(c.tag)}">${escH(tagText(c.tag))}</span></td></tr>`;
     }).join("");
     $("#csNote").textContent = t("cs_note");
+  }
+  // ---------- 👑 优质公司推荐 ----------
+  function qlLink(code){
+    const c=String(code);
+    const mk=c.startsWith("6")?"sh":(c.startsWith("8")||c.startsWith("4")||c.startsWith("920")?"bj":"sz");
+    return `https://quote.eastmoney.com/${mk}${c}.html`;
+  }
+  function renderQuality(){
+    const card=$("#qlCard"); if(!card) return;
+    const Q=window.__QL__;
+    if(!Q||!Q.picks||!Q.picks.length){ card.classList.add("hidden"); return; }
+    card.classList.remove("hidden");
+    const M=Q.meta||{};
+    $("#qlMeta").textContent = `${t("ql_meta_a")}${M.n_screened??dash}${t("ql_meta_b")}${M.n_pool??dash}${t("ql_meta_c")}${M.n_crown??0}${t("ql_meta_d")} · ${M.date||""}`;
+    const GK=["q4","y4","beat","roe","pe","dom"].filter(k=> Q.picks.some(p=>p.gates&&(k in p.gates)));
+    const th=`<tr class="text-slate-400 text-[11px]"><th class="text-left py-1">#</th><th class="text-left">${t("ql_col_stock")}</th><th class="text-left">${t("ql_col_ind")}</th><th class="text-right">${t("ql_col_score")}</th><th class="text-left pl-3">${t("ql_col_gates")}</th><th class="text-right">PE</th><th class="text-right">ROE%</th><th class="text-right">${t("ql_col_q4")}</th><th class="text-right">${t("ql_col_y4")}</th><th class="text-left pl-2">${t("ql_col_dom")}</th><th class="text-right">${t("ql_col_rd")}</th></tr>`;
+    $("#qlTbl").innerHTML = th + Q.picks.map((p,i)=>{
+      const crown = GK.every(k=>p.gates&&p.gates[k]) ? "👑 " : "";
+      const gates = GK.map(k=>{
+        const ok=p.gates&&p.gates[k];
+        return `<span class="badge ${ok?"tag-strong":"tag-watch"} !text-[10px] !px-1.5 ${ok?"":"opacity-50"}" title="${t("ql_g_"+k)}">${ok?"✓":"✗"}${t("ql_g_"+k)}</span>`;
+      }).join(" ");
+      const q4=(p.ni_q4||[]).map(v=>(v>0?"+":"")+v.toFixed(0)).join("›");
+      const y4=(p.ni_y4||[]).map(v=>(v>0?"+":"")+v.toFixed(0)).join("›");
+      const domt = isNum(p.dom_rank)? `第${p.dom_rank}名${isNum(p.dom_share)?` · ${p.dom_share}%`:""}` : dash;
+      return `<tr class="border-t border-slate-700/40 hover:bg-slate-700/20">`+
+        `<td class="py-1.5 text-slate-500">${i+1}</td>`+
+        `<td><a href="${qlLink(p.code)}" target="_blank" rel="noopener" class="hover:underline">${crown}<b>${escH(String(p.name||"").slice(0,26))}</b> <span class="font-mono text-xs text-slate-400">${escH(p.code)} ↗</span></a>${p.accel?` <span title="${t("ql_accel")}">⚡</span>`:""}</td>`+
+        `<td class="text-slate-400 text-xs">${escH(p.industry||dash)}</td>`+
+        `<td class="text-right font-bold text-emerald-300">${p.score??dash}</td>`+
+        `<td class="pl-3">${gates}</td>`+
+        `<td class="text-right ${isNum(p.pe)&&p.pe<31?"text-emerald-300":"text-slate-400"}">${isNum(p.pe)?p.pe:dash}</td>`+
+        `<td class="text-right ${isNum(p.roe)&&p.roe>=15?"text-emerald-300":"text-slate-400"}">${isNum(p.roe)?p.roe:dash}</td>`+
+        `<td class="text-right text-xs">${q4||dash}</td>`+
+        `<td class="text-right text-xs">${y4||dash}</td>`+
+        `<td class="pl-2 text-xs">${domt}</td>`+
+        `<td class="text-right">${isNum(p.rd)?p.rd+"%":(p.rd_exempt?t("ql_rd_na"):dash)}</td></tr>`;
+    }).join("");
+    $("#qlNote").textContent = t("ql_note");
   }
   window.btOpen = btOpen;
   renderOverview();
