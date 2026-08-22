@@ -266,6 +266,16 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
         "picks": picks,
     }
     json.dump(result, open(QL_JSON, "w", encoding="utf-8"), ensure_ascii=False)
+    # 每日榜单落盘到 history/, 供"榜单战绩"回测 (优质榜不在候选快照里, 需自己留痕)
+    try:
+        hdir = os.path.join(DASHBOARD_DIR, "history")
+        os.makedirs(hdir, exist_ok=True)
+        slim = [{k: p.get(k) for k in ("code", "name", "industry", "score", "n_pass", "pe", "roe", "gates")}
+                for p in picks]
+        with open(os.path.join(hdir, f"quality_{result['meta']['date']}.json"), "w", encoding="utf-8") as f:
+            json.dump({"date": result["meta"]["date"], "picks": slim}, f, ensure_ascii=False)
+    except Exception as e:
+        log.warning("优质榜历史落盘失败: %s", e)
     with open(QL_JS, "w", encoding="utf-8") as f:
         f.write("window.__QL__ = ")
         json.dump(result, f, ensure_ascii=False)

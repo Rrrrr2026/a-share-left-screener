@@ -62,6 +62,19 @@ def run(full_market: bool, use_cache: bool):
     # 走重试, 而不是永远挂死。2026-08-13/17/18/19 连续四天 13:30 任务卡死在
     # 某个无超时的网络读上, 4小时被调度器杀掉、留下孤儿进程, 当天不出榜。
     socket.setdefaulttimeout(60)
+    # 心跳: watchdog.py 据此判断流水线是否卡死 (20分钟不动 -> 杀掉重试)
+    import threading as _th
+    _hb = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "heartbeat.txt")
+
+    def _beat():
+        while True:
+            try:
+                with open(_hb, "w") as _f:
+                    _f.write(dt.datetime.now().isoformat())
+            except Exception:
+                pass
+            time.sleep(60)
+    _th.Thread(target=_beat, daemon=True).start()
     tqdm = _tqdm()
     run_date = dt.date.today().isoformat()
     started = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")

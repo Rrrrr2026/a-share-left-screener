@@ -380,8 +380,9 @@ def _opp_bucket(s):
     return "cold" if s < 40 else ("hot" if s >= 60 else "mid")
 
 
-def build_and_run(snaps: list[dict], prices: dict) -> list[dict]:
+def build_and_run(snaps: list[dict], prices: dict, rkeys=None, rmap=None) -> list[dict]:
     episodes = []
+    rkeys, rmap = (rkeys or []), (rmap or {})
     busy_until = {}          # code -> date str, 该日期(含冷却)前不开新事件
     for snap in snaps:
         as_of = snap["as_of"]
@@ -422,6 +423,7 @@ def build_and_run(snaps: list[dict], prices: dict) -> list[dict]:
                 "industry": c.get("industry"),
                 "cuosha": ("cs" if c.get("cuosha_score")
                            else ("elig" if c.get("cuosha_eligible") else "other")),
+                "regime": _at(rkeys, rmap, as_of, "na") if rkeys else "na",
                 **{k: r.get(k) for k in ("status", "fill_date", "fill_px", "exit_date",
                                           "exit_px", "ret", "days", "complete",
                                           "max_gain", "max_dd")},
@@ -436,6 +438,106 @@ def build_and_run(snaps: list[dict], prices: dict) -> list[dict]:
                 busy_until[code] = "9999-12-31"
     return episodes
 
+
+
+# ===========================================================================
+#  市场状态 (指数 vs 50日均线) + 榜单战绩 (错杀/优质 按"次日开盘买入"的前瞻收益)
+# ===========================================================================
+import bisect as _bisect
+
+PICK_H = (10, 30, 60)
+PICK_COOLDOWN_DAYS = 30
+
+
+def _bench_frame():
+    try:
+        from . import datasource as ds
+        df = ds.fetch_benchmark_close()
+        if df is None or len(df) < 60 or "close" not in df.columns:
+            return None
+        df = df.copy()
+        df["date"] = df["date"].astype(str).str[:10]
+        return df.sort_values("date").reset_index(drop=True)
+    except Exception as e:
+        log.warning("基准指数获取失败(状态/相对收益降级): %s", e)
+        return None
+
+
+def regime_map(df) -> tuple[list, dict, dict]:
+    """-> (排序日期, date->regime, date->close)。regime: 指数收盘>50日均线 bull, 否则 bear。"""
+    if df is None:
+        return [], {}, {}
+    c = df["close"].astype(float)
+    ma = c.rolling(50).mean()
+    reg, px = {}, {}
+    for d, cv, m in zip(df["date"], c, ma):
+        px[d] = float(cv)
+        if m == m:
+            reg[d] = "bull" if cv > m else "bear"
+    return sorted(reg), reg, px
+
+
+def _at(keys: list, m: dict, d: str, default=None):
+    i = _bisect.bisect_right(keys, d) - 1
+    return m[keys[i]] if i >= 0 else default
+
+
+def eval_picks(day_items: list, prices: dict, bkeys: list, bpx: dict) -> dict:
+    """day_items: [(as_of, [codes])] 按日升序。每只票同一30天内只计首次入选。
+    买入 = 信号后第一根bar开盘; 统计 +10/+30/+60 bar 收盘收益、30bar内最高价曾达+20%、
+    30bar 收益是否跑赢指数。只有窗口走完的样本才进对应统计。"""
+    last_pick = {}
+    rows = []
+    for as_of, codes in day_items:
+        for code in codes:
+            lp = last_pick.get(code)
+            if lp and (dt.date.fromisoformat(as_of) - dt.date.fromisoformat(lp)).days < PICK_COOLDOWN_DAYS:
+                continue
+            ser = prices.get(code)
+            if not ser:
+                continue
+            dates, ohlc = ser["dates"], ser["ohlc"]
+            idx = int(np.searchsorted(np.array(dates), as_of, side="right"))
+            if idx >= len(dates) or ohlc[idx][0] <= 0:
+                continue
+            last_pick[code] = as_of
+            entry = float(ohlc[idx][0])
+            r = {"code": code, "d": as_of}
+            for h in PICK_H:
+                j = idx + h
+                if j < len(dates):
+                    r[f"r{h}"] = float(ohlc[j][3]) / entry - 1.0
+            if idx + 30 < len(dates):
+                r["hit20"] = bool(float(np.max(ohlc[idx + 1:idx + 31, 1])) >= entry * 1.2)
+                b0, b1 = _at(bkeys, bpx, dates[idx]), _at(bkeys, bpx, dates[idx + 30])
+                if b0 and b1:
+                    r["beat30"] = (r["r30"] - (b1 / b0 - 1.0)) > 0
+            rows.append(r)
+    def _avg(k):
+        v = [x[k] for x in rows if k in x]
+        return (round(float(np.mean(v)) * 100.0, 2), len(v)) if v else (None, 0)
+    out = {"n": len(rows)}
+    for h in PICK_H:
+        out[f"r{h}"], out[f"n{h}"] = _avg(f"r{h}")
+    h20 = [x["hit20"] for x in rows if "hit20" in x]
+    out["hit20"] = round(sum(h20) / len(h20) * 100.0, 1) if h20 else None
+    bt = [x["beat30"] for x in rows if "beat30" in x]
+    out["beat30"] = round(sum(bt) / len(bt) * 100.0, 1) if bt else None
+    out["first"] = rows[0]["d"] if rows else None
+    out["last"] = rows[-1]["d"] if rows else None
+    return out
+
+
+def _quality_history() -> list:
+    items = []
+    for p in sorted(glob.glob(os.path.join(HISTORY_DIR, "quality_*.json"))):
+        try:
+            j = json.load(open(p, encoding="utf-8"))
+            items.append((j.get("date") or os.path.basename(p)[8:18],
+                          [x["code"] for x in (j.get("picks") or []) if x.get("code")]))
+        except Exception:
+            continue
+    return items
 
 RESOLVED = ("won", "stopped", "expired")
 UNFILLED = ("no_fill", "box_broke", "gap_invalid")
@@ -494,6 +596,9 @@ def aggregate(episodes: list[dict]) -> dict:
     # 选择效应(深回撤+基本面前40%), cs vs elig 才是对打分本身的检验
     for k, eps in _group(lambda e: e.get("cuosha") or "other").items():
         out["by_cuosha"][k] = _seg_stats(eps, p0)
+    out["by_regime"] = {}
+    for k, eps in _group(lambda e: e.get("regime") or "na").items():
+        out["by_regime"][k] = _seg_stats(eps, p0)
     return out
 
 
@@ -549,14 +654,26 @@ def run_backtest(write_js: bool = True) -> dict | None:
             cuosha.annotate(s["cands"])
     except Exception as e:
         log.warning("错杀标注失败(回测继续): %s", e)
-    codes = sorted({c["code"] for s in snaps for c in s["cands"] if c.get("code")})
+    qhist = _quality_history()
+    qcodes = {code for _, cs in qhist for code in cs}
+    codes = sorted({c["code"] for s in snaps for c in s["cands"] if c.get("code")} | qcodes)
     start = (dt.date.fromisoformat(snaps[0]["as_of"])
              - dt.timedelta(days=FETCH_START_PAD_DAYS)).isoformat()
     log.info("回测: %d 天快照, %d 只股票, 价格起点 %s", len(snaps), len(codes), start)
     prices = fetch_price_series(codes, start)
     log.info("价格覆盖 %d/%d", len(prices), len(codes))
-    episodes = build_and_run(snaps, prices)
+    bdf = _bench_frame()
+    rkeys, rmap, bpx = regime_map(bdf)
+    episodes = build_and_run(snaps, prices, rkeys, rmap)
     agg = aggregate(episodes)
+    # 榜单战绩: 错杀候选 (每日快照重算) / 优质公司 (history/quality_*.json)
+    try:
+        cs_items = [(s["as_of"], [c["code"] for c in s["cands"] if c.get("cuosha_score")]) for s in snaps]
+        picks_bt = {"cuosha": eval_picks(cs_items, prices, rkeys, bpx),
+                    "quality": eval_picks(qhist, prices, rkeys, bpx)}
+    except Exception as e:
+        log.warning("榜单战绩计算失败: %s", e)
+        picks_bt = {}
     latest = snaps[-1]["cands"]
     recos, today_map = recommend(latest, agg)
 
@@ -577,7 +694,7 @@ def run_backtest(write_js: bool = True) -> dict | None:
                  "n_episodes": len(episodes),
                  "horizon": HORIZON_BARS, "headline_gain": HEADLINE_GAIN,
                  "cost_rt": COST_RT},
-        "agg": agg, "recos": recos[:40], "today": today_map,
+        "agg": agg, "recos": recos[:40], "today": today_map, "picks_bt": picks_bt,
         "recent": [{k: e.get(k) for k in ("code", "name", "tag", "sig_date", "fill_date",
                                            "exit_date", "status", "ret", "days", "growth")}
                    for e in recent],

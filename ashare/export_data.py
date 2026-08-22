@@ -188,6 +188,14 @@ def build_payload(run_date: str | None = None) -> dict:
             return None
         n_p = prob20.annotate(_cs_items, _hist, conditional=True, key="cuosha_p20")
         log.info("错杀候选 30日涨20%%概率: %d/%d 只有数", n_p, len(_cs_items))
+        # 财报预约披露日: 7天内亮 📅, 错杀/买卖点提示"财报前不建仓"
+        from . import earnings_cal
+        n_e = earnings_cal.annotate(candidates, as_of=str(runlog.get("data_date") or run_date)[:10])
+        log.info("财报预约日标注: %d 只", n_e)
+        # "为什么跌"线索: 错杀候选的近期新闻标题关键词 🚩 (只拉错杀股, 数量小)
+        from . import newsflag
+        n_f = newsflag.annotate(candidates, as_of=str(runlog.get("data_date") or run_date)[:10])
+        log.info("错杀候选新闻标记: %d 只有🚩", n_f)
     except Exception as e:
         log.warning("错杀检测失败: %s", e)
 
