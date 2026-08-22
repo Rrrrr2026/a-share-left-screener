@@ -133,6 +133,13 @@ def _rd_intensity(code: str) -> float | None:
     except Exception:
         return None
 
+def _long_hist(code: str):
+    from . import datasource as ds
+    df = ds.fetch_long_hist(code, years=5)
+    if df is None or len(df) < 120 or "high" not in df.columns:
+        return None
+    return (df["high"].to_numpy(float), df["close"].to_numpy(float))
+
 
 def build_quality(top_n: int = TOP_N) -> dict | None:
     from . import datasource as ds
@@ -245,6 +252,11 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
                                              else (6.0 if rd >= RD_OK else 0.0)), 1)
     short.sort(key=lambda r: (-r["n_pass"], -(r["score"] or 0)))
     picks = short[:top_n]
+    try:
+        from . import prob20
+        prob20.annotate(picks, _long_hist, conditional=False, key="p20")
+    except Exception as e:
+        log.warning("30日涨20%%概率计算失败: %s", e)
     n_crown = sum(1 for r in picks if r["n_pass"] == 5)
     result = {
         "meta": {"date": dt.date.today().isoformat(),

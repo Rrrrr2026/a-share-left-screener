@@ -460,6 +460,11 @@
       // 错杀候选
       cs_title:"💎 错杀候选 — 高质量·情绪性下跌·高度关注",
       cs_filter:"💎 错杀候选", cs_popup_title:"错杀检测",
+      cs_col_p20:"30日涨20%概率", ql_col_p20:"30日涨20%概率",
+      p20_tip_cs:"历史上该股距高点≥18%的日子里，随后30个交易日内最高价曾涨20%的频率（向同组均值收缩）",
+      p20_tip_ql:"历史上任意时点起，随后30个交易日内最高价曾涨20%的频率（向同组均值收缩）",
+      p20_note:"「30日涨20%概率」= 该股自身多年日线的历史频率（错杀候选按历史上同样深跌的日子统计；优质公司按任意时点统计，白马波动小故数值天然偏低），每5个交易日取一次窗口并向同组均值收缩，n 为窗口数——是历史频率不是预测。",
+      sort_hint:"点击排序 · Shift+点击追加次级排序键",
       // 优质公司
       ql_title:"👑 优质公司 · 每日推荐 — 连续增长·龙头·高ROE·低估值",
       ql_meta_a:"全市场筛 ", ql_meta_b:" 只 · 入池 ", ql_meta_c:" · 👑门槛全过 ", ql_meta_d:" 只",
@@ -613,6 +618,11 @@
       // Mispriced candidates
       cs_title:"💎 Mispriced — quality names in emotional selloffs · high attention",
       cs_filter:"💎 Mispriced", cs_popup_title:"Mispricing check",
+      cs_col_p20:"P(+20% in 30d)", ql_col_p20:"P(+20% in 30d)",
+      p20_tip_cs:"Historical frequency: on past days when this stock was ≥18% off its high, how often its high within the next 30 trading days reached +20% (shrunk toward the group mean)",
+      p20_tip_ql:"Historical frequency from any past day: how often the high within the next 30 trading days reached +20% (shrunk toward the group mean)",
+      p20_note:"'P(+20% in 30d)' is the stock's own multi-year historical frequency (mispriced names: measured on similarly beaten-down days; quality names: from any day, so low-volatility compounders naturally score lower), sampled every 5 trading days and shrunk toward the group mean; n = windows. A historical frequency, not a forecast.",
+      sort_hint:"Click to sort · Shift+click adds a secondary key",
       // Quality compounders
       ql_title:"👑 Quality Compounders · Daily Picks — sustained growth · leaders · high ROE · fair PE",
       ql_meta_a:"Screened ", ql_meta_b:" · pool ", ql_meta_c:" · 👑 all gates ", ql_meta_d:"",
@@ -938,36 +948,64 @@
     }).join("")+`</div>` : "";
     $("#btNote").textContent = t("bt_note");
   }
+  // ---------- 表格排序 (点击列头; Shift+点击 追加次级键) ----------
+  const SORTS = { cs: [{k:"score",dir:"desc"}], ql: [{k:"n_pass",dir:"desc"},{k:"score",dir:"desc"}] };
+  const RERENDER = { cs: ()=>renderCuosha(), ql: ()=>renderQuality() };
+  function sortRows(rows, keys, get){
+    return rows.slice().sort((a,b)=>{
+      for(const {k,dir} of keys){
+        const va=get(a,k), vb=get(b,k);
+        const na=(va==null||va!==va), nb=(vb==null||vb!==vb);
+        if(na&&nb) continue; if(na) return 1; if(nb) return -1;
+        if(va<vb) return dir==="asc"?-1:1; if(va>vb) return dir==="asc"?1:-1;
+      }
+      return 0;
+    });
+  }
+  function sortClick(which, k, ev){
+    const arr=SORTS[which]; const i=arr.findIndex(x=>x.k===k);
+    if(ev&&ev.shiftKey){ if(i>=0) arr[i].dir=(arr[i].dir==="desc"?"asc":"desc"); else arr.push({k,dir:"desc"}); }
+    else if(i===0){ arr[0].dir=(arr[0].dir==="desc"?"asc":"desc"); }
+    else { SORTS[which]=[{k,dir:"desc"}]; }
+    RERENDER[which]();
+  }
+  window.sortClick = sortClick;
+  function sortTh(which, k, label, align){
+    const arr=SORTS[which]; const i=arr.findIndex(x=>x.k===k);
+    const mark = i<0? "" : ` <span class="text-sky-300">${arr[i].dir==="desc"?"▼":"▲"}${arr.length>1?(i+1):""}</span>`;
+    return `<th class="${align||"text-left"} py-1 cursor-pointer select-none hover:text-sky-300" title="${t("sort_hint")}" onclick="sortClick('${which}','${k}',event)">${label}${mark}</th>`;
+  }
+  const p20cell=(v,n,tip)=> isNum(v)? `<span class="${v>=50?"text-emerald-300":(v>=30?"text-amber-300":"text-slate-300")}" title="${tip} · n=${n||dash}">${v.toFixed(0)}%</span>` : dash;
   // ---------- 💎 错杀候选 ----------
+  const csGet=(c,k)=>({score:c.cuosha_score, dd:c.cuosha_dd, expl:c.cuosha_expl, g:c._g, up:c.cuosha_upside, p20:c.cuosha_p20, name:c.code, ind:c.industry, tag:c.tag})[k];
   function renderCuosha(){
     const card=$("#csCard"); if(!card) return;
-    const hits=(DATA.candidates||[]).filter(c=>isNum(c.cuosha_score)).sort((a,b)=>b.cuosha_score-a.cuosha_score);
+    let hits=(DATA.candidates||[]).filter(c=>isNum(c.cuosha_score));
     if(!hits.length){ card.classList.add("hidden"); return; }
     card.classList.remove("hidden");
+    hits.forEach(c=>{ const qoq=(c.ni_qoq||[]).filter(isNum); c._g = qoq.length? qoq.slice(-2).reduce((a,b)=>a+b,0)/Math.min(2,qoq.length) : null; });
+    hits = sortRows(hits, SORTS.cs, csGet);
     $("#csMeta").textContent = `${t("cs_meta_a")}${hits.length}${t("cs_meta_b")}`;
-    const th=`<tr class="text-slate-400 text-[11px]"><th class="text-left py-1">#</th><th class="text-left">${t("cs_col_stock")}</th><th class="text-left">${t("cs_col_ind")}</th><th class="text-right">${t("cs_col_score")}</th><th class="text-right">${t("cs_col_dd")}</th><th class="text-right">${t("cs_col_expl")}</th><th class="text-right">${t("cs_col_g")}</th><th class="text-right">${t("cs_col_up")}</th><th class="text-left pl-3">${t("cs_col_tag")}</th></tr>`;
+    const th=`<tr class="text-slate-400 text-[11px]"><th class="text-left py-1">#</th>${sortTh("cs","name",t("cs_col_stock"))}${sortTh("cs","ind",t("cs_col_ind"))}${sortTh("cs","score",t("cs_col_score"),"text-right")}${sortTh("cs","dd",t("cs_col_dd"),"text-right")}${sortTh("cs","expl",t("cs_col_expl"),"text-right")}${sortTh("cs","g",t("cs_col_g"),"text-right")}${sortTh("cs","up",t("cs_col_up"),"text-right")}${sortTh("cs","p20",t("cs_col_p20"),"text-right")}${sortTh("cs","tag",t("cs_col_tag"),"text-left pl-3")}</tr>`;
     $("#csTbl").innerHTML = th + hits.slice(0,20).map((c,i)=>{
-      const qoq=(c.ni_qoq||[]).filter(isNum);
-      const g=qoq.length? qoq.slice(-2).reduce((a,b)=>a+b,0)/Math.min(2,qoq.length) : null;
+      const g=c._g;
       return `<tr class="border-t border-slate-700/40 hover:bg-slate-700/20 cursor-pointer" onclick="btOpen('${escH(c.code)}')">`+
         `<td class="py-1.5 text-slate-500">${i+1}</td>`+
-        `<td><b>${escH(c.name||"")}</b> <span class="font-mono text-xs text-slate-400">${escH(c.code)}</span></td>`+
+        `<td><b>${escH(String(c.name||"").slice(0,26))}</b> <span class="font-mono text-xs text-slate-400">${escH(c.code)}</span></td>`+
         `<td class="text-slate-400 text-xs">${escH(c.industry||dash)}</td>`+
         `<td class="text-right font-bold text-amber-300" title="${escH(c.cuosha_note||"")}">${c.cuosha_score}</td>`+
         `<td class="text-right text-rose-300">${isNum(c.cuosha_dd)?c.cuosha_dd.toFixed(0)+"%":dash}</td>`+
         `<td class="text-right text-sky-300">${isNum(c.cuosha_expl)?c.cuosha_expl+"%":dash}</td>`+
         `<td class="text-right ${g>0?"text-emerald-300":"text-slate-400"}">${isNum(g)?(g>0?"+":"")+g.toFixed(0)+"%":dash}</td>`+
         `<td class="text-right ${c.cuosha_upside>0?"text-emerald-300 font-semibold":"text-slate-500"}">${(c.cuosha_upside>0)?"+"+c.cuosha_upside+"%":dash}</td>`+
+        `<td class="text-right">${p20cell(c.cuosha_p20, c.cuosha_p20_n, t("p20_tip_cs"))}</td>`+
         `<td class="pl-3"><span class="badge ${tagClass(c.tag)}">${escH(tagText(c.tag))}</span></td></tr>`;
     }).join("");
-    $("#csNote").textContent = t("cs_note");
+    $("#csNote").textContent = t("cs_note")+" "+t("p20_note");
   }
   // ---------- 👑 优质公司推荐 ----------
-  function qlLink(code){
-    const c=String(code);
-    const mk=c.startsWith("6")?"sh":(c.startsWith("8")||c.startsWith("4")||c.startsWith("920")?"bj":"sz");
-    return `https://quote.eastmoney.com/${mk}${c}.html`;
-  }
+  function qlLink(code){ const c=String(code); const mk=c.startsWith("6")?"sh":((c.startsWith("8")||c.startsWith("4")||c.startsWith("920"))?"bj":"sz"); return `https://quote.eastmoney.com/${mk}${c}.html`; }
+  const qlGet=(p,k)=>({score:p.score, pe:p.pe, roe:p.roe, q4:(p.ni_q4||[]).slice(-1)[0], y4:(p.ni_y4||[]).slice(-1)[0], dom:(isNum(p.dom_rank)? -p.dom_rank : null), rd:p.rd, p20:p.p20, n_pass:Object.values(p.gates||{}).filter(Boolean).length, name:p.code, ind:p.industry})[k];
   function renderQuality(){
     const card=$("#qlCard"); if(!card) return;
     const Q=window.__QL__;
@@ -976,13 +1014,11 @@
     const M=Q.meta||{};
     $("#qlMeta").textContent = `${t("ql_meta_a")}${M.n_screened??dash}${t("ql_meta_b")}${M.n_pool??dash}${t("ql_meta_c")}${M.n_crown??0}${t("ql_meta_d")} · ${M.date||""}`;
     const GK=["q4","y4","beat","roe","pe","dom"].filter(k=> Q.picks.some(p=>p.gates&&(k in p.gates)));
-    const th=`<tr class="text-slate-400 text-[11px]"><th class="text-left py-1">#</th><th class="text-left">${t("ql_col_stock")}</th><th class="text-left">${t("ql_col_ind")}</th><th class="text-right">${t("ql_col_score")}</th><th class="text-left pl-3">${t("ql_col_gates")}</th><th class="text-right">PE</th><th class="text-right">ROE%</th><th class="text-right">${t("ql_col_q4")}</th><th class="text-right">${t("ql_col_y4")}</th><th class="text-left pl-2">${t("ql_col_dom")}</th><th class="text-right">${t("ql_col_rd")}</th></tr>`;
-    $("#qlTbl").innerHTML = th + Q.picks.map((p,i)=>{
+    const picks = sortRows(Q.picks, SORTS.ql, qlGet);
+    const th=`<tr class="text-slate-400 text-[11px]"><th class="text-left py-1">#</th>${sortTh("ql","name",t("ql_col_stock"))}${sortTh("ql","ind",t("ql_col_ind"))}${sortTh("ql","score",t("ql_col_score"),"text-right")}${sortTh("ql","n_pass",t("ql_col_gates"),"text-left pl-3")}${sortTh("ql","pe","PE","text-right")}${sortTh("ql","roe","ROE%","text-right")}${sortTh("ql","q4",t("ql_col_q4"),"text-right")}${sortTh("ql","y4",t("ql_col_y4"),"text-right")}${sortTh("ql","dom",t("ql_col_dom"),"text-left pl-2")}${sortTh("ql","rd",t("ql_col_rd"),"text-right")}${sortTh("ql","p20",t("ql_col_p20"),"text-right")}</tr>`;
+    $("#qlTbl").innerHTML = th + picks.map((p,i)=>{
       const crown = GK.every(k=>p.gates&&p.gates[k]) ? "👑 " : "";
-      const gates = GK.map(k=>{
-        const ok=p.gates&&p.gates[k];
-        return `<span class="badge ${ok?"tag-strong":"tag-watch"} !text-[10px] !px-1.5 ${ok?"":"opacity-50"}" title="${t("ql_g_"+k)}">${ok?"✓":"✗"}${t("ql_g_"+k)}</span>`;
-      }).join(" ");
+      const gates = GK.map(k=>{ const ok=p.gates&&p.gates[k]; return `<span class="badge ${ok?"tag-strong":"tag-watch"} !text-[10px] !px-1.5 ${ok?"":"opacity-50"}" title="${t("ql_g_"+k)}">${ok?"✓":"✗"}${t("ql_g_"+k)}</span>`; }).join(" ");
       const q4=(p.ni_q4||[]).map(v=>(v>0?"+":"")+v.toFixed(0)).join("›");
       const y4=(p.ni_y4||[]).map(v=>(v>0?"+":"")+v.toFixed(0)).join("›");
       const domt = isNum(p.dom_rank)? `第${p.dom_rank}名${isNum(p.dom_share)?` · ${p.dom_share}%`:""}` : dash;
@@ -997,9 +1033,10 @@
         `<td class="text-right text-xs">${q4||dash}</td>`+
         `<td class="text-right text-xs">${y4||dash}</td>`+
         `<td class="pl-2 text-xs">${domt}</td>`+
-        `<td class="text-right">${isNum(p.rd)?p.rd+"%":(p.rd_exempt?t("ql_rd_na"):dash)}</td></tr>`;
+        `<td class="text-right">${isNum(p.rd)?p.rd+"%":(p.rd_exempt?t("ql_rd_na"):dash)}</td>`+
+        `<td class="text-right">${p20cell(p.p20, p.p20_n, t("p20_tip_ql"))}</td></tr>`;
     }).join("");
-    $("#qlNote").textContent = t("ql_note");
+    $("#qlNote").textContent = t("ql_note")+" "+t("p20_note");
   }
   window.btOpen = btOpen;
   renderOverview();

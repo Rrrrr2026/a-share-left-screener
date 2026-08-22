@@ -168,6 +168,26 @@ def build_payload(run_date: str | None = None) -> dict:
         from . import cuosha
         n_cs = cuosha.annotate(candidates)
         log.info("错杀候选: %d 只", n_cs)
+        # 30日内涨20%的历史概率 (条件: 该股历史上同样深跌的日子); 长历史不可得时退回存档K线
+        from . import prob20
+        _cs_items = [c for c in candidates if c.get("cuosha_score")]
+        _details = locals().get("details") or {}
+
+        def _hist(code):
+            try:
+                from . import datasource as _ds2
+                df = _ds2.fetch_long_hist(code, years=5)
+                if df is not None and len(df) >= 120 and "high" in df.columns and "close" in df.columns:
+                    return (df["high"].to_numpy(float), df["close"].to_numpy(float))
+            except Exception:
+                pass
+            d = _details.get(code) or {}
+            oh = d.get("ohlc") or []
+            if len(oh) >= 120:
+                return ([r[3] for r in oh], [r[1] for r in oh])      # echarts [o,c,l,h]
+            return None
+        n_p = prob20.annotate(_cs_items, _hist, conditional=True, key="cuosha_p20")
+        log.info("错杀候选 30日涨20%%概率: %d/%d 只有数", n_p, len(_cs_items))
     except Exception as e:
         log.warning("错杀检测失败: %s", e)
 
