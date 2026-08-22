@@ -23,3 +23,6 @@ Thumbs.db
 # 同花顺API Key(本地凭据, 勿提交)
 data/.fuyao_key
 dashboard/history/
+
+# pre-core-merge backups (local only)
+*/_pre_core_backup/

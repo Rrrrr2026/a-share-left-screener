@@ -15,6 +15,13 @@ import os
 # 项目根目录 (this file is .../a-share-left-screener/ashare/config.py)
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
+
+# ---- 共用核心 (leftside_core): 两个筛选器的回测/错杀/新闻标记/计划/指标等共用一份代码 ----
+# 目录: 环境变量 STOCK_CORE_DIR, 否则本仓库的同级目录 ../stock-core
+import sys as _sys
+_CORE = os.environ.get("STOCK_CORE_DIR") or os.path.join(os.path.dirname(ROOT_DIR), "stock-core")
+if os.path.isdir(_CORE) and _CORE not in _sys.path:
+    _sys.path.insert(0, _CORE)
 DATA_DIR = os.path.join(ROOT_DIR, "data")
 DASHBOARD_DIR = os.path.join(ROOT_DIR, "dashboard")
 
