@@ -455,6 +455,8 @@
       bt_reco_tip:"同类历史信号收缩后胜率", bt_reco_none:"今日暂无达标段位（样本随每日运行自动积累）",
       bt_recent:"最近了结", bt_open_pos:"进行中",
       bt_cs:"💎 错杀≥60", bt_cselig:"过门槛<60", bt_noncs:"其它",
+      bt_reco_seg:"信号类型", bt_reco_hist:"历史胜率", bt_reco_vs:"全池",
+      bt_reco_tip2:"该股属于此信号类型；胜率是类型的历史频率，不是个股预测。点击查看买卖点计划",
       // 错杀候选
       cs_title:"💎 错杀候选 — 高质量·情绪性下跌·高度关注",
       cs_filter:"💎 错杀候选", cs_popup_title:"错杀检测",
@@ -606,6 +608,8 @@
       bt_reco_tip:"Shrunk win rate of similar past signals", bt_reco_none:"No segment qualifies yet (sample grows with each daily run)",
       bt_recent:"Recently resolved", bt_open_pos:"open",
       bt_cs:"💎 Mispriced ≥60", bt_cselig:"Gate-passed <60", bt_noncs:"Others",
+      bt_reco_seg:"Signal type", bt_reco_hist:"historical win rate", bt_reco_vs:"pool",
+      bt_reco_tip2:"This stock belongs to the signal type above; the win rate is the type's historical frequency, not a per-stock forecast. Click for the trade plan",
       // Mispriced candidates
       cs_title:"💎 Mispriced — quality names in emotional selloffs · high attention",
       cs_filter:"💎 Mispriced", cs_popup_title:"Mispricing check",
@@ -916,8 +920,16 @@
       [dim(t("bt_opp_hot"),O.hot), dim(t("bt_opp_mid"),O.mid), dim(t("bt_opp_cold"),O.cold),
        dim(t("bt_g_G"),G.G), dim(t("bt_g_M"),G.M), dim(t("bt_g_W"),G.W),
        dim(t("bt_cs"),CS.cs), dim(t("bt_cselig"),CS.elig), dim(t("bt_noncs"),CS.other)].filter(Boolean).join("");
-    const rec=(B.recos||[]).slice(0,14);
-    $("#btRecos").innerHTML = rec.length? rec.map(r=>`<span class="badge tag-strong cursor-pointer" onclick="btOpen('${escH(r.code)}')" title="${t("bt_reco_tip")} ${pct(r.seg_win_post)} · n=${r.seg_n}">${escH(r.code)} ${escH(String(r.name||"").slice(0,10))} <b>${pct(r.seg_win_post)}</b></span>`).join("") : `<span class="text-xs text-slate-500">${t("bt_reco_none")}</span>`;
+    const rec=(B.recos||[]).slice(0,20);
+    // 胜率是"信号类型"的历史频率而非个股预测: 按类型分组, 类型只标一次, 个股显示各自综合分
+    const groups={};
+    rec.forEach(r=>{ const key=(r.seg_kind==="combo")? `${r.tag}|${r.growth}` : (r.tag||"?"); (groups[key]=groups[key]||{r, items:[]}).items.push(r); });
+    $("#btRecos").innerHTML = rec.length? Object.values(groups).map(g=>{
+      const r=g.r;
+      const lab=(r.seg_kind==="combo")? `${escH(tagText(r.tag))} × ${t("bt_g_"+r.growth)}` : escH(tagText(r.tag));
+      return `<div class="w-full"><div class="text-xs text-slate-300 mb-1">${t("bt_reco_seg")} <span class="badge ${tagClass(r.tag)}">${lab}</span> ${t("bt_reco_hist")} <b class="text-emerald-300">${pct(r.seg_win_post)}</b> <span class="text-slate-500">(n=${r.seg_n} · ${t("bt_reco_vs")} ${pct(B.agg.p0)})</span></div><div class="flex flex-wrap gap-2">`+
+        g.items.map(x=>`<span class="badge tag-strong cursor-pointer" onclick="btOpen('${escH(x.code)}')" title="${t("bt_reco_tip2")}">${escH(x.code)} ${escH(String(x.name||"").slice(0,10))} <span class="text-[10px] opacity-70">${t("composite")} ${isNum(x.fs)?x.fs.toFixed(1):dash}</span></span>`).join("")+`</div></div>`;
+    }).join("") : `<span class="text-xs text-slate-500">${t("bt_reco_none")}</span>`;
     const rc2=(B.recent||[]).slice(0,10);
     $("#btRecent").innerHTML = rc2.length? `<div class="text-xs text-slate-400 mb-1">${t("bt_recent")}</div><div class="flex flex-wrap gap-2">`+rc2.map(e=>{
       const ic=e.status==="won"?"✅":(e.status==="stopped"?"⛔":"⏳");
