@@ -160,3 +160,8 @@ python tests/test_offline.py
 - **EPS 同比**：部分接口无现成字段时用净利同比近似，并以 `—` 优雅降级。
 - **估值历史（PE/PB 分位）**：akshare 1.12+ 已移除 `stock_a_indicator_lg`，本系统改用东财 `stock_value_em`（一次返回 PE-TTM/PB/PE静/总市值 的逐日历史），失败再退回百度股市通 `stock_zh_valuation_baidu`。该来源不含**股息率**，故 `股息率` 显示 `—`（属 PRD 选配项，不影响核心打分）。已在 akshare **1.18.60** 上核对全部接口签名。
 - 单只标的拉取/计算失败只跳过并记录，绝不中断整轮。
+
+
+## 共用核心 (leftside_core)
+
+回测 / 错杀检测 / 新闻标记 / 买卖点计划 / 指标等逻辑与 A股/美股 另一个筛选器共用，源码在 `stock-core` 仓库的 `leftside_core/`；本仓库 `vendor/leftside_core/` 是每次更新时同步进来的副本，所以克隆本仓库即可直接运行。本机若存在同级目录 `../stock-core`（或设置 `STOCK_CORE_DIR`）则优先使用它。修改共用逻辑请改 stock-core，不要直接改 vendor 副本。

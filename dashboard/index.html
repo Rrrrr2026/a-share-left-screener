@@ -962,7 +962,7 @@
     $("#oppNote").textContent = t("opp_note");
   }
   // ---------- 共用看板功能见 leftside_shared.js (LS.init 在主脚本末尾) ----------
-  const LS_MARKET = { qlLink: code=>{ const c=String(code); const mk=c.startsWith("6")?"sh":((c.startsWith("8")||c.startsWith("4")||c.startsWith("920"))?"bj":"sz"); return `https://quote.eastmoney.com/${mk}${c}.html`; }, domFmt: r=>`第${r}名` };
+  const LS_MARKET = { key: "ashare", qlLink: code=>{ const c=String(code); const mk=c.startsWith("6")?"sh":((c.startsWith("8")||c.startsWith("4")||c.startsWith("920"))?"bj":"sz"); return `https://quote.eastmoney.com/${mk}${c}.html`; }, domFmt: r=>`第${r}名` };
 
   renderOverview();
 

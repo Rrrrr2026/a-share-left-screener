@@ -12,6 +12,7 @@ echo ==== START ==== >> "%LOG%"
 
 echo [0/3] Seed history from published docs (fresh-clone safety) ...
 robocopy "docs\history" "dashboard\history" /E /XC /XN /XO /NJH /NJS /NDL /NFL >nul 2>&1
+if exist "..\stock-core\leftside_core" robocopy "..\stock-core\leftside_core" "vendor\leftside_core" /MIR /XD __pycache__ /NJH /NJS /NDL /NFL >nul 2>&1
 
 echo [1/3] Fetch data and score (about 10-15 min) ...
 "%PYEXE%" watchdog.py >> "%LOG%" 2>&1
@@ -26,7 +27,7 @@ if exist "dashboard\leftside_shared.js" copy /Y "dashboard\leftside_shared.js" "
 robocopy "dashboard\history" "docs\history" /MIR /NJH /NJS /NDL /NFL >nul 2>&1
 
 echo [3/3] Publish to GitHub Pages ...
-git add docs >> "%LOG%" 2>&1
+git add docs vendor >> "%LOG%" 2>&1
 git commit -m "auto update data" >> "%LOG%" 2>&1
 git pull --rebase --autostash origin main >> "%LOG%" 2>&1
 git push >> "%LOG%" 2>&1

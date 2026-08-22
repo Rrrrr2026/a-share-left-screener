@@ -1491,6 +1491,7 @@ def fetch_profit_reports(n_periods: int = 12) -> dict:
             continue
         if raw is None or len(raw) == 0:
             continue
+        log.info("业绩报表 %s: %d 行", p, len(raw))
         pd_date = f"{p[:4]}-{p[4:6]}-{p[6:]}"
         for _, r in raw.iterrows():
             code = str(r.get("股票代码", "")).strip()

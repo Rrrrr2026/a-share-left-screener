@@ -162,7 +162,14 @@ LS.init = function(ctx){
   }
 
   // ---------- 📒 交易日志 / 模拟组合 (localStorage, 本机浏览器) ----------
-  const JN_KEY="leftside_journal_v1";
+  const JN_KEY = "leftside_journal_v1:" + ((market&&market.key)||"default");
+  // 两个看板同源(同一 GitHub Pages 域), 旧版共用一个 key -> 按市场拆分, 旧记录按代码形态迁移一次
+  (function(){ try{ const old=localStorage.getItem("leftside_journal_v1"); if(!old) return; const arr=JSON.parse(old)||[];
+    const mine=arr.filter(x=>x&&x.code&&((market&&market.key)==="ashare" ? /^\d{6}$/.test(String(x.code)) : !/^\d{6}$/.test(String(x.code))));
+    const cur=JSON.parse(localStorage.getItem(JN_KEY)||"[]"); const ids=new Set(cur.map(x=>x.id)); mine.forEach(x=>{ if(!ids.has(x.id)) cur.push(x); });
+    localStorage.setItem(JN_KEY, JSON.stringify(cur));
+    const rest=arr.filter(x=>!mine.includes(x)); if(rest.length) localStorage.setItem("leftside_journal_v1", JSON.stringify(rest)); else localStorage.removeItem("leftside_journal_v1");
+  }catch(e){} })();
   function jnLoad(){ try{ return JSON.parse(localStorage.getItem(JN_KEY)||"[]"); }catch(e){ return []; } }
   function jnSave(arr){ try{ localStorage.setItem(JN_KEY, JSON.stringify(arr)); }catch(e){} }
   function jnPrice(code){ const c=(getData().candidates||[]).find(x=>x.code===code); return c&&isNum(c.price)? c.price : null; }

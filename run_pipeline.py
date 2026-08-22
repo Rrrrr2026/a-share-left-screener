@@ -62,17 +62,29 @@ def run(full_market: bool, use_cache: bool):
     # 走重试, 而不是永远挂死。2026-08-13/17/18/19 连续四天 13:30 任务卡死在
     # 某个无超时的网络读上, 4小时被调度器杀掉、留下孤儿进程, 当天不出榜。
     socket.setdefaulttimeout(60)
-    # 心跳: watchdog.py 据此判断流水线是否卡死 (20分钟不动 -> 杀掉重试)
+    # 心跳 (watchdog.py 据此判断是否卡死): 只有"有进展"才更新 —— 进展 = 各阶段循环每完成
+    # 一只 (下方 _prog) 或 任意一条日志; 纯存活不算进展, 否则主线程卡在网络读上时心跳照样跳。
+    # 心跳带 watchdog 下发的令牌, 孤儿/手动进程写的心跳不会冒充被监控的子进程。
     import threading as _th
     _hb = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "heartbeat.txt")
+    _hb_token = os.environ.get("LS_HB_TOKEN", "manual")
+    _prog = {"n": 0}
+
+    class _ProgressHandler(logging.Handler):
+        def emit(self, record):
+            _prog["n"] += 1
+    logging.getLogger().addHandler(_ProgressHandler())
 
     def _beat():
+        last = -1
         while True:
-            try:
-                with open(_hb, "w") as _f:
-                    _f.write(dt.datetime.now().isoformat())
-            except Exception:
-                pass
+            if _prog["n"] != last:
+                last = _prog["n"]
+                try:
+                    with open(_hb, "w", encoding="utf-8") as _f:
+                        _f.write(f"{_hb_token}|{dt.datetime.now().isoformat()}|{last}")
+                except Exception:
+                    pass
             time.sleep(60)
     _th.Thread(target=_beat, daemon=True).start()
     tqdm = _tqdm()
@@ -214,6 +226,7 @@ def run(full_market: bool, use_cache: bool):
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [pool.submit(_scan_stock, c, n, i) for (c, n, i) in universe]
         for fut in tqdm(as_completed(futures), total=len(futures)):
+            _prog["n"] += 1
             n_scanned += 1
             try:
                 r = fut.result()
@@ -288,6 +301,7 @@ def run(full_market: bool, use_cache: bool):
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [pool.submit(_fund_stock, rd) for rd in top_hits]
         for fut in tqdm(as_completed(futures), total=len(futures)):
+            _prog["n"] += 1
             try:
                 results.append(fut.result())
             except Exception as e:

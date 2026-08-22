@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Market — 两个筛选器共用核心的"市场适配器"
+==========================================
+leftside_core 里的回测/错杀/新闻标记等模块不知道自己跑在哪个市场; 每个仓库
+定义一个 Market 实例 (ashare/market.py, screener/market.py), 把市场差异集中
+在这一个对象里: 交易规则开关、成本、成长质量标签映射、价格序列/基准指数/
+新闻标题的取数函数、路径。核心模块通过 `MARKET` 全局读取 (由各仓库的 shim
+在导入时注入)。
+"""
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Callable, Optional
+
+
+@dataclass
+class Market:
+    name: str                                   # "ashare" | "us"
+    # 路径
+    dashboard_dir: str
+    data_dir: str
+    db_path: str
+    # 回测交易规则
+    t_plus_one: bool = False
+    limit_boards: bool = False
+    cost_rt: float = 0.002
+    # 成长质量标签 -> G/M/W
+    growth_tier: dict = field(default_factory=dict)
+    tier_label: dict = field(default_factory=dict)
+    # 取数钩子
+    fetch_price_series: Optional[Callable[[list, str], dict]] = None    # (codes, start) -> {code: {dates, ohlc}}
+    fetch_benchmark: Optional[Callable[[], object]] = None              # () -> DataFrame(date, close)
+    limit_up_oneline: Optional[Callable] = None                         # (o,h,l,c,prev_c) -> bool
+    limit_down_oneline: Optional[Callable] = None
+    news_titles: Optional[Callable[[str], list]] = None                 # code -> [(date, title, url)]
+    news_keywords: list = field(default_factory=list)                   # [(keyword, label)]
+    log_prefix: str = "leftside_core"
+
+
+_CURRENT: Market | None = None
+
+
+def set_market(m: Market) -> Market:
+    global _CURRENT
+    _CURRENT = m
+    return m
+
+
+def current() -> Market:
+    if _CURRENT is None:
+        raise RuntimeError("leftside_core: Market 未注入 — 请先 import 仓库的 market 模块 (set_market)")
+    return _CURRENT
