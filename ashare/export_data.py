@@ -38,6 +38,7 @@ MAIN_COLUMNS = [
     ("pos_52w_pct", "52周位置%"), ("ret_1m_pct", "近一月涨%"), ("ret_half_year_pct", "近半年涨跌%"),
     ("turnover", "换手率"), ("volume_ratio", "量比"), ("kdj_tag", "KDJ"),
     ("pb", "市净率"), ("eps", "EPS"), ("roe", "ROE"),
+    ("cuosha_score", "错杀分"), ("cuosha_upside", "修复空间%"), ("cuosha_p20", "30日涨20%概率"),
 ]
 
 

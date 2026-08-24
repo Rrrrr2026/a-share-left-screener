@@ -9,6 +9,7 @@
 <script src="dashboard_data.js"></script>
 <script src="backtest_data.js"></script>
 <script src="quality_data.js"></script>
+<script src="paper_data.js"></script>
 <script src="leftside_shared.js"></script>
 <style>
   :root{
@@ -101,7 +102,7 @@
   </header>
 
   <!-- 免责声明 -->
-  <div class="card border-amber-500/40 bg-amber-500/5 px-4 py-3 mb-4 text-[13px] leading-relaxed text-amber-200/90" data-i18n-html="disclaimer">
+  <div class="card border-amber-500/40 bg-amber-500/5 px-3 py-1.5 mb-2 text-[11px] leading-snug text-amber-200/80" data-i18n-html="disclaimer">
     ⚠️ <b>免责声明</b>：本系统仅对美股做技术/基本面数据的自动化整理与形态筛选，<b>不构成任何投资建议</b>。
     "左侧买入"是在下跌中、支撑确认前进场，风险天然更高（可能继续下跌或破位）。价格单位为美元(USD)。
     所有标的需<b>人工复核</b>，使用者自负盈亏与风控。
@@ -112,11 +113,11 @@
   <div id="staleBanner" class="hidden card border-rose-500/50 bg-rose-500/10 px-4 py-2 mb-4 text-[13px] leading-relaxed text-rose-200"></div>
 
   <!-- 概览卡 -->
-  <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_scanned">今日扫描数</div><div id="ovScanned" class="text-2xl font-bold text-white mt-1">—</div></div>
-    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_hit">命中候选数</div><div id="ovHit" class="text-2xl font-bold text-sky-300 mt-1">—</div></div>
-    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_inds">入选景气板块</div><div id="ovInds" class="text-2xl font-bold text-emerald-300 mt-1">—</div></div>
-    <div class="card p-4"><div class="text-slate-400 text-xs" data-i18n="ov_date">数据日期</div><div id="ovDate" class="text-2xl font-bold text-white mt-1">—</div></div>
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+    <div class="card p-2.5"><div class="text-slate-400 text-[11px]" data-i18n="ov_scanned">今日扫描数</div><div id="ovScanned" class="text-lg font-bold text-white mt-0.5">—</div></div>
+    <div class="card p-2.5"><div class="text-slate-400 text-[11px]" data-i18n="ov_hit">命中候选数</div><div id="ovHit" class="text-lg font-bold text-sky-300 mt-0.5">—</div></div>
+    <div class="card p-2.5"><div class="text-slate-400 text-[11px]" data-i18n="ov_inds">入选景气板块</div><div id="ovInds" class="text-lg font-bold text-emerald-300 mt-0.5">—</div></div>
+    <div class="card p-2.5"><div class="text-slate-400 text-[11px]" data-i18n="ov_date">数据日期</div><div id="ovDate" class="text-lg font-bold text-white mt-0.5">—</div></div>
   </section>
   <!-- 派生统计条 -->
   <section id="ovStrip" class="flex flex-wrap gap-2 mb-3"></section>
@@ -142,36 +143,30 @@
   </section>
 
   <!-- 📊 信号回测 -->
-  <section id="btCard" class="card p-4 mb-5 hidden" style="border-color:rgba(52,211,153,.35)">
-    <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+  <section id="btCard" class="card p-3 mb-3 hidden" style="border-color:rgba(52,211,153,.35)">
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-1">
       <h4 class="sec-title" data-i18n="bt_title">📊 信号回测 — 过去发出的建议，真实走成了什么样？</h4>
       <span id="btMeta" class="text-xs text-slate-400"></span>
     </div>
-    <div id="btStats" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3"></div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div>
-        <div class="text-xs text-slate-400 mb-1" data-i18n="bt_seg_title">按标签（已了结信号）</div>
-        <div class="overflow-x-auto"><table class="w-full text-[13px]" id="btTagTbl"></table></div>
+    <div class="text-[11px] text-slate-400 mb-2 leading-snug" data-i18n="bt_how">怎么读：系统每天给出的买卖点，事后用真实行情检验。「达标」= 按建议买入后 20 个交易日内先涨到 +10%（而不是先碰止损）；「达标率」= 同类信号过去达标的比例；「平均净收益」= 含成本的每笔平均结果。</div>
+    <div id="btStats" class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2"></div>
+    <div class="text-xs text-slate-400 mb-1" data-i18n="bt_reco_title">📈 回测优选 — 今日候选中，其信号类型过去达标率最高的</div>
+    <div id="btRecos" class="flex flex-wrap gap-2"></div>
+    <details class="mt-2">
+      <summary class="text-xs text-slate-400 cursor-pointer select-none hover:text-sky-300" data-i18n="bt_details">详情：按标签 · 按市场温度/成长质量 · 最近了结 · 方法说明</summary>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-2">
+        <div>
+          <div class="text-xs text-slate-400 mb-1" data-i18n="bt_seg_title">按标签（已了结信号）</div>
+          <div class="overflow-x-auto"><table class="w-full text-[13px]" id="btTagTbl"></table></div>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400 mb-1" data-i18n="bt_dim_title">按市场温度 / 成长质量（胜率）</div>
+          <div id="btDims" class="flex flex-wrap gap-2"></div>
+          <div id="btRecent" class="mt-3"></div>
+        </div>
       </div>
-      <div>
-        <div class="text-xs text-slate-400 mb-1" data-i18n="bt_dim_title">按市场温度 / 成长质量（胜率）</div>
-        <div id="btDims" class="flex flex-wrap gap-2"></div>
-        <div class="text-xs text-slate-400 mt-3 mb-1" data-i18n="bt_reco_title">📈 回测优选 — 今日候选中，历史同类信号战绩达标的</div>
-        <div id="btRecos" class="flex flex-wrap gap-2"></div>
-        <div id="btRecent" class="mt-3"></div>
-      </div>
-    </div>
-    <div id="btNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
-  </section>
-
-  <!-- 💎 错杀候选 (高度关注) -->
-  <section id="csCard" class="card p-4 mb-5 hidden" style="border-color:rgba(250,204,21,.45)">
-    <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-      <h4 class="sec-title" data-i18n="cs_title">💎 错杀候选 — 高质量·情绪性下跌·高度关注</h4>
-      <span id="csMeta" class="text-xs text-slate-400"></span>
-    </div>
-    <div class="overflow-x-auto"><table class="w-full text-[13px]" id="csTbl"></table></div>
-    <div id="csNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
+      <div id="btNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
+    </details>
   </section>
 
   <!-- 👑 优质公司推荐 -->
@@ -193,6 +188,7 @@
         <label class="segbtn cursor-pointer"><span data-i18n="jn_import">导入JSON</span><input id="jnImport" type="file" accept="application/json" class="hidden"/></label>
       </div>
     </div>
+    <div id="ppWrap" class="mb-1"></div>
     <div id="jnStats" class="flex flex-wrap gap-2 mb-2"></div>
     <div class="overflow-x-auto"><table class="w-full text-[13px]" id="jnOpen"></table></div>
     <div class="overflow-x-auto mt-3"><table class="w-full text-[13px]" id="jnClosed"></table></div>
@@ -210,7 +206,7 @@
         <button class="segbtn" id="segTree" data-i18n="seg_tree">矩形树图</button>
       </div>
     </div>
-    <div id="industryChart" style="width:100%;height:380px;"></div>
+    <div id="industryChart" style="width:100%;height:220px;"></div>
   </section>
 
   <!-- 权重实验室 -->
@@ -466,20 +462,22 @@
       // 信号回测
       bt_title:"📊 信号回测 — 过去发出的建议，真实走成了什么样？",
       bt_days:" 天快照", bt_hz:"持有窗口 ", bt_hz2:" 交易日",
-      bt_n:"完整窗口已了结", bt_n_open:"持仓/窗口未满", bt_fill:"触发率",
-      bt_win:"先赚10%胜率", bt_win_sub:"止损前先到 +10%",
+      bt_n:"已验证信号", bt_n_open:"窗口未满", bt_fill:"触发率",
+      bt_win:"达标率", bt_win_sub:"20日内先涨到+10%",
       bt_ret:"平均净收益", bt_ret_sub:"每笔·含成本",
       bt_days_med:"中位持有", bt_days_sub:"交易日",
       bt_seg_title:"按标签（已了结信号）", bt_dim_title:"按市场温度 / 成长质量（胜率）",
-      bt_col_tag:"标签", bt_col_n:"已了结", bt_col_win:"胜率+10%", bt_col_r5:"曾达+5%",
+      bt_col_tag:"标签", bt_col_n:"已验证", bt_col_win:"达标率", bt_col_r5:"曾达+5%",
       bt_col_ret:"平均收益", bt_col_d:"天数", bt_low_n:"样本少",
       bt_opp_hot:"🔥 高温日", bt_opp_mid:"➖ 常温日", bt_opp_cold:"🧊 低温日",
       bt_g_G:"🟢 可持续", bt_g_M:"🟡 待观察", bt_g_W:"🔴 一次性",
-      bt_reco_title:"📈 回测优选 — 今日候选中，历史同类信号战绩达标的",
+      bt_reco_title:"📈 回测优选 — 今日候选中，其信号类型过去达标率最高的",
       bt_reco_tip:"同类历史信号收缩后胜率", bt_reco_none:"今日暂无达标段位（样本随每日运行自动积累）",
       bt_recent:"最近了结", bt_open_pos:"进行中",
       bt_cs:"💎 错杀≥60", bt_cselig:"过门槛<60", bt_noncs:"其它",
-      bt_reco_seg:"信号类型", bt_reco_hist:"历史胜率", bt_reco_vs:"全池",
+      bt_how:"怎么读：系统每天给出的买卖点，事后用真实行情检验。「达标」= 按建议买入后 20 个交易日内先涨到 +10%（而不是先碰止损）；「达标率」= 同类信号过去达标的比例；「平均净收益」= 含成本的每笔平均结果。", bt_details:"详情：按标签 · 按市场温度/成长质量 · 最近了结 · 方法说明",
+      pp_title:"🤖 自动模拟组合", pp_sub:"四类榜单信号首次出现即自动买入 __B__（按买卖点建议成交）", pp_total:"合计盈亏", pp_open:"持仓", pp_resolved:"已了结", pp_win:"胜率", pp_avg:"均每笔", pp_cat_quality:"👑 优质公司", pp_cat_cuosha:"💎 错杀候选", pp_cat_coil:"🎯 蓄势待发", pp_cat_dip:"🕳 深跌抄底", pp_details:"持仓与最近了结明细", pp_open_title:"持仓中", pp_closed_title:"最近了结", pp_col_stock:"标的", pp_col_fill:"成交日", pp_col_dates:"成交 → 离场", pp_col_entry:"成交价", pp_col_now:"现价", pp_col_exit:"离场价", pp_col_ret:"收益率", pp_col_pnl:"盈亏", pp_col_status:"结果", pp_won:"🎯 达标", pp_stopped:"⛔ 止损", pp_expired:"⏳ 到期", pp_empty:"暂无成交 —— 新信号出现后会自动买入并在这里跟踪", pp_note:"规则：优质公司 / 错杀候选 / 蓄势待发 / 深跌抄底 首次上榜自动注册，按买卖点建议模拟成交（突破单需站上箱体上沿、回踩限价、市价次日开盘；A股含T+1与一字板限制；开盘已破止损不接飞刀；含交易成本）。离场 = 止损 / +10%目标 / 20个交易日到期，同一股票同类信号30天冷却。规则与下方“信号回测”完全一致；纸面推演，非实盘、非建议。",
+      bt_reco_seg:"信号类型", bt_reco_hist:"过去达标率", bt_reco_vs:"全部信号",
       bt_reco_tip2:"该股属于此信号类型；胜率是类型的历史频率，不是个股预测。点击查看买卖点计划",
       // 错杀候选
       cs_title:"💎 错杀候选 — 高质量·情绪性下跌·高度关注",
@@ -513,13 +511,13 @@
       ql_col_stock:"股票", ql_col_ind:"行业", ql_col_score:"评分", ql_col_gates:"硬性门槛",
       ql_col_q4:"近四季净利同比", ql_col_y4:"年度净利同比", ql_col_dom:"行业地位", ql_col_rd:"研发%",
       ql_g_q4:"四季连增", ql_g_y4:"年度连增", ql_g_beat:"超预期×4", ql_g_roe:"ROE≥15",
-      ql_g_pe:"PE<31", ql_g_dom:"龙头≤3", ql_accel:"最近单季同比 ≥ 年度同比: 增长仍在加速",
+      ql_g_pe:"PE<31", ql_g_dom:"龙头≤3", ql_g_cap:"蓝筹", ql_g_up:"空间≥20%", ql_col_up2:"盈利空间", ql_accel:"最近单季同比 ≥ 年度同比: 增长仍在加速",
       ql_rd_na:"豁免",
-      ql_note:"从全市场约5000只做客观条件筛选（非投资建议）：硬性门槛 = 近四个单季营收+归母净利同比全部为正 · 近四个完整年度营收+净利同比全部为正 · 最近年度加权ROE≥15% · PE-TTM<31 · 行业营收前3。评分另计研发强度（金融业豁免）、增长加速、更低估值、更大份额。👑=门槛全过；不足10只全过时，其余按「差在哪一条」列出，✗ 标出未达标项。A股缺少干净的一致预期数据，「超市场预期」以「增长仍在加速」近似（美股版用真实EPS超预期）。财报有滞后，买前请人工研究基本面与公告。",
+      ql_note:"从全市场约5000只做客观条件筛选（非投资建议）：硬性门槛 = 近四个单季营收+归母净利同比全部为正 · 近四个完整年度营收+净利同比全部为正 · 最近年度加权ROE≥15% · PE-TTM<31 · 行业营收前3 · 蓝筹总市值≥300亿 · 盈利空间≥20%（PEG法模型值：合理PE=增速夹在10-35，空间=合理PE/当前PE-1，非一致预期目标价，显示封顶100%）。评分另计研发强度（金融业豁免）、增长加速、更低估值、盈利空间。👑=门槛全过；不足10只全过时，其余按「差在哪一条」列出，✗ 标出未达标项。A股缺少干净的一致预期数据，「超市场预期」以「增长仍在加速」近似（美股版用真实EPS超预期）。财报有滞后，买前请人工研究基本面与公告。",
       cs_meta_a:"共 ", cs_meta_b:" 只达标（错杀分≥60）· 显示前20",
       cs_col_stock:"股票", cs_col_ind:"行业", cs_col_score:"错杀分",
       cs_col_dd:"距52周高点", cs_col_expl:"板块解释", cs_col_g:"近两季增速",
-      cs_col_up:"修复空间", cs_col_tag:"标签",
+      cs_col_up:"修复空间", cs_col_tag:"标签", col_cs:"错杀分", col_csup:"修复空间%", col_csp20:"30日涨20%概率",
       cs_note:"错杀分 = 背离度40（跌得深 × 单季利润仍在增长）+ 板块归因25（跌幅可由行业中位跌幅解释的比例，越高越像情绪/资金面驱动）+ 质量护城河25（成长档位/ROE/行业营收排名/自身PE历史分位低位）+ 企稳迹象10（贴支撑/RSI/多次踩不破）。修复空间只回补「超出板块的那部分跌幅」，不预测板块本身修复。⚠️ 财报有滞后：下跌可能反映尚未公布的恶化，此处结论是「无可见基本面恶化」而非「确认错杀」，重仓前请人工核查公告与下跌原因。回测卡中的「💎错杀」分段会用真实胜率持续验证这套打分。",
       bt_note:"回测 = 把历史每日快照里当天发出的买卖点建议（回踩买入区/突破买点、止损、目标），与其后真实行情逐日对照：观察窗内先到 +10% 记为胜，先破止损记为负，同日双触发按先止损保守计，T+1 成交当日不判离场，一字涨停买不进、一字跌停顺延到次日开盘才卖出，含交易成本。胜率只统计观察窗完整走完的信号——已了结但窗口未满的一并剔除，否则「快出结果的交易」会被优先计入、胜率被截尾偏差推高。同一股票同一时间只计一次信号。样本仅覆盖近几周单一市场环境、信号按日聚集彼此相关，有效样本小于名义数量；胜率是历史频率而非未来保证，「回测优选」只是把今天候选对到历史战绩达标的信号类型上，仍需人工复核。",
       // 建议仓位 (¼凯利)
@@ -642,20 +640,22 @@
       // Signal backtest
       bt_title:"📊 Signal Backtest — how did past calls actually play out?",
       bt_days:"-day snapshots", bt_hz:"holding window ", bt_hz2:" trading days",
-      bt_n:"Resolved (full window)", bt_n_open:"open/window not full", bt_fill:"Fill rate",
-      bt_win:"+10% win rate", bt_win_sub:"hit +10% before stop",
+      bt_n:"Verified signals", bt_n_open:"window not full", bt_fill:"Fill rate",
+      bt_win:"Hit rate", bt_win_sub:"+10% within 20 days, before the stop",
       bt_ret:"Avg net return", bt_ret_sub:"per trade, incl. costs",
       bt_days_med:"Median hold", bt_days_sub:"trading days",
       bt_seg_title:"By tag (resolved signals)", bt_dim_title:"By market temp / growth quality (win rate)",
-      bt_col_tag:"Tag", bt_col_n:"Resolved", bt_col_win:"Win +10%", bt_col_r5:"Reached +5%",
+      bt_col_tag:"Tag", bt_col_n:"Verified", bt_col_win:"Hit rate", bt_col_r5:"Reached +5%",
       bt_col_ret:"Avg return", bt_col_d:"Days", bt_low_n:"low n",
       bt_opp_hot:"🔥 Hot days", bt_opp_mid:"➖ Mid days", bt_opp_cold:"🧊 Cold days",
       bt_g_G:"🟢 Sustainable", bt_g_M:"🟡 Watch", bt_g_W:"🔴 One-off",
-      bt_reco_title:"📈 Backtest picks — today's candidates whose signal type has a proven record",
+      bt_reco_title:"📈 Backtest picks — today's candidates whose signal type has the best past hit rate",
       bt_reco_tip:"Shrunk win rate of similar past signals", bt_reco_none:"No segment qualifies yet (sample grows with each daily run)",
       bt_recent:"Recently resolved", bt_open_pos:"open",
       bt_cs:"💎 Mispriced ≥60", bt_cselig:"Gate-passed <60", bt_noncs:"Others",
-      bt_reco_seg:"Signal type", bt_reco_hist:"historical win rate", bt_reco_vs:"pool",
+      bt_how:"How to read: every day's published entry/stop/target is checked against what prices did next. 'Hit' = after buying per the plan, the stock reached +10% within 20 trading days before touching the stop; 'hit rate' = share of past signals of that type that hit; 'avg net return' = average per-trade result after costs.", bt_details:"Details: by tag · by market temp / growth quality · recently resolved · method",
+      pp_title:"🤖 Auto paper portfolio", pp_sub:"every first-time signal auto-buys __B__ per the trade plan", pp_total:"Total P&L", pp_open:"open", pp_resolved:"resolved", pp_win:"win", pp_avg:"avg", pp_cat_quality:"👑 Quality", pp_cat_cuosha:"💎 Mispriced", pp_cat_coil:"🎯 Coiling", pp_cat_dip:"🕳 Deep dip", pp_details:"Open positions & recent exits", pp_open_title:"Open", pp_closed_title:"Recently resolved", pp_col_stock:"Stock", pp_col_fill:"Filled", pp_col_dates:"Fill → exit", pp_col_entry:"Entry", pp_col_now:"Now", pp_col_exit:"Exit", pp_col_ret:"Return", pp_col_pnl:"P&L", pp_col_status:"Result", pp_won:"🎯 Target", pp_stopped:"⛔ Stopped", pp_expired:"⏳ Expired", pp_empty:"No fills yet — new signals will be bought automatically and tracked here", pp_note:"Rules: first appearance on Quality / Mispriced / Coiling / Deep-dip auto-registers a paper buy per the published trade plan (breakout stop-order, pullback limit, or next-open market; T+1 and sealed limit boards for A-shares; no entry if the open already breaches the stop; costs included). Exit = stop / +10% target / 20-trading-day expiry; 30-day cooldown per stock per signal type. Identical rules to the Signal Backtest below. Paper simulation — not real trading, not advice.",
+      bt_reco_seg:"Signal type", bt_reco_hist:"past hit rate", bt_reco_vs:"all signals",
       bt_reco_tip2:"This stock belongs to the signal type above; the win rate is the type's historical frequency, not a per-stock forecast. Click for the trade plan",
       // Mispriced candidates
       cs_title:"💎 Mispriced — quality names in emotional selloffs · high attention",
@@ -689,13 +689,13 @@
       ql_col_stock:"Stock", ql_col_ind:"Industry", ql_col_score:"Score", ql_col_gates:"Hard gates",
       ql_col_q4:"4Q profit YoY", ql_col_y4:"Annual profit YoY", ql_col_dom:"Position", ql_col_rd:"R&D%",
       ql_g_q4:"4Q up", ql_g_y4:"Years up", ql_g_beat:"Beat ×4", ql_g_roe:"ROE≥15",
-      ql_g_pe:"PE<31", ql_g_dom:"Top-3", ql_accel:"Latest quarter YoY ≥ annual YoY: still accelerating",
+      ql_g_pe:"PE<31", ql_g_dom:"Top-3", ql_g_cap:"Blue chip", ql_g_up:"Upside≥20%", ql_col_up2:"Upside", ql_accel:"Latest quarter YoY ≥ annual YoY: still accelerating",
       ql_rd_na:"exempt",
       ql_note:"An objective screen over ~5,000 listed companies (not investment advice). Hard gates: last four single quarters with revenue AND net profit YoY all positive · last four full fiscal years both rising · latest annual ROE ≥15% · PE-TTM <31 · top-3 revenue in industry. Score adds R&D intensity (financials exempt), acceleration, cheaper valuation, larger share. 👑 = all gates passed; when fewer than 10 pass everything, the rest are listed with the failed gate marked ✗. A-share lacks clean consensus data, so 'beating expectations' is approximated by 'still accelerating' (the US version uses real EPS surprises). Financials lag — research before buying.",
       cs_meta_a:"", cs_meta_b:" qualified (score ≥60) · top 20 shown",
       cs_col_stock:"Stock", cs_col_ind:"Industry", cs_col_score:"Score",
       cs_col_dd:"From 52w high", cs_col_expl:"Sector-explained", cs_col_g:"Recent-2Q growth",
-      cs_col_up:"Repair upside", cs_col_tag:"Tag",
+      cs_col_up:"Repair upside", cs_col_tag:"Tag", col_cs:"Mispricing", col_csup:"Repair upside", col_csp20:"P(+20%/30d)",
       cs_note:"Score = divergence 40 (deep drop × still-growing single-quarter profit) + sector attribution 25 (share of the drop explained by the industry median — higher looks emotional/flow-driven) + moat 25 (growth tier / ROE / industry revenue rank / low own-history PE percentile) + stabilization 10 (near support / RSI / repeated holds). Repair upside only refills the drop in excess of the sector, without betting on the sector itself recovering. ⚠️ Financials lag: a selloff can reflect deterioration not yet reported — this reads 'no visible deterioration', not 'confirmed mispricing'; check filings/news before sizing up. The backtest card's 💎 segment keeps validating this score with realized win rates.",
       bt_note:"Backtest = replay each day's published entry/stop/target advice against actual subsequent prices: reaching +10% before the stop within the window counts as a win, hitting the stop first counts as a loss, same-day double-trigger conservatively counts as a stop; T+1 means no same-day exits, sealed limit-up days can't be bought and sealed limit-down days defer the stop exit to the next open; costs included. Win rates only count signals whose full observation window has elapsed — early-resolved trades inside unfinished windows are excluded too, otherwise fast resolvers would be over-counted (censoring bias). One episode per stock at a time. The sample covers a few recent weeks in one regime and signals cluster by day, so effective sample sizes are smaller than nominal; win rates are historical frequencies, not guarantees. 'Backtest picks' map today's candidates onto signal types with a qualifying record — still review manually.",
       plan_pos:"Position size", plan_pos_u:"of capital", plan_kelly_l:"¼-Kelly",
@@ -805,7 +805,8 @@
     final_score:"col_final",tech_score:"col_tech",fund_score:"col_fund",price:"col_price",spark:"col_spark",
     dist_support_pct:"col_dist",support_disp:"col_support",breakdown_price:"col_break",pos_52w_pct:"col_pos52",
     ret_1m_pct:"col_ret1m",ret_half_year_pct:"col_rethy",turnover:"col_turnover",volume_ratio:"col_volratio",
-    kdj_tag:"col_kdj",pe_disp:"col_pe",pb:"col_pb",eps:"col_eps",roe:"col_roe" };
+    kdj_tag:"col_kdj",pe_disp:"col_pe",pb:"col_pb",eps:"col_eps",roe:"col_roe",
+    cuosha_score:"col_cs",cuosha_upside:"col_csup",cuosha_p20:"col_csp20" };
   function colLabel(c){ const k=COL_I18N[c.key]; return (k? t(k) : c.label); }
   function applyStaticI18n(){
     document.documentElement.lang = (LANG==="en")?"en":"zh-CN";
@@ -929,6 +930,7 @@
     setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderCuosha(); }, 0);
     setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderQuality(); }, 0);
     setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderJournal(); }, 0);
+    setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderPaper(); }, 0);
   }
   // ---------- 🌡️ 机会温度计 ----------
   function renderOpp(o){
@@ -1001,13 +1003,13 @@
           itemStyle:{borderColor:(document.body.classList.contains("light")?"#eef2f8":"#0b1220"),borderWidth:2,gapWidth:2}, data }]
       });
     } else {
-      const arr = inds.slice(0,15).slice().reverse();
+      const arr = inds.slice(0,12).slice().reverse();
       const names = arr.map(d=>d.industry);
       const scores = arr.map(d=> isNum(d.prosperity_score)? +d.prosperity_score.toFixed(1) : 0);
       const colors = arr.map(d=> d.selected? "#16a34a" : C.base);
       indChart.setOption({
         backgroundColor:"transparent",
-        grid:{left:100,right:44,top:10,bottom:20},
+        grid:{left:96,right:40,top:6,bottom:16},
         tooltip:{trigger:"axis", axisPointer:{type:"shadow"},
           formatter:(p)=>{ const i=arr[p[0].dataIndex];
             const row=(lab,v)=>`${lab}：<b>${isNum(v)?v.toFixed(0):"—"}</b>`;
@@ -1041,7 +1043,7 @@
   const NUMERIC = new Set(["final_score","tech_score","fund_score","tech_norm","prosperity_score","price","dist_support_pct",
     "breakdown_price","pos_52w_pct","ret_1m_pct","ret_half_year_pct","avg_amt20_yi","dividend_yield","pb","eps","roe",
     "streak","upside_pct","target_price","analyst_count","atr_pct","max_dd_pct","beta","boll_low","volume_ratio","turnover",
-    "ni_ttm_yoy","rev_ttm_yoy","dom_share","dominance_disp"]);
+    "ni_ttm_yoy","rev_ttm_yoy","dom_share","dominance_disp","cuosha_score","cuosha_upside","cuosha_p20"]);
   try{ const saved=JSON.parse(localStorage.getItem(COLORDER_KEY)||"null");
     if(Array.isArray(saved)&&saved.length){ COLS.sort((a,b)=>{ let ia=saved.indexOf(a.key), ib=saved.indexOf(b.key); return (ia<0?999:ia)-(ib<0?999:ib); }); } }catch(e){}
 
@@ -1177,6 +1179,9 @@
         return signPctCell(v)+basis;
       }
       case "growth_quality": return growthQualityCell(v, c);
+      case "cuosha_score": return isNum(v)? `<span class="font-bold text-amber-300 cursor-help" title="${escH(c.cuosha_note||"")}">💎 ${v}</span>` : dash;
+      case "cuosha_upside": return isNum(v)? (v>0? `<span class="text-emerald-300 font-semibold">+${v}%</span>` : `<span class="text-slate-500">0%</span>`) : dash;
+      case "cuosha_p20": return isNum(v)? `<span class="${v>=50?"text-emerald-300":(v>=30?"text-amber-300":"text-slate-300")}" title="n=${c.cuosha_p20_n||dash}">${v.toFixed(0)}%</span>` : dash;
       case "dominance_disp": {
         if(v==null||v==="") return `<span>${dash}</span>`;
         const gold = String(v).indexOf("👑")>=0;
@@ -1987,7 +1992,7 @@
   render();
   // 共用看板功能初始化 (必须在主脚本所有 const 工具函数定义之后)
   LS.init({$, t, isNum, escH, tagClass, tagText, dash, getData:()=>DATA, openDetail, getCur:()=>curC, market: LS_MARKET});
-  setTimeout(()=>{ LS.renderBacktest(); LS.renderCuosha(); LS.renderQuality(); LS.renderJournal(); }, 0);
+  setTimeout(()=>{ LS.renderBacktest(); LS.renderCuosha(); LS.renderQuality(); LS.renderJournal(); LS.renderPaper(); }, 0);
 })();
 </script>
 </body>

@@ -281,7 +281,13 @@ def log_run(run_date, started_at, finished_at, n_scanned, n_hit,
 
 # ---------------------------------------------------------------------------
 def latest_run_date() -> str | None:
+    # 只认 status='ok' 的完整运行 —— 演示/中断的部分扫描不能成为导出锚点
     with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT run_date FROM run_log WHERE status='ok' ORDER BY run_date DESC LIMIT 1")
+        row = cur.fetchone()
+        if row:
+            return row["run_date"]
         cur = conn.execute("SELECT run_date FROM run_log ORDER BY run_date DESC LIMIT 1")
         row = cur.fetchone()
         return row["run_date"] if row else None

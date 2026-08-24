@@ -47,6 +47,9 @@ TOP_N = 10               # 每日榜单条数
 SHORTLIST = 30           # 研发强度只对前 N 名逐只补数据 (THS 单线程)
 RD_GOOD, RD_OK = 5.0, 3.0
 FIN_INDUSTRIES = ("银行", "保险", "证券", "多元金融")   # 研发强度豁免
+CAP_MIN = 300e8          # 蓝筹门槛: 总市值 >= 300亿
+UPSIDE_MIN = 20.0        # 盈利空间门槛 (PEG法模型值) >= 20%
+JUSTIFIED_PE_LO, JUSTIFIED_PE_HI = 10.0, 35.0
 
 _PREV_Q = {"03": None, "06": "03", "09": "06", "12": "09"}
 
@@ -202,9 +205,20 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
         g_pe = bool(pe is not None and 0 < pe < PE_MAX)
         dr = dom_rank.get(code)
         g_dom = bool(dr is not None and dr <= DOM_RANK_MAX)
-        gates = {"q4": g_q4, "y4": g_y4, "roe": g_roe, "pe": g_pe, "dom": g_dom}
+        mv = sp.get("total_mv")
+        mv = float(mv) if isinstance(mv, (int, float)) and mv == mv else None
+        g_cap = bool(mv is not None and mv >= CAP_MIN)
+        # 盈利空间 (PEG法, 模型值): 合理PE = 最近年度增速夹在 [10,35], 空间 = 合理PE/当前PE - 1。
+        # A股没有干净的一致预期目标价, 这是"如果估值向增速回归"的保守模型, 前端明确标注。
+        upside = None
+        if pe and pe > 0 and ni_y4:
+            justified = min(JUSTIFIED_PE_HI, max(JUSTIFIED_PE_LO, ni_y4[0][1]))
+            upside = min((justified / pe - 1.0) * 100.0, 100.0)   # 模型值封顶100%, 防止低PE股显示离谱数字
+        g_up = bool(upside is not None and upside >= UPSIDE_MIN)
+        gates = {"q4": g_q4, "y4": g_y4, "roe": g_roe, "pe": g_pe, "dom": g_dom,
+                 "cap": g_cap, "up": g_up}
         n_pass = sum(gates.values())
-        if n_pass < 3:                            # 连3条都不过的不进排名池
+        if n_pass < 4:                            # 7 个门槛更严: 先过 4 条才进排名池
             continue
 
         # 评分 (硬门槛之外的排序依据)
@@ -215,6 +229,10 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
             score += min(20.0, sum(1 for _, v in ni_y4 if v > 0) * 5.0)
         if dr is not None:
             score += 15.0 if dr == 1 else (10.0 if dr <= 3 else 0.0)
+        if upside is not None:
+            score += min(15.0, max(0.0, upside) / 4.0)
+        if g_cap:
+            score += 5.0
         if pe is not None and pe > 0:
             score += 10.0 if pe < 20 else (5.0 if pe < PE_MAX else 0.0)
         accel = None
@@ -229,6 +247,8 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
             "roe": round(roe_a, 1) if roe_a is not None else None,
             "roe_year": roe_y,
             "dom_rank": dr,
+            "mcap_b": round(mv / 1e8, 0) if mv else None,
+            "upside": round(upside, 1) if upside is not None else None,
             "dom_share": round(dom_share.get(code), 1) if code in dom_share else None,
             "ni_q4": [round(v, 1) for _, v in ni_q4][::-1] if ni_q4 else None,   # 旧→新
             "rev_q4": [round(v, 1) for _, v in rev_q4][::-1] if rev_q4 else None,
@@ -257,7 +277,7 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
         prob20.annotate(picks, _long_hist, conditional=False, key="p20")
     except Exception as e:
         log.warning("30日涨20%%概率计算失败: %s", e)
-    n_crown = sum(1 for r in picks if r["n_pass"] == 5)
+    n_crown = sum(1 for r in picks if r["gates"] and all(r["gates"].values()))
     result = {
         "meta": {"date": dt.date.today().isoformat(),
                  "generated": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
