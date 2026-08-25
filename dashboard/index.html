@@ -113,11 +113,11 @@
   <div id="staleBanner" class="hidden card border-rose-500/50 bg-rose-500/10 px-4 py-2 mb-4 text-[13px] leading-relaxed text-rose-200"></div>
 
   <!-- 概览卡 -->
-  <section class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
-    <div class="card p-2.5"><div class="text-slate-400 text-[11px]" data-i18n="ov_scanned">今日扫描数</div><div id="ovScanned" class="text-lg font-bold text-white mt-0.5">—</div></div>
-    <div class="card p-2.5"><div class="text-slate-400 text-[11px]" data-i18n="ov_hit">命中候选数</div><div id="ovHit" class="text-lg font-bold text-sky-300 mt-0.5">—</div></div>
-    <div class="card p-2.5"><div class="text-slate-400 text-[11px]" data-i18n="ov_inds">入选景气板块</div><div id="ovInds" class="text-lg font-bold text-emerald-300 mt-0.5">—</div></div>
-    <div class="card p-2.5"><div class="text-slate-400 text-[11px]" data-i18n="ov_date">数据日期</div><div id="ovDate" class="text-lg font-bold text-white mt-0.5">—</div></div>
+  <section class="card px-3 py-1.5 mb-2 text-[12px] flex flex-wrap items-center gap-x-5 gap-y-1">
+    <span class="text-slate-400"><span data-i18n="ov_scanned">今日扫描数</span> <b id="ovScanned" class="text-white">—</b></span>
+    <span class="text-slate-400"><span data-i18n="ov_hit">命中候选数</span> <b id="ovHit" class="text-sky-300">—</b></span>
+    <span class="text-slate-400"><span data-i18n="ov_inds">入选景气板块</span> <b id="ovInds" class="text-emerald-300">—</b></span>
+    <span class="text-slate-400"><span data-i18n="ov_date">数据日期</span> <b id="ovDate" class="text-white">—</b></span>
   </section>
   <!-- 派生统计条 -->
   <section id="ovStrip" class="flex flex-wrap gap-2 mb-3"></section>
@@ -171,29 +171,18 @@
 
   <!-- 👑 优质公司推荐 -->
   <section id="qlCard" class="card p-4 mb-5 hidden" style="border-color:rgba(52,211,153,.5)">
-    <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+    <details>
+      <summary class="cursor-pointer select-none hover:opacity-80"><div class="flex items-center justify-between flex-wrap gap-2 ">
       <h4 class="sec-title" data-i18n="ql_title">👑 优质公司 · 每日推荐 — 连续增长·龙头·高ROE·低估值</h4>
       <span id="qlMeta" class="text-xs text-slate-400"></span>
-    </div>
+    </div></summary>
+      <div class="mt-2">
     <div class="overflow-x-auto"><table class="w-full text-[13px]" id="qlTbl"></table></div>
     <div id="qlNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
+  </div>
+    </details>
   </section>
-  <!-- 📒 交易日志 / 模拟组合 (本机浏览器保存) -->
-  <section id="jnCard" class="card p-4 mb-5" style="border-color:rgba(129,140,248,.45)">
-    <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-      <h4 class="sec-title" data-i18n="jn_title">📒 交易日志 · 模拟组合 — 记录你真正采纳的标的，系统跟踪结果</h4>
-      <div class="flex items-center gap-2">
-        <span id="jnMeta" class="text-xs text-slate-400"></span>
-        <button class="segbtn" id="jnExport" data-i18n="jn_export">导出JSON</button>
-        <label class="segbtn cursor-pointer"><span data-i18n="jn_import">导入JSON</span><input id="jnImport" type="file" accept="application/json" class="hidden"/></label>
-      </div>
-    </div>
-    <div id="ppWrap" class="mb-1"></div>
-    <div id="jnStats" class="flex flex-wrap gap-2 mb-2"></div>
-    <div class="overflow-x-auto"><table class="w-full text-[13px]" id="jnOpen"></table></div>
-    <div class="overflow-x-auto mt-3"><table class="w-full text-[13px]" id="jnClosed"></table></div>
-    <div id="jnNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
-  </section>
+
 
 
   <!-- 行业景气榜 -->
@@ -260,6 +249,23 @@
       </table>
     </div>
     <div id="emptyHint" class="text-center text-slate-500 py-8 hidden" data-i18n="empty_hint">无符合条件的标的。可放宽筛选或调整 CONFIG 阈值。</div>
+  </section>
+
+  <!-- 📒 交易日志 / 模拟组合 (本机浏览器保存) -->
+  <section id="jnCard" class="card p-4 mb-5" style="border-color:rgba(129,140,248,.45)">
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+      <h4 class="sec-title" data-i18n="jn_title">📒 交易日志 · 模拟组合 — 记录你真正采纳的标的，系统跟踪结果</h4>
+      <div class="flex items-center gap-2">
+        <span id="jnMeta" class="text-xs text-slate-400"></span>
+        <button class="segbtn" id="jnExport" data-i18n="jn_export">导出JSON</button>
+        <label class="segbtn cursor-pointer"><span data-i18n="jn_import">导入JSON</span><input id="jnImport" type="file" accept="application/json" class="hidden"/></label>
+      </div>
+    </div>
+    <div id="ppWrap" class="mb-1"></div>
+    <div id="jnStats" class="flex flex-wrap gap-2 mb-2"></div>
+    <div class="overflow-x-auto"><table class="w-full text-[13px]" id="jnOpen"></table></div>
+    <div class="overflow-x-auto mt-3"><table class="w-full text-[13px]" id="jnClosed"></table></div>
+    <div id="jnNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
   </section>
 
   <p class="text-xs text-slate-500 text-center mb-8" data-i18n="footer">

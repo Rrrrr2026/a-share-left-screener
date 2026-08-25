@@ -120,6 +120,103 @@ def news_titles(code: str) -> list:
         return []
 
 
+def fetch_bars_bulk(codes: list, start: str) -> dict:
+    """长历史日线(含成交量), 腾讯前复权, 按 ~700 自然日分页拼接 (单请求上限640根)。
+    -> {code: [(d,o,h,l,c,v), ...]} 升序; 盘中丢当日未走完bar。"""
+    from concurrent.futures import ThreadPoolExecutor
+    from . import datasource as ds
+    skip_day = _drop_partial_today()
+    today = dt.date.today()
+    d0 = dt.date.fromisoformat(start)
+    pages = []
+    cur = d0
+    while cur < today:
+        nxt = min(cur + dt.timedelta(days=700), today)
+        pages.append((cur.isoformat(), nxt.isoformat()))
+        cur = nxt + dt.timedelta(days=1)
+    res = {}
+
+    def one(code):
+        rows, seen = [], set()
+        for a, b in pages:
+            try:
+                kl = ds.call_with_retry(ds._tencent_chunk, ds._tencent_symbol(code), a, b)
+            except Exception:
+                return code, None
+            for k in (kl or []):
+                if not k or len(k) < 6:
+                    continue
+                d1 = str(k[0])[:10]
+                if d1 in seen or (skip_day and d1 >= skip_day):
+                    continue
+                try:
+                    o, c, h, l, v = (float(k[1]), float(k[2]), float(k[3]),
+                                     float(k[4]), float(k[5]))
+                except (TypeError, ValueError):
+                    continue
+                if h < l or min(o, c, h, l) <= 0 or v < 0:
+                    continue
+                seen.add(d1)
+                rows.append((d1, o, h, l, c, v))
+        rows.sort()
+        return code, (rows if len(rows) >= 60 else None)
+
+    with ThreadPoolExecutor(max_workers=6) as exe:
+        for i, (code, rows) in enumerate(exe.map(one, codes), 1):
+            if rows:
+                res[code] = rows
+            if i % 300 == 0 or i == len(codes):
+                log.info("长历史进度 %d/%d (拿到 %d)", i, len(codes), len(res))
+    return res
+
+
+def fetch_index_bars(start: str) -> list:
+    """沪深300 (sh000300) 长历史日线 -> [(d,o,h,l,c,v), ...]。"""
+    from . import datasource as ds
+    skip_day = _drop_partial_today()
+    today = dt.date.today()
+    d0 = dt.date.fromisoformat(start)
+    rows, seen = [], set()
+    cur = d0
+    while cur < today:
+        nxt = min(cur + dt.timedelta(days=700), today)
+        try:
+            kl = ds.call_with_retry(ds._tencent_chunk, "sh000300",
+                                    cur.isoformat(), nxt.isoformat())
+        except Exception:
+            kl = []
+        for k in (kl or []):
+            if not k or len(k) < 6:
+                continue
+            d1 = str(k[0])[:10]
+            if d1 in seen or (skip_day and d1 >= skip_day):
+                continue
+            try:
+                o, c, h, l, v = (float(k[1]), float(k[2]), float(k[3]),
+                                 float(k[4]), float(k[5]))
+            except (TypeError, ValueError):
+                continue
+            seen.add(d1)
+            rows.append((d1, o, h, l, c, v))
+        cur = nxt + dt.timedelta(days=1)
+    rows.sort()
+    return rows
+
+
+def universe_codes() -> list:
+    """全A代码 (主板/创业板/科创板: 0/3/6 前缀; 剔除北交所)。"""
+    from . import datasource as ds
+    spot = ds.fetch_spot_snapshot()
+    if spot is None or spot.empty:
+        return []
+    out = []
+    for c in spot["code"]:
+        c = str(c).zfill(6)
+        if c[0] in ("0", "3", "6"):
+            out.append(c)
+    return sorted(set(out))
+
+
 MARKET = set_market(Market(
     name="ashare",
     dashboard_dir=DASHBOARD_DIR, data_dir=DATA_DIR, db_path=DB_PATH,
@@ -128,5 +225,7 @@ MARKET = set_market(Market(
     fetch_price_series=fetch_price_series, fetch_benchmark=fetch_benchmark,
     limit_up_oneline=limit_up_oneline, limit_down_oneline=limit_down_oneline,
     news_titles=news_titles, news_keywords=NEWS_KEYWORDS,
+    fetch_bars_bulk=fetch_bars_bulk, fetch_index_bars=fetch_index_bars,
+    universe_codes=universe_codes,
     log_prefix="ashare",
 ))
