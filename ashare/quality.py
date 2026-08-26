@@ -297,7 +297,7 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
     except Exception as e:
         log.warning("优质榜历史落盘失败: %s", e)
     try:
-        result["profiles"] = _drawer_profiles(picks)
+        result["profiles"] = _drawer_profiles(picks, reports)
     except Exception as e:
         log.warning("优质榜弹窗档案失败(不影响榜单): %s", e)
     with open(QL_JS, "w", encoding="utf-8") as f:
@@ -314,9 +314,8 @@ if __name__ == "__main__":
     build_quality()
 
 
-def _drawer_profiles(picks: list) -> dict:
-    """优质榜前10只生成候选股同构档案 -> 主表同款弹窗可用。
-    键模板取当日快照第一只候选 (缺项 None -> 前端显示 '—'), 行情走 fuyao 长历史。"""
+def _drawer_profiles(picks: list, reports: dict | None = None) -> dict:
+    """优质榜前10只生成候选股同构档案 -> 主表同款弹窗 (尽量填满总览页字段)。"""
     import glob
     import pandas as pd
     from . import datasource as ds
@@ -332,9 +331,18 @@ def _drawer_profiles(picks: list) -> dict:
             pass
     try:
         spot = ds.fetch_spot_snapshot()
-        spot_map = {str(r.get("code", "")).zfill(6): r for _, r in spot.iterrows()}             if spot is not None and not spot.empty else {}
+        spot_map = {str(r.get("code", "")).zfill(6): r for _, r in spot.iterrows()} \
+            if spot is not None and not spot.empty else {}
     except Exception:
         spot_map = {}
+
+    def _f(v):
+        try:
+            v = float(v)
+            return v if v == v else None
+        except (TypeError, ValueError):
+            return None
+
     out = {}
     for i, p in enumerate(picks, 1):
         code = p.get("code")
@@ -345,16 +353,31 @@ def _drawer_profiles(picks: list) -> dict:
             close = pd.Series(pd.to_numeric(df["close"], errors="coerce")).dropna()
             high = pd.Series(pd.to_numeric(df["high"], errors="coerce")).dropna()
             low = pd.Series(pd.to_numeric(df["low"], errors="coerce")).dropna()
+            vol = pd.Series(pd.to_numeric(df.get("volume"), errors="coerce")).dropna() \
+                if "volume" in df.columns else None
             k, d, jv = ind.kdj(high, low, close)
             k, d, jv = (float(k.iloc[-1]), float(d.iloc[-1]), float(jv.iloc[-1]))
             sp = spot_map.get(code)
-            price = None
-            if sp is not None and pd.notna(sp.get("price")):
-                price = float(sp.get("price"))
+            price = _f(sp.get("price")) if sp is not None else None
             if not price or price <= 0:
                 price = float(close.iloc[-1])
             h52 = float(high.iloc[-250:].max())
             l52 = float(low.iloc[-250:].min())
+            vr = None
+            sig_vol = None
+            if vol is not None and len(vol) >= 20 and float(vol.iloc[-20:].mean()) > 0:
+                vr = round(float(vol.iloc[-5:].mean()) / float(vol.iloc[-20:].mean()), 2)
+                sig_vol = "缩量" if vr < 0.7 else ("放量" if vr > 1.5 else "平量")
+            ni_q4 = p.get("ni_q4") or []
+            rev_q4 = p.get("rev_q4") or []
+            ni_y4 = p.get("ni_y4") or []
+            roe_trend = None
+            if reports and code in reports:
+                rep = reports[code]
+                pts = [{"date": pp, "value": round(float(v), 2)}
+                       for pp, v in sorted(zip(rep["periods"], rep.get("roe_cum") or []))
+                       if pp.endswith("12-31") and v is not None]
+                roe_trend = pts[-5:] or None
             prof = dict(template)
             prof.update({
                 "code": code, "name": p.get("name"), "industry": p.get("industry"),
@@ -364,14 +387,24 @@ def _drawer_profiles(picks: list) -> dict:
                 "pos_52w_pct": round((price - l52) / (h52 - l52) * 100, 1) if h52 > l52 else None,
                 "max_dd_pct": round(float(ind.max_drawdown(close)), 1),
                 "atr_pct": round(float(ind.atr_pct(high, low, close)), 2),
+                "boll_low": round(float(ind.bollinger_lower(close).iloc[-1]), 2),
+                "vol_ratio_calc": vr, "sig_vol": sig_vol,
+                "volume_ratio": _f(sp.get("volume_ratio")) if sp is not None else None,
+                "turnover": _f(sp.get("turnover")) if sp is not None else None,
                 "kdj_k": round(k, 1), "kdj_d": round(d, 1), "kdj_j": round(jv, 1),
                 "kdj_tag": ind.kdj_tag(k, d, jv),
                 "rsi": round(float(ind.rsi(close).iloc[-1]), 1),
                 "pe_ttm": p.get("pe"), "pe_disp": (str(p.get("pe")) if p.get("pe") is not None else None),
+                "pb": _f(sp.get("pb")) if sp is not None else None,
                 "roe": p.get("roe"),
-                "ni_qoq": p.get("ni_q4"), "growth_quality": None,
+                "netprofit_yoy": (ni_q4[0] if ni_q4 else None),
+                "revenue_yoy": (rev_q4[0] if rev_q4 else None),
+                "ni_ttm_yoy": (ni_y4[0] if ni_y4 else None), "ni_basis": "年度" if ni_y4 else None,
+                "ni_qoq": ni_q4, "rev_qoq": rev_q4,
+                "roe_trend": roe_trend,
+                "fund_score": round(float(p.get("score") or 0)),
                 "dom_rank": p.get("dom_rank"), "dom_share": p.get("dom_share"),
-                "conclusion": f"👑 优质榜第{i}名 · 硬门槛 {p.get('n_pass')}/7 · 长线研究池标的, 非左侧信号; 完整技术/买卖点仅候选股提供。",
+                "conclusion": f"👑 优质榜第{i}名 · 硬门槛 {p.get('n_pass')}/7 · 长线研究池标的, 非左侧信号; 买卖点/胜率仅候选股提供。",
                 "conclusion_en": f"Quality #{i} · gates {p.get('n_pass')}/7 · research-pool name, not a left-side signal.",
             })
             out[code] = prof
