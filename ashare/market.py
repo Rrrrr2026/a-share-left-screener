@@ -204,6 +204,82 @@ def fetch_index_bars(start: str) -> list:
     return rows
 
 
+def fetch_bars_bulk_em(codes: list, start: str) -> dict:
+    """东财备源长历史日线 (腾讯WAF封禁时用): 一只票一请求, 前复权含成交量。
+    与腾讯混用无碍 —— 前复权因子只需同一只票内部一致, 跨票无所谓。"""
+    from concurrent.futures import ThreadPoolExecutor
+    from . import datasource as ds
+    import akshare as ak
+    skip_day = _drop_partial_today()
+    s8 = start.replace("-", "")
+    e8 = dt.date.today().strftime("%Y%m%d")
+
+    def one(code):
+        try:
+            df = ds.call_with_retry(ak.stock_zh_a_hist, symbol=code, period="daily",
+                                    start_date=s8, end_date=e8, adjust="qfq")
+        except Exception:
+            return code, None
+        if df is None or len(df) < 60:
+            return code, None
+        rows = []
+        for _, r in df.iterrows():
+            d1 = str(r["日期"])[:10]
+            if skip_day and d1 >= skip_day:
+                continue
+            try:
+                o, h, l, c, v = (float(r["开盘"]), float(r["最高"]), float(r["最低"]),
+                                 float(r["收盘"]), float(r["成交量"]))
+            except (TypeError, ValueError, KeyError):
+                continue
+            if h < l or min(o, h, l, c) <= 0 or v < 0:
+                continue
+            rows.append((d1, o, h, l, c, v))
+        rows.sort()
+        return code, (rows if len(rows) >= 60 else None)
+
+    res = {}
+    with ThreadPoolExecutor(max_workers=2) as exe:      # 东财白天限流, 更温和
+        for i, (code, rows) in enumerate(exe.map(one, codes), 1):
+            if rows:
+                res[code] = rows
+            if i % 200 == 0 or i == len(codes):
+                log.info("EM长历史进度 %d/%d (拿到 %d)", i, len(codes), len(res))
+    return res
+
+
+def fetch_index_bars_em(start: str) -> list:
+    """沪深300 长历史: 东财优先, 挂了走新浪 (列名英文)。"""
+    from . import datasource as ds
+    import akshare as ak
+    skip_day = _drop_partial_today()
+    rows = []
+    try:
+        df = ds.call_with_retry(ak.index_zh_a_hist, symbol="000300", period="daily",
+                                start_date=start.replace("-", ""),
+                                end_date=dt.date.today().strftime("%Y%m%d"))
+        for _, r in df.iterrows():
+            d1 = str(r["日期"])[:10]
+            if not (skip_day and d1 >= skip_day):
+                rows.append((d1, float(r["开盘"]), float(r["最高"]), float(r["最低"]),
+                             float(r["收盘"]), float(r["成交量"])))
+    except Exception as e:
+        log.warning("EM指数长历史失败(改用新浪): %s", e)
+        try:
+            df = ds.call_with_retry(ak.stock_zh_index_daily, symbol="sh000300")
+            for _, r in df.iterrows():
+                d1 = str(r["date"])[:10]
+                if d1 < start or (skip_day and d1 >= skip_day):
+                    continue
+                rows.append((d1, float(r["open"]), float(r["high"]), float(r["low"]),
+                             float(r["close"]), float(r["volume"])))
+        except Exception as e2:
+            log.warning("新浪指数长历史也失败: %s", e2)
+            return []
+    rows.sort()
+    return rows
+
+
 def universe_codes() -> list:
     """全A代码 (主板/创业板/科创板: 0/3/6 前缀; 剔除北交所)。"""
     from . import datasource as ds
