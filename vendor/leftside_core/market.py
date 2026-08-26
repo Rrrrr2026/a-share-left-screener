@@ -35,6 +35,10 @@ class Market:
     limit_down_oneline: Optional[Callable] = None
     news_titles: Optional[Callable[[str], list]] = None                 # code -> [(date, title, url)]
     news_keywords: list = field(default_factory=list)                   # [(keyword, label)]
+    # 长历史研究钩子 (pricestore/coilscan 用): 带成交量的日线批量取数 + 基准指数长历史
+    fetch_bars_bulk: Optional[Callable[[list, str], dict]] = None       # (codes, start) -> {code: [(d,o,h,l,c,v),...]}
+    fetch_index_bars: Optional[Callable[[str], list]] = None            # (start) -> [(d,o,h,l,c,v),...]
+    universe_codes: Optional[Callable[[], list]] = None                 # () -> 全市场代码
     log_prefix: str = "leftside_core"
 
 
