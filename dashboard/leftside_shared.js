@@ -8,6 +8,7 @@ LS.init = function(ctx){
   function btOpen(code){
     const c=(getData().candidates||[]).find(x=>x.code===code);
     if(c) openDetail(c);
+    else if(market && market.qlLink) window.open(market.qlLink(code), "_blank");   // 非候选股: 跳行情页
   }
   function renderBacktest(){
     const B = window.__BT__;
@@ -132,9 +133,9 @@ LS.init = function(ctx){
       const q4=(p.ni_q4||[]).map(v=>(v>0?"+":"")+v.toFixed(0)).join("›");
       const y4=(p.ni_y4||[]).map(v=>(v>0?"+":"")+v.toFixed(0)).join("›");
       const domt = isNum(p.dom_rank)? `${market.domFmt(p.dom_rank)}${isNum(p.dom_share)?` · ${p.dom_share}%`:""}` : dash;
-      return `<tr class="border-t border-slate-700/40 hover:bg-slate-700/20">`+
+      return `<tr class="border-t border-slate-700/40 hover:bg-slate-700/20 cursor-pointer" onclick="btOpen('${String(p.code).replace(/[^\w.]/g,"")}')">`+
         `<td class="py-1.5 text-slate-500">${i+1}</td>`+
-        `<td><a href="${qlLink(p.code)}" target="_blank" rel="noopener" class="hover:underline">${crown}<b>${escH(String(p.name||"").slice(0,26))}</b> <span class="font-mono text-xs text-slate-400">${escH(p.code)} ↗</span></a>${p.accel?` <span title="${t("ql_accel")}">⚡</span>`:""}</td>`+
+        `<td>${crown}<b>${escH(String(p.name||"").slice(0,26))}</b> <span class="font-mono text-xs text-slate-400">${escH(p.code)}</span>${p.accel?` <span title="${t("ql_accel")}">⚡</span>`:""}</td>`+
         `<td class="text-slate-400 text-xs">${escH(p.industry||dash)}</td>`+
         `<td class="text-right font-bold text-emerald-300">${p.score??dash}</td>`+
         `<td class="pl-3">${gates}</td>`+
