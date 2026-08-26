@@ -7,8 +7,10 @@ LS.init = function(ctx){
   // ---------- 📊 信号回测 ----------
   function btOpen(code){
     const c=(getData().candidates||[]).find(x=>x.code===code);
-    if(c) openDetail(c);
-    else if(market && market.qlLink) window.open(market.qlLink(code), "_blank");   // 非候选股: 跳行情页
+    if(c){ openDetail(c); return; }
+    const prof = window.__QL__ && __QL__.profiles && __QL__.profiles[code];   // 优质榜档案: 主表同款弹窗
+    if(prof){ try{ openDetail(prof); return; }catch(e){ console.warn("profile popup failed", e); } }
+    if(market && market.qlLink) window.open(market.qlLink(code), "_blank");
   }
   function renderBacktest(){
     const B = window.__BT__;

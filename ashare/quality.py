@@ -296,6 +296,10 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
             json.dump({"date": result["meta"]["date"], "picks": slim}, f, ensure_ascii=False)
     except Exception as e:
         log.warning("优质榜历史落盘失败: %s", e)
+    try:
+        result["profiles"] = _drawer_profiles(picks)
+    except Exception as e:
+        log.warning("优质榜弹窗档案失败(不影响榜单): %s", e)
     with open(QL_JS, "w", encoding="utf-8") as f:
         f.write("window.__QL__ = ")
         json.dump(result, f, ensure_ascii=False)
@@ -308,3 +312,70 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     build_quality()
+
+
+def _drawer_profiles(picks: list) -> dict:
+    """优质榜前10只生成候选股同构档案 -> 主表同款弹窗可用。
+    键模板取当日快照第一只候选 (缺项 None -> 前端显示 '—'), 行情走 fuyao 长历史。"""
+    import glob
+    import pandas as pd
+    from . import datasource as ds
+    from leftside_core import indicators as ind
+    template = {}
+    days = sorted(glob.glob(os.path.join(DASHBOARD_DIR, "history", "day_*.json")))
+    if days:
+        try:
+            cands = (json.load(open(days[-1], encoding="utf-8")).get("candidates") or [])
+            if cands:
+                template = {k: None for k in cands[0]}
+        except Exception:
+            pass
+    try:
+        spot = ds.fetch_spot_snapshot()
+        spot_map = {str(r.get("code", "")).zfill(6): r for _, r in spot.iterrows()}             if spot is not None and not spot.empty else {}
+    except Exception:
+        spot_map = {}
+    out = {}
+    for i, p in enumerate(picks, 1):
+        code = p.get("code")
+        try:
+            df = ds.fetch_long_hist(code, years=2)
+            if df is None or len(df) < 60:
+                continue
+            close = pd.Series(pd.to_numeric(df["close"], errors="coerce")).dropna()
+            high = pd.Series(pd.to_numeric(df["high"], errors="coerce")).dropna()
+            low = pd.Series(pd.to_numeric(df["low"], errors="coerce")).dropna()
+            k, d, jv = ind.kdj(high, low, close)
+            k, d, jv = (float(k.iloc[-1]), float(d.iloc[-1]), float(jv.iloc[-1]))
+            sp = spot_map.get(code)
+            price = None
+            if sp is not None and pd.notna(sp.get("price")):
+                price = float(sp.get("price"))
+            if not price or price <= 0:
+                price = float(close.iloc[-1])
+            h52 = float(high.iloc[-250:].max())
+            l52 = float(low.iloc[-250:].min())
+            prof = dict(template)
+            prof.update({
+                "code": code, "name": p.get("name"), "industry": p.get("industry"),
+                "tag": "🔎 观察", "price": round(price, 2),
+                "spark": [round(float(v), 2) for v in close.iloc[-40:]],
+                "high_52w": round(h52, 2), "low_52w": round(l52, 2),
+                "pos_52w_pct": round((price - l52) / (h52 - l52) * 100, 1) if h52 > l52 else None,
+                "max_dd_pct": round(float(ind.max_drawdown(close)), 1),
+                "atr_pct": round(float(ind.atr_pct(high, low, close)), 2),
+                "kdj_k": round(k, 1), "kdj_d": round(d, 1), "kdj_j": round(jv, 1),
+                "kdj_tag": ind.kdj_tag(k, d, jv),
+                "rsi": round(float(ind.rsi(close).iloc[-1]), 1),
+                "pe_ttm": p.get("pe"), "pe_disp": (str(p.get("pe")) if p.get("pe") is not None else None),
+                "roe": p.get("roe"),
+                "ni_qoq": p.get("ni_q4"), "growth_quality": None,
+                "dom_rank": p.get("dom_rank"), "dom_share": p.get("dom_share"),
+                "conclusion": f"👑 优质榜第{i}名 · 硬门槛 {p.get('n_pass')}/7 · 长线研究池标的, 非左侧信号; 完整技术/买卖点仅候选股提供。",
+                "conclusion_en": f"Quality #{i} · gates {p.get('n_pass')}/7 · research-pool name, not a left-side signal.",
+            })
+            out[code] = prof
+        except Exception as e:
+            log.debug("优质档案 %s 失败: %s", code, e)
+    log.info("优质榜弹窗档案: %d/%d", len(out), len(picks))
+    return out
