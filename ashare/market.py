@@ -280,6 +280,49 @@ def fetch_index_bars_em(start: str) -> list:
     return rows
 
 
+def fetch_bars_bulk_fuyao(codes: list, start: str) -> dict:
+    """同花顺金融数据API (fuyao) 长历史日线: 一次请求整段前复权, 无拼接断裂。
+    注意: 同一只票的序列必须整段来自同一数据源 (复权基准不同, 混拼会有跳变)。"""
+    from concurrent.futures import ThreadPoolExecutor
+    from . import fuyao
+    if not fuyao.available():
+        return {}
+    years = min(9.8, max(1.0, (dt.date.today() - dt.date.fromisoformat(start)).days / 365.0))
+    skip_day = _drop_partial_today()
+
+    def one(code):
+        try:
+            df = fuyao.hist(code, years=years)
+        except Exception:
+            return code, None
+        if df is None or "volume" not in df.columns:
+            return code, None
+        rows = []
+        for _, r in df.iterrows():
+            d1 = str(r["date"])[:10]
+            if d1 < start or (skip_day and d1 >= skip_day):
+                continue
+            try:
+                o, h, l, c, v = (float(r["open"]), float(r["high"]), float(r["low"]),
+                                 float(r["close"]), float(r["volume"]))
+            except (TypeError, ValueError):
+                continue
+            if h < l or min(o, h, l, c) <= 0 or v < 0:
+                continue
+            rows.append((d1, o, h, l, c, v))
+        rows.sort()
+        return code, (rows if len(rows) >= 60 else None)
+
+    res = {}
+    with ThreadPoolExecutor(max_workers=4) as exe:
+        for i, (code, rows) in enumerate(exe.map(one, codes), 1):
+            if rows:
+                res[code] = rows
+            if i % 200 == 0 or i == len(codes):
+                log.info("fuyao长历史进度 %d/%d (拿到 %d)", i, len(codes), len(res))
+    return res
+
+
 def universe_codes() -> list:
     """全A代码 (主板/创业板/科创板: 0/3/6 前缀; 剔除北交所)。"""
     from . import datasource as ds
