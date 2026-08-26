@@ -9,7 +9,7 @@ import leftside_core.coilscan as _core
 
 globals().update({k: v for k, v in vars(_core).items() if not k.startswith("__")})
 
-N_PERIODS = 28               # ~7年报告期: 5年窗口内的早期episode也够算同比
+N_PERIODS = 36               # ~9年报告期: 覆盖9年价格窗口内的早期episode同比
 
 
 def _avail(period: str) -> str:
