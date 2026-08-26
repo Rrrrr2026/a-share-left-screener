@@ -131,7 +131,8 @@ def fetch_bars_bulk(codes: list, start: str) -> dict:
     pages = []
     cur = d0
     while cur < today:
-        nxt = min(cur + dt.timedelta(days=700), today)
+        # 880自然日 ≈ 600交易日 < 单请求上限640 -> 5年只需2页, 省1/3请求量 (腾讯有IP配额)
+        nxt = min(cur + dt.timedelta(days=880), today)
         pages.append((cur.isoformat(), nxt.isoformat()))
         cur = nxt + dt.timedelta(days=1)
     res = {}
@@ -161,7 +162,7 @@ def fetch_bars_bulk(codes: list, start: str) -> dict:
         rows.sort()
         return code, (rows if len(rows) >= 60 else None)
 
-    with ThreadPoolExecutor(max_workers=6) as exe:
+    with ThreadPoolExecutor(max_workers=3) as exe:      # 温和并发, 少触发配额
         for i, (code, rows) in enumerate(exe.map(one, codes), 1):
             if rows:
                 res[code] = rows
