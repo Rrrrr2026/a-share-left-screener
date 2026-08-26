@@ -10,6 +10,7 @@
 <script src="backtest_data.js"></script>
 <script src="quality_data.js"></script>
 <script src="paper_data.js"></script>
+<script src="biweekly_data.js"></script>
 <script src="leftside_shared.js"></script>
 <style>
   :root{
@@ -261,6 +262,7 @@
         <label class="segbtn cursor-pointer"><span data-i18n="jn_import">导入JSON</span><input id="jnImport" type="file" accept="application/json" class="hidden"/></label>
       </div>
     </div>
+    <div id="bwWrap" class="mb-1"></div>
     <div id="ppWrap" class="mb-1"></div>
     <div id="jnStats" class="flex flex-wrap gap-2 mb-2"></div>
     <div class="overflow-x-auto"><table class="w-full text-[13px]" id="jnOpen"></table></div>
@@ -483,6 +485,7 @@
       bt_cs:"💎 错杀≥60", bt_cselig:"过门槛<60", bt_noncs:"其它",
       bt_how:"怎么读：系统每天给出的买卖点，事后用真实行情检验。「达标」= 按建议买入后 20 个交易日内先涨到 +10%（而不是先碰止损）；「达标率」= 同类信号过去达标的比例；「平均净收益」= 含成本的每笔平均结果。", bt_details:"详情：按标签 · 按市场温度/成长质量 · 最近了结 · 方法说明",
       pp_title:"🤖 自动模拟组合", pp_sub:"四类榜单信号首次出现即自动买入 __B__（按买卖点建议成交）", pp_total:"合计盈亏", pp_open:"持仓", pp_resolved:"已了结", pp_win:"胜率", pp_avg:"均每笔", pp_cat_quality:"👑 优质公司", pp_cat_cuosha:"💎 错杀候选", pp_cat_coil:"🎯 蓄势待发", pp_cat_dip:"🕳 深跌抄底", pp_details:"持仓与最近了结明细", pp_open_title:"持仓中", pp_closed_title:"最近了结", pp_col_stock:"标的", pp_col_fill:"成交日", pp_col_dates:"成交 → 离场", pp_col_entry:"成交价", pp_col_now:"现价", pp_col_exit:"离场价", pp_col_ret:"收益率", pp_col_pnl:"盈亏", pp_col_status:"结果", pp_won:"🎯 达标", pp_stopped:"⛔ 止损", pp_expired:"⏳ 到期", pp_empty:"暂无成交 —— 新信号出现后会自动买入并在这里跟踪", pp_note:"规则：优质公司 / 错杀候选 / 蓄势待发 / 深跌抄底 首次上榜自动注册，按买卖点建议模拟成交（突破单需站上箱体上沿、回踩限价、市价次日开盘；A股含T+1与一字板限制；开盘已破止损不接飞刀；含交易成本）。离场 = 止损 / +10%目标 / 20个交易日到期，同一股票同类信号30天冷却。规则与下方“信号回测”完全一致；纸面推演，非实盘、非建议。",
+      bw_title:"双周量化组合", bw_sub:"每10个交易日一期 · 按信号历史战绩选股 · 温度门控制仓位 · 纸面推演", bw_total:"累计盈亏", bw_u_cycles:"期已结", bw_win_cycles:"盈利期", bw_u_stocks:"只", bw_cycle_at:"本期开仓", bw_col_ind:"行业", bw_col_score:"评分", bw_col_now:"现价/结算价", bw_stopped:"⛔ 止损", bw_cycle_end:"🏁 期末结算", bw_open:"持仓中", bw_pending:"待成交", bw_no_fill:"一字板放弃", bw_empty:"本期空仓（温度门）或无达标信号", bw_note:"规则：每期从当日候选选≤6只（信号类型历史达标率≥45%、样本≥12、期内不出财报、每行业≤2只），次日开盘等额买入，止损单保护，第10个交易日收盘全部结算；市场温度≥55满仓、40-55半仓、<40空仓。含交易成本，纸面推演非实盘。",
       bt_reco_seg:"信号类型", bt_reco_hist:"过去达标率", bt_reco_vs:"全部信号",
       bt_reco_tip2:"该股属于此信号类型；胜率是类型的历史频率，不是个股预测。点击查看买卖点计划",
       // 错杀候选
@@ -661,6 +664,7 @@
       bt_cs:"💎 Mispriced ≥60", bt_cselig:"Gate-passed <60", bt_noncs:"Others",
       bt_how:"How to read: every day's published entry/stop/target is checked against what prices did next. 'Hit' = after buying per the plan, the stock reached +10% within 20 trading days before touching the stop; 'hit rate' = share of past signals of that type that hit; 'avg net return' = average per-trade result after costs.", bt_details:"Details: by tag · by market temp / growth quality · recently resolved · method",
       pp_title:"🤖 Auto paper portfolio", pp_sub:"every first-time signal auto-buys __B__ per the trade plan", pp_total:"Total P&L", pp_open:"open", pp_resolved:"resolved", pp_win:"win", pp_avg:"avg", pp_cat_quality:"👑 Quality", pp_cat_cuosha:"💎 Mispriced", pp_cat_coil:"🎯 Coiling", pp_cat_dip:"🕳 Deep dip", pp_details:"Open positions & recent exits", pp_open_title:"Open", pp_closed_title:"Recently resolved", pp_col_stock:"Stock", pp_col_fill:"Filled", pp_col_dates:"Fill → exit", pp_col_entry:"Entry", pp_col_now:"Now", pp_col_exit:"Exit", pp_col_ret:"Return", pp_col_pnl:"P&L", pp_col_status:"Result", pp_won:"🎯 Target", pp_stopped:"⛔ Stopped", pp_expired:"⏳ Expired", pp_empty:"No fills yet — new signals will be bought automatically and tracked here", pp_note:"Rules: first appearance on Quality / Mispriced / Coiling / Deep-dip auto-registers a paper buy per the published trade plan (breakout stop-order, pullback limit, or next-open market; T+1 and sealed limit boards for A-shares; no entry if the open already breaches the stop; costs included). Exit = stop / +10% target / 20-trading-day expiry; 30-day cooldown per stock per signal type. Identical rules to the Signal Backtest below. Paper simulation — not real trading, not advice.",
+      bw_title:"Bi-weekly quant portfolio", bw_sub:"one cycle per 10 trading days · picks by signal track record · temperature-gated sizing · paper only", bw_total:"Total P&L", bw_u_cycles:"cycles closed", bw_win_cycles:"winning", bw_u_stocks:"stocks", bw_cycle_at:"Current cycle", bw_col_ind:"Industry", bw_col_score:"Score", bw_col_now:"Now/settle", bw_stopped:"⛔ Stopped", bw_cycle_end:"🏁 Settled", bw_open:"Open", bw_pending:"Pending", bw_no_fill:"Limit-up skip", bw_empty:"Cycle in cash (temperature gate) or no qualifying signals", bw_note:"Rules: up to 6 picks per cycle (signal-type hit rate >=45%, n>=12, no earnings in window, max 2 per industry), equal-sized buys at next open, stop-loss protection, full settlement at close of trading day 10; market temperature >=55 full size, 40-55 half, <40 cash. Costs included; paper only.",
       bt_reco_seg:"Signal type", bt_reco_hist:"past hit rate", bt_reco_vs:"all signals",
       bt_reco_tip2:"This stock belongs to the signal type above; the win rate is the type's historical frequency, not a per-stock forecast. Click for the trade plan",
       // Mispriced candidates
@@ -937,6 +941,7 @@
     setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderQuality(); }, 0);
     setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderJournal(); }, 0);
     setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderPaper(); }, 0);
+    setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderBiweekly(); }, 0);
   }
   // ---------- 🌡️ 机会温度计 ----------
   function renderOpp(o){
@@ -1998,7 +2003,7 @@
   render();
   // 共用看板功能初始化 (必须在主脚本所有 const 工具函数定义之后)
   LS.init({$, t, isNum, escH, tagClass, tagText, dash, getData:()=>DATA, openDetail, getCur:()=>curC, market: LS_MARKET});
-  setTimeout(()=>{ LS.renderBacktest(); LS.renderCuosha(); LS.renderQuality(); LS.renderJournal(); LS.renderPaper(); }, 0);
+  setTimeout(()=>{ LS.renderBacktest(); LS.renderCuosha(); LS.renderQuality(); LS.renderJournal(); LS.renderPaper(); LS.renderBiweekly(); }, 0);
 })();
 </script>
 </body>

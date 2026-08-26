@@ -251,6 +251,48 @@ LS.init = function(ctx){
   $("#jnImport").onchange = (e)=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const arr=JSON.parse(rd.result); if(Array.isArray(arr)){ const cur=jnLoad(); const ids=new Set(cur.map(x=>x.id)); arr.forEach(x=>{ if(x&&x.id&&!ids.has(x.id)) cur.push(x); }); jnSave(cur); renderJournal(); } }catch(err){ alert("bad json"); } }; rd.readAsText(f); e.target.value=""; };
   $("#jnAddBtn").onclick = ()=>{ if(getCur()) jnAdd(getCur()); };
 
+
+  // ---------- 📆 双周量化组合 (biweekly_data.js -> window.__BW__) ----------
+  function renderBiweekly(){
+    const el = $("#bwWrap");
+    if(!el) return;
+    const B = window.__BW__;
+    if(!B || !B.total || !B.cycles || !B.cycles.length){ el.innerHTML = ""; return; }
+    const cur = (B.meta&&B.meta.currency)||"$";
+    const money = v => v==null? dash : (v<0?"−":"+")+cur+Math.abs(v).toLocaleString(undefined,{maximumFractionDigits:0});
+    const pcx = v => v==null? dash : (v>0?"+":"")+v.toFixed(1)+"%";
+    const STN = {stopped:t("bw_stopped"), cycle_end:t("bw_cycle_end"), open:t("bw_open"),
+                 pending:t("bw_pending"), no_fill:t("bw_no_fill"), no_data:dash, bad_anchor:dash, too_expensive:dash};
+    const last = B.cycles[B.cycles.length-1];
+    const rows = (last.picks||[]).map(p=>{
+      const r = p.result||{};
+      return `<tr class="border-t border-slate-700/40">
+        <td class="py-1"><b>${escH(p.name||"")}</b> <span class="font-mono text-xs text-slate-400">${escH(p.code)}</span> <span class="badge ${tagClass(p.tag)} !text-[10px]">${escH(tagText(p.tag))}</span></td>
+        <td class="text-xs text-slate-400">${escH(p.industry||"")}</td>
+        <td class="text-right">${p.score??dash}</td>
+        <td class="text-right">${isNum(r.entry)?r.entry:dash}</td>
+        <td class="text-right">${isNum(r.exit_px)?r.exit_px:dash}</td>
+        <td class="text-right font-semibold ${r.ret>0?"text-emerald-300":(r.ret<0?"text-rose-300":"")}">${isNum(r.ret)?pcx(r.ret*100):dash}</td>
+        <td class="text-right">${STN[r.status]||r.status||dash}</td></tr>`;
+    }).join("");
+    const hist = B.cycles.slice(0,-1).slice(-5).map(cy=>{
+      const sm = cy.summary||{}; const pnl=(sm.pnl_done||0)+(sm.pnl_open||0);
+      return `<span class="rounded border border-slate-700/60 px-2 py-0.5 text-[11px] ${pnl>0?"text-emerald-300":(pnl<0?"text-rose-300":"text-slate-400")}">${escH(cy.start_date)} · ${sm.n_filled||0}${t("bw_u_stocks")} · ${money(pnl)}</span>`;
+    }).join(" ");
+    el.innerHTML = `
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="text-sm font-semibold text-cyan-300">📆 ${t("bw_title")} <span class="text-xs text-slate-400 font-normal">${t("bw_sub")}</span></div>
+        <div class="text-xs text-slate-400">${t("bw_total")} <b class="${B.total.pnl>0?"text-emerald-300":(B.total.pnl<0?"text-rose-300":"")}">${money(B.total.pnl)}</b> · ${B.total.n_closed}/${B.total.n_cycles} ${t("bw_u_cycles")}${B.total.n_closed?` · ${t("bw_win_cycles")} ${B.total.n_win_cycles}/${B.total.n_closed}`:""}</div>
+      </div>
+      <div class="text-xs text-slate-400 mt-1">${t("bw_cycle_at")} ${escH(last.start_date)} · ${escH(last.gate_note||"")} · ${(last.picks||[]).length} ${t("bw_u_stocks")}</div>
+      ${rows? `<div class="overflow-x-auto mt-1"><table class="w-full text-[13px]">
+        <tr class="text-slate-400 text-[11px]"><th class="text-left py-1">${t("pp_col_stock")}</th><th class="text-left">${t("bw_col_ind")}</th><th class="text-right">${t("bw_col_score")}</th><th class="text-right">${t("pp_col_entry")}</th><th class="text-right">${t("bw_col_now")}</th><th class="text-right">${t("pp_col_ret")}</th><th class="text-right">${t("pp_col_status")}</th></tr>${rows}</table></div>`
+        : `<div class="text-xs text-slate-500 mt-1">${t("bw_empty")}</div>`}
+      ${hist? `<div class="mt-2 flex flex-wrap gap-1.5">${hist}</div>`:""}
+      <div class="text-xs text-slate-500 mt-2 leading-relaxed">${t("bw_note")}</div>
+      <div class="border-t border-slate-700/50 my-3"></div>`;
+  }
+
   // ---------- 🤖 自动模拟组合 (paper_data.js -> window.__PP__) ----------
   function renderPaper(){
     const el = $("#ppWrap");
@@ -305,6 +347,6 @@ LS.init = function(ctx){
   }
   window.btOpen = btOpen;
   LS.renderBacktest = renderBacktest; LS.renderCuosha = renderCuosha; LS.renderQuality = renderQuality;
-  LS.renderJournal = renderJournal; LS.renderPaper = renderPaper; LS.btOpen = btOpen;
+  LS.renderJournal = renderJournal; LS.renderPaper = renderPaper; LS.renderBiweekly = renderBiweekly; LS.btOpen = btOpen;
   LS.ready = true;
 };
