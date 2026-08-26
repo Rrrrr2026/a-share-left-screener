@@ -252,6 +252,43 @@ LS.init = function(ctx){
   $("#jnAddBtn").onclick = ()=>{ if(getCur()) jnAdd(getCur()); };
 
 
+
+  // ---------- 🎯 今日作战台 (温度→仓位 · 恐慌灯 · 本期焦点) ----------
+  function renderDeck(){
+    const el = $("#deckWrap");
+    if(!el) return;
+    const D = getData();
+    if(!D || !D.meta){ el.innerHTML = ""; return; }
+    const isUS = (market && market.key) === "us";
+    let temp = null;
+    if(isUS){ const S = window.__SENT__; temp = (S && isNum(S.score)) ? S.score : null; }
+    else { const opp = D.meta && D.meta.opp; temp = (opp && isNum(opp.score)) ? opp.score : null; }
+    const pos = temp==null ? [dash, "text-slate-400"]
+      : temp>=55 ? [t("deck_full"), "text-emerald-300"]
+      : temp>=40 ? [t("deck_half"), "text-amber-300"]
+      : [t("deck_cash"), "text-rose-300"];
+    let lamp = "";
+    if(isUS){
+      const ph = String((window.__SENT__||{}).phase||"");
+      lamp = (/prolonged|持续/.test(ph)) ? `<span class="badge tag-dip" title="${t("deck_prolonged_tip")}">🎯 ${t("deck_prolonged")}</span>`
+           : (/acute|急|新恐慌/.test(ph)) ? `<span class="badge tag-warn" title="${t("deck_acute_tip")}">⚠️ ${t("deck_acute")}</span>`
+           : `<span class="badge tag-watch">🟢 ${t("deck_calm")}</span>`;
+    }
+    const B = window.__BW__;
+    const cyc = (B && B.cycles && B.cycles.length) ? B.cycles[B.cycles.length-1] : null;
+    const focus = (cyc && cyc.picks && cyc.picks.length)
+      ? cyc.picks.map(p=>`<span class="badge tag-dip !text-[11px]">${escH(p.name||p.code)}</span>`).join(" ")
+      : `<span class="text-slate-500 text-xs">${t("deck_nofocus")}</span>`;
+    const cs = (D.candidates||[]).filter(c=>c.cuosha_score).length;
+    el.innerHTML = `<div class="card px-3 py-2 flex flex-wrap items-center gap-x-5 gap-y-1.5" style="border-color:rgba(52,211,153,.45)">
+      <span class="text-sm font-semibold text-emerald-300">${t("deck_title")}</span>
+      <span class="text-xs text-slate-300">${t(isUS?"deck_temp_us":"deck_temp_a")} <b class="font-mono">${temp==null?dash:temp.toFixed(0)}</b> → <b class="${pos[1]}">${pos[0]}</b></span>
+      ${lamp}
+      <span class="text-xs text-slate-300">💎 ${t("deck_cs")} <b class="text-amber-300">${cs}</b></span>
+      <span class="text-xs text-slate-300 flex items-center gap-1.5 flex-wrap">📆 ${t("deck_focus")} ${focus}</span>
+    </div>`;
+  }
+
   // ---------- 📆 双周量化组合 (biweekly_data.js -> window.__BW__) ----------
   function renderBiweekly(){
     const el = $("#bwWrap");
@@ -281,7 +318,7 @@ LS.init = function(ctx){
     }).join(" ");
     el.innerHTML = `
       <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="text-sm font-semibold text-cyan-300">📆 ${t("bw_title")} <span class="text-xs text-slate-400 font-normal">${t("bw_sub")}</span></div>
+        <div class="text-sm font-semibold text-cyan-300">${t("bw_title")} <span class="text-xs text-slate-400 font-normal">${t("bw_sub")}</span></div>
         <div class="text-xs text-slate-400">${t("bw_total")} <b class="${B.total.pnl>0?"text-emerald-300":(B.total.pnl<0?"text-rose-300":"")}">${money(B.total.pnl)}</b> · ${B.total.n_closed}/${B.total.n_cycles} ${t("bw_u_cycles")}${B.total.n_closed?` · ${t("bw_win_cycles")} ${B.total.n_win_cycles}/${B.total.n_closed}`:""}</div>
       </div>
       <div class="text-xs text-slate-400 mt-1">${t("bw_cycle_at")} ${escH(last.start_date)} · ${escH(last.gate_note||"")} · ${(last.picks||[]).length} ${t("bw_u_stocks")}</div>
@@ -347,6 +384,6 @@ LS.init = function(ctx){
   }
   window.btOpen = btOpen;
   LS.renderBacktest = renderBacktest; LS.renderCuosha = renderCuosha; LS.renderQuality = renderQuality;
-  LS.renderJournal = renderJournal; LS.renderPaper = renderPaper; LS.renderBiweekly = renderBiweekly; LS.btOpen = btOpen;
+  LS.renderJournal = renderJournal; LS.renderPaper = renderPaper; LS.renderBiweekly = renderBiweekly; LS.renderDeck = renderDeck; LS.btOpen = btOpen;
   LS.ready = true;
 };

@@ -281,7 +281,7 @@ LS.init = function(ctx){
       : `<span class="text-slate-500 text-xs">${t("deck_nofocus")}</span>`;
     const cs = (D.candidates||[]).filter(c=>c.cuosha_score).length;
     el.innerHTML = `<div class="card px-3 py-2 flex flex-wrap items-center gap-x-5 gap-y-1.5" style="border-color:rgba(52,211,153,.45)">
-      <span class="text-sm font-semibold text-emerald-300">🎯 ${t("deck_title")}</span>
+      <span class="text-sm font-semibold text-emerald-300">${t("deck_title")}</span>
       <span class="text-xs text-slate-300">${t(isUS?"deck_temp_us":"deck_temp_a")} <b class="font-mono">${temp==null?dash:temp.toFixed(0)}</b> → <b class="${pos[1]}">${pos[0]}</b></span>
       ${lamp}
       <span class="text-xs text-slate-300">💎 ${t("deck_cs")} <b class="text-amber-300">${cs}</b></span>
@@ -318,7 +318,7 @@ LS.init = function(ctx){
     }).join(" ");
     el.innerHTML = `
       <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="text-sm font-semibold text-cyan-300">📆 ${t("bw_title")} <span class="text-xs text-slate-400 font-normal">${t("bw_sub")}</span></div>
+        <div class="text-sm font-semibold text-cyan-300">${t("bw_title")} <span class="text-xs text-slate-400 font-normal">${t("bw_sub")}</span></div>
         <div class="text-xs text-slate-400">${t("bw_total")} <b class="${B.total.pnl>0?"text-emerald-300":(B.total.pnl<0?"text-rose-300":"")}">${money(B.total.pnl)}</b> · ${B.total.n_closed}/${B.total.n_cycles} ${t("bw_u_cycles")}${B.total.n_closed?` · ${t("bw_win_cycles")} ${B.total.n_win_cycles}/${B.total.n_closed}`:""}</div>
       </div>
       <div class="text-xs text-slate-400 mt-1">${t("bw_cycle_at")} ${escH(last.start_date)} · ${escH(last.gate_note||"")} · ${(last.picks||[]).length} ${t("bw_u_stocks")}</div>

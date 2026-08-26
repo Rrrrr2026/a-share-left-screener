@@ -79,6 +79,28 @@
   .note-good{ border-left:3px solid #22c55e; background:rgba(34,197,94,.07); }
   .note-info{ border-left:3px solid #64748b; background:rgba(148,163,184,.08); }
   @media (max-width:640px){ th,td{ padding:6px 6px; font-size:12px; } }
+
+  /* ===== TradingView 风格皮肤 (令牌层换皮, 结构不动) ===== */
+  :root{ --bg:#131722; --card:#1e222d; --border:#2a2e39; --text:#d1d4dc; --dim:#b2b5be; --muted:#787b86;
+    --head:#1e222d; --rowhover:#2a2e39; --input:#2a2e39; --inputborder:#363a45; --gridline:#2a2e39; --drawer:#131722; }
+  body.light{ --bg:#ffffff; --card:#ffffff; --border:#e0e3eb; --text:#131722; --dim:#434651; --muted:#787b86;
+    --head:#f8f9fd; --rowhover:#f0f3fa; --input:#ffffff; --inputborder:#d1d4dc; --gridline:#e0e3eb; --drawer:#f8f9fd; }
+  .card{ border-radius:6px; }
+  .card[style*="border-color"]{ border-color:var(--border)!important; }
+  #deckWrap .card{ border-left:2px solid #2962ff!important; }
+  .badge{ border-radius:4px; font-weight:500; padding:1px 7px; }
+  .miniStat,.segbtn,select,input{ border-radius:4px; }
+  .segbtn.on{ background:#2962ff; border-color:#2962ff; color:#fff; }
+  th,td{ padding:5.5px 8px; font-size:12.5px; }
+  td{ font-variant-numeric:tabular-nums; }
+  header h1{ font-size:17px!important; }
+  header .text-sm{ font-size:12px!important; }
+  .sec-title::before{ background:#2962ff; }
+  th.sortable:hover{ color:#2962ff; }
+  input[type=range]{ accent-color:#2962ff; }
+  .star.on{ color:#f7a600; }
+  ::-webkit-scrollbar-thumb{ background:#4a4e59; }
+  body.light ::-webkit-scrollbar-thumb{ background:#c1c4cd; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -464,7 +486,7 @@
       hist_banner_a:"正在查看历史快照 ", hist_banner_b:" — 该日榜单为当日打分, K线明细与深度档案仅最新一天提供；在日期框选回最新日期即可返回。",
       // 买卖点建议
       // 机会温度计
-      opp_title:"🌡️ 机会温度计 — 今天该不该重仓？",
+      opp_title:"机会温度计 — 今天该不该重仓？",
       opp_s0:"0 观望", opp_s40:"40 正常试仓", opp_s60:"60 加大试仓", opp_s80:"80 重仓分批",
       opp_v_deploy:"🔥 重仓分批", opp_v_lean:"👍 加大试仓", opp_v_normal:"➖ 正常试仓",
       opp_v_hold:"🧊 观望留子弹", opp_v_na:"样本不足",
@@ -474,7 +496,7 @@
       opp_pctile:"分位",
       opp_note:"温度 = 当日榜单质量(强左侧/蓄势数量、计划盈亏比与胜率、贴支撑占比、沪深300回撤深度)相对自身历史的加权百分位。优质左侧机会在时间上扎堆出现——温度高(历史前20%)时才值得下重手，平庸日子请留好子弹。这是相对排位，不是对未来的预测。",
       // 信号回测
-      bt_title:"📊 信号回测 — 过去发出的建议，真实走成了什么样？",
+      bt_title:"信号回测 — 过去发出的建议，真实走成了什么样？",
       bt_days:" 天快照", bt_hz:"持有窗口 ", bt_hz2:" 交易日",
       bt_n:"已验证信号", bt_n_open:"窗口未满", bt_fill:"触发率",
       bt_win:"达标率", bt_win_sub:"20日内先涨到+10%",
@@ -485,13 +507,13 @@
       bt_col_ret:"平均收益", bt_col_d:"天数", bt_low_n:"样本少",
       bt_opp_hot:"🔥 高温日", bt_opp_mid:"➖ 常温日", bt_opp_cold:"🧊 低温日",
       bt_g_G:"🟢 可持续", bt_g_M:"🟡 待观察", bt_g_W:"🔴 一次性",
-      bt_reco_title:"📈 回测优选 — 今日候选中，其信号类型过去达标率最高的",
+      bt_reco_title:"回测优选 — 今日候选中，其信号类型过去达标率最高的",
       bt_reco_tip:"同类历史信号收缩后胜率", bt_reco_none:"今日暂无达标段位（样本随每日运行自动积累）",
       bt_recent:"最近了结", bt_open_pos:"进行中",
       bt_cs:"💎 错杀≥60", bt_cselig:"过门槛<60", bt_noncs:"其它",
       bt_how:"怎么读：系统每天给出的买卖点，事后用真实行情检验。「达标」= 按建议买入后 20 个交易日内先涨到 +10%（而不是先碰止损）；「达标率」= 同类信号过去达标的比例；「平均净收益」= 含成本的每笔平均结果。", bt_details:"详情：按标签 · 按市场温度/成长质量 · 最近了结 · 方法说明",
       deck_title:"今日作战台", deck_temp_a:"市场温度", deck_temp_us:"风险偏好", deck_full:"满仓档", deck_half:"半仓档", deck_cash:"空仓档", deck_prolonged:"持续恐慌 · 狙击窗口", deck_prolonged_tip:"35年数据唯一显著机会：恐慌持续后3个月中位+6.7%", deck_acute:"新恐慌 · 勿接飞刀", deck_acute_tip:"刚恐慌=掷硬币且左尾−15%，等企稳", deck_calm:"情绪平静", deck_cs:"错杀候选", deck_focus:"双周组合本期:", deck_nofocus:"本期空仓或无达标信号", seg_chip_tip:"该信号类型的历史达标率（20个交易日内先涨到+10%）", coil_demote_tip:"9年回测：追突破中位收益为负——仅作观察参考，不构成买入理由", warn_neg_tip:"两市回测中唯一的负期望标签：技术面好但基本面弱，谨慎", bt_findings:"<b>📌 九年研究结论速览：</b>① A股追突破中位收益为负——这是均值回归市场，深跌承接优于追涨；② 基本面最优公司的突破表现反而最差（27.9%达标）——优质名单的正确用法是'跌下来敢接的白名单'；③ 熊市里突破平均为负——温度门是纪律不是参考；④ 极紧箱体（≤10%）更差——'越紧越好'是迷信；⑤ 缩量蓄势在美股有增益（21.8%→26.1%），在A股没有。",
-      pp_title:"🤖 自动模拟组合", pp_sub:"四类榜单信号首次出现即自动买入 __B__（按买卖点建议成交）", pp_total:"合计盈亏", pp_open:"持仓", pp_resolved:"已了结", pp_win:"胜率", pp_avg:"均每笔", pp_cat_quality:"👑 优质公司", pp_cat_cuosha:"💎 错杀候选", pp_cat_coil:"🎯 蓄势待发", pp_cat_dip:"🕳 深跌抄底", pp_details:"持仓与最近了结明细", pp_open_title:"持仓中", pp_closed_title:"最近了结", pp_col_stock:"标的", pp_col_fill:"成交日", pp_col_dates:"成交 → 离场", pp_col_entry:"成交价", pp_col_now:"现价", pp_col_exit:"离场价", pp_col_ret:"收益率", pp_col_pnl:"盈亏", pp_col_status:"结果", pp_won:"🎯 达标", pp_stopped:"⛔ 止损", pp_expired:"⏳ 到期", pp_empty:"暂无成交 —— 新信号出现后会自动买入并在这里跟踪", pp_note:"规则：优质公司 / 错杀候选 / 蓄势待发 / 深跌抄底 首次上榜自动注册，按买卖点建议模拟成交（突破单需站上箱体上沿、回踩限价、市价次日开盘；A股含T+1与一字板限制；开盘已破止损不接飞刀；含交易成本）。离场 = 止损 / +10%目标 / 20个交易日到期，同一股票同类信号30天冷却。规则与下方“信号回测”完全一致；纸面推演，非实盘、非建议。",
+      pp_title:"自动模拟组合", pp_sub:"四类榜单信号首次出现即自动买入 __B__（按买卖点建议成交）", pp_total:"合计盈亏", pp_open:"持仓", pp_resolved:"已了结", pp_win:"胜率", pp_avg:"均每笔", pp_cat_quality:"👑 优质公司", pp_cat_cuosha:"💎 错杀候选", pp_cat_coil:"🎯 蓄势待发", pp_cat_dip:"🕳 深跌抄底", pp_details:"持仓与最近了结明细", pp_open_title:"持仓中", pp_closed_title:"最近了结", pp_col_stock:"标的", pp_col_fill:"成交日", pp_col_dates:"成交 → 离场", pp_col_entry:"成交价", pp_col_now:"现价", pp_col_exit:"离场价", pp_col_ret:"收益率", pp_col_pnl:"盈亏", pp_col_status:"结果", pp_won:"🎯 达标", pp_stopped:"⛔ 止损", pp_expired:"⏳ 到期", pp_empty:"暂无成交 —— 新信号出现后会自动买入并在这里跟踪", pp_note:"规则：优质公司 / 错杀候选 / 蓄势待发 / 深跌抄底 首次上榜自动注册，按买卖点建议模拟成交（突破单需站上箱体上沿、回踩限价、市价次日开盘；A股含T+1与一字板限制；开盘已破止损不接飞刀；含交易成本）。离场 = 止损 / +10%目标 / 20个交易日到期，同一股票同类信号30天冷却。规则与下方“信号回测”完全一致；纸面推演，非实盘、非建议。",
       bw_title:"双周量化组合", bw_sub:"每10个交易日一期 · 按信号历史战绩选股 · 温度门控制仓位 · 纸面推演", bw_total:"累计盈亏", bw_u_cycles:"期已结", bw_win_cycles:"盈利期", bw_u_stocks:"只", bw_cycle_at:"本期开仓", bw_col_ind:"行业", bw_col_score:"评分", bw_col_now:"现价/结算价", bw_stopped:"⛔ 止损", bw_cycle_end:"🏁 期末结算", bw_open:"持仓中", bw_pending:"待成交", bw_no_fill:"一字板放弃", bw_empty:"本期空仓（温度门）或无达标信号", bw_note:"规则：每期从当日候选选≤6只（信号类型历史达标率≥45%、样本≥12、期内不出财报、每行业≤2只），次日开盘等额买入，止损单保护，第10个交易日收盘全部结算；市场温度≥55满仓、40-55半仓、<40空仓。含交易成本，纸面推演非实盘。",
       bt_reco_seg:"信号类型", bt_reco_hist:"过去达标率", bt_reco_vs:"全部信号",
       bt_reco_tip2:"该股属于此信号类型；胜率是类型的历史频率，不是个股预测。点击查看买卖点计划",
@@ -499,7 +521,7 @@
       cs_title:"💎 错杀候选 — 高质量·情绪性下跌·高度关注",
       cs_filter:"💎 错杀候选", cs_popup_title:"错杀检测",
       // 交易日志
-      jn_title:"📒 交易日志 · 模拟组合 — 记录你真正采纳的标的，系统跟踪结果",
+      jn_title:"交易日志 · 模拟组合 — 记录你真正采纳的标的，系统跟踪结果",
       jn_export:"导出JSON", jn_import:"导入JSON", jn_add:"📒 记录买入（按计划）", jn_add_hint:"按计划入场价/止损/目标预填，可在日志里改",
       jn_meta_a:"持仓 ", jn_meta_b:" · 已平仓 ", jn_meta_c:" · 数据仅存本浏览器，换设备请导出/导入",
       jn_prompt_entry:"买入价（默认为计划入场参考价）：", jn_prompt_size:"仓位占总资金 %（可留空）：", jn_prompt_exit:"卖出价（默认为最新价）：", jn_prompt_reason:"平仓原因（止损/止盈/时间到/改主意…）：", jn_confirm_del:"删除这条记录？",
@@ -522,7 +544,7 @@
       p20_note:"「30日涨20%概率」= 该股自身多年日线的历史频率（错杀候选按历史上同样深跌的日子统计；优质公司按任意时点统计，白马波动小故数值天然偏低），每5个交易日取一次窗口并向同组均值收缩，n 为窗口数——是历史频率不是预测。",
       sort_hint:"点击排序 · Shift+点击追加次级排序键",
       // 优质公司
-      ql_title:"👑 优质公司 · 长线研究池 + 错杀白名单 — 好公司是跌下来接的，不是追的",
+      ql_title:"优质公司 · 长线研究池 + 错杀白名单 — 好公司是跌下来接的，不是追的",
       ql_meta_a:"全市场筛 ", ql_meta_b:" 只 · 入池 ", ql_meta_c:" · 👑门槛全过 ", ql_meta_d:" 只",
       ql_col_stock:"股票", ql_col_ind:"行业", ql_col_score:"评分", ql_col_gates:"硬性门槛",
       ql_col_q4:"近四季净利同比", ql_col_y4:"年度净利同比", ql_col_dom:"行业地位", ql_col_rd:"研发%",
@@ -644,7 +666,7 @@
       growq_tip:"Cross-check of 4-year annual parent-NI trend × last 4 single-quarter YoY: sustained growth vs one-off spike",
       date_sel_title:"Browse past scan days",
       hist_banner_a:"Viewing historical snapshot ", hist_banner_b:" — scores are as of that day; K-line details & deep profiles are only available for the latest day. Pick the latest date to return.",
-      opp_title:"🌡️ Opportunity Thermometer — deploy big today?",
+      opp_title:"Opportunity Thermometer — deploy big today?",
       opp_s0:"0 hold", opp_s40:"40 normal", opp_s60:"60 lean in", opp_s80:"80 deploy",
       opp_v_deploy:"🔥 Deploy in size", opp_v_lean:"👍 Lean in", opp_v_normal:"➖ Normal probes",
       opp_v_hold:"🧊 Hold fire", opp_v_na:"Insufficient history",
@@ -654,7 +676,7 @@
       opp_pctile:"pctile",
       opp_note:"Temperature = today's board quality (strong-left/coiled counts, plan R/R & win rates, near-support share, CSI300 drawdown) as a weighted percentile vs its own history. Great left-side entries cluster in time — swing big only when the reading is historically hot (top 20%); keep your powder dry on mediocre days. A relative ranking, not a forecast.",
       // Signal backtest
-      bt_title:"📊 Signal Backtest — how did past calls actually play out?",
+      bt_title:"Signal Backtest — how did past calls actually play out?",
       bt_days:"-day snapshots", bt_hz:"holding window ", bt_hz2:" trading days",
       bt_n:"Verified signals", bt_n_open:"window not full", bt_fill:"Fill rate",
       bt_win:"Hit rate", bt_win_sub:"+10% within 20 days, before the stop",
@@ -665,13 +687,13 @@
       bt_col_ret:"Avg return", bt_col_d:"Days", bt_low_n:"low n",
       bt_opp_hot:"🔥 Hot days", bt_opp_mid:"➖ Mid days", bt_opp_cold:"🧊 Cold days",
       bt_g_G:"🟢 Sustainable", bt_g_M:"🟡 Watch", bt_g_W:"🔴 One-off",
-      bt_reco_title:"📈 Backtest picks — today's candidates whose signal type has the best past hit rate",
+      bt_reco_title:"Backtest picks — today's candidates whose signal type has the best past hit rate",
       bt_reco_tip:"Shrunk win rate of similar past signals", bt_reco_none:"No segment qualifies yet (sample grows with each daily run)",
       bt_recent:"Recently resolved", bt_open_pos:"open",
       bt_cs:"💎 Mispriced ≥60", bt_cselig:"Gate-passed <60", bt_noncs:"Others",
       bt_how:"How to read: every day's published entry/stop/target is checked against what prices did next. 'Hit' = after buying per the plan, the stock reached +10% within 20 trading days before touching the stop; 'hit rate' = share of past signals of that type that hit; 'avg net return' = average per-trade result after costs.", bt_details:"Details: by tag · by market temp / growth quality · recently resolved · method",
       deck_title:"Action deck", deck_temp_a:"Market temp", deck_temp_us:"Risk appetite", deck_full:"Full size", deck_half:"Half size", deck_cash:"Cash", deck_prolonged:"Prolonged panic · window", deck_prolonged_tip:"The one CI-solid edge in 35y: +6.7% median 3M after prolonged panic", deck_acute:"Fresh panic · no knives", deck_acute_tip:"Fresh panic = coin flip with −15% left tail; wait for stabilization", deck_calm:"Calm", deck_cs:"Mispriced", deck_focus:"Bi-weekly picks:", deck_nofocus:"cycle in cash or no qualifying signals", seg_chip_tip:"This signal type's historical hit rate (+10% within 20 trading days, before the stop)", coil_demote_tip:"9y backtest: breakout chasing has negative median return — observation only", warn_neg_tip:"The only negative-expectancy tag in both markets: good technicals, weak fundamentals", bt_findings:"<b>📌 9-year research findings:</b> ① A-share breakout chasing has negative median returns — a mean-reversion market where deep-dip entries beat momentum; ② the best-fundamental companies perform WORST after breakouts (27.9% hit) — the quality list is a 'catch list', not a chase list; ③ bear-market breakouts average negative — the temperature gate is discipline; ④ ultra-tight boxes (≤10%) do worse — tighter is not better; ⑤ volume contraction helps in the US (21.8%→26.1%), not in A-shares.",
-      pp_title:"🤖 Auto paper portfolio", pp_sub:"every first-time signal auto-buys __B__ per the trade plan", pp_total:"Total P&L", pp_open:"open", pp_resolved:"resolved", pp_win:"win", pp_avg:"avg", pp_cat_quality:"👑 Quality", pp_cat_cuosha:"💎 Mispriced", pp_cat_coil:"🎯 Coiling", pp_cat_dip:"🕳 Deep dip", pp_details:"Open positions & recent exits", pp_open_title:"Open", pp_closed_title:"Recently resolved", pp_col_stock:"Stock", pp_col_fill:"Filled", pp_col_dates:"Fill → exit", pp_col_entry:"Entry", pp_col_now:"Now", pp_col_exit:"Exit", pp_col_ret:"Return", pp_col_pnl:"P&L", pp_col_status:"Result", pp_won:"🎯 Target", pp_stopped:"⛔ Stopped", pp_expired:"⏳ Expired", pp_empty:"No fills yet — new signals will be bought automatically and tracked here", pp_note:"Rules: first appearance on Quality / Mispriced / Coiling / Deep-dip auto-registers a paper buy per the published trade plan (breakout stop-order, pullback limit, or next-open market; T+1 and sealed limit boards for A-shares; no entry if the open already breaches the stop; costs included). Exit = stop / +10% target / 20-trading-day expiry; 30-day cooldown per stock per signal type. Identical rules to the Signal Backtest below. Paper simulation — not real trading, not advice.",
+      pp_title:"Auto paper portfolio", pp_sub:"every first-time signal auto-buys __B__ per the trade plan", pp_total:"Total P&L", pp_open:"open", pp_resolved:"resolved", pp_win:"win", pp_avg:"avg", pp_cat_quality:"👑 Quality", pp_cat_cuosha:"💎 Mispriced", pp_cat_coil:"🎯 Coiling", pp_cat_dip:"🕳 Deep dip", pp_details:"Open positions & recent exits", pp_open_title:"Open", pp_closed_title:"Recently resolved", pp_col_stock:"Stock", pp_col_fill:"Filled", pp_col_dates:"Fill → exit", pp_col_entry:"Entry", pp_col_now:"Now", pp_col_exit:"Exit", pp_col_ret:"Return", pp_col_pnl:"P&L", pp_col_status:"Result", pp_won:"🎯 Target", pp_stopped:"⛔ Stopped", pp_expired:"⏳ Expired", pp_empty:"No fills yet — new signals will be bought automatically and tracked here", pp_note:"Rules: first appearance on Quality / Mispriced / Coiling / Deep-dip auto-registers a paper buy per the published trade plan (breakout stop-order, pullback limit, or next-open market; T+1 and sealed limit boards for A-shares; no entry if the open already breaches the stop; costs included). Exit = stop / +10% target / 20-trading-day expiry; 30-day cooldown per stock per signal type. Identical rules to the Signal Backtest below. Paper simulation — not real trading, not advice.",
       bw_title:"Bi-weekly quant portfolio", bw_sub:"one cycle per 10 trading days · picks by signal track record · temperature-gated sizing · paper only", bw_total:"Total P&L", bw_u_cycles:"cycles closed", bw_win_cycles:"winning", bw_u_stocks:"stocks", bw_cycle_at:"Current cycle", bw_col_ind:"Industry", bw_col_score:"Score", bw_col_now:"Now/settle", bw_stopped:"⛔ Stopped", bw_cycle_end:"🏁 Settled", bw_open:"Open", bw_pending:"Pending", bw_no_fill:"Limit-up skip", bw_empty:"Cycle in cash (temperature gate) or no qualifying signals", bw_note:"Rules: up to 6 picks per cycle (signal-type hit rate >=45%, n>=12, no earnings in window, max 2 per industry), equal-sized buys at next open, stop-loss protection, full settlement at close of trading day 10; market temperature >=55 full size, 40-55 half, <40 cash. Costs included; paper only.",
       bt_reco_seg:"Signal type", bt_reco_hist:"past hit rate", bt_reco_vs:"all signals",
       bt_reco_tip2:"This stock belongs to the signal type above; the win rate is the type's historical frequency, not a per-stock forecast. Click for the trade plan",
@@ -679,7 +701,7 @@
       cs_title:"💎 Mispriced — quality names in emotional selloffs · high attention",
       cs_filter:"💎 Mispriced", cs_popup_title:"Mispricing check",
       // Journal
-      jn_title:"📒 Trade Journal · Paper Portfolio — log what you actually take; the system tracks the outcome",
+      jn_title:"Trade Journal · Paper Portfolio — log what you actually take; the system tracks the outcome",
       jn_export:"Export JSON", jn_import:"Import JSON", jn_add:"📒 Log entry (per plan)", jn_add_hint:"Prefilled with the plan's entry/stop/target; editable in the journal",
       jn_meta_a:"Open ", jn_meta_b:" · closed ", jn_meta_c:" · stored in this browser only; export/import to move devices",
       jn_prompt_entry:"Entry price (defaults to the plan's reference entry):", jn_prompt_size:"Position size, % of capital (optional):", jn_prompt_exit:"Exit price (defaults to latest):", jn_prompt_reason:"Reason for closing (stop / target / time / changed mind…):", jn_confirm_del:"Delete this record?",
@@ -702,7 +724,7 @@
       p20_note:"'P(+20% in 30d)' is the stock's own multi-year historical frequency (mispriced names: measured on similarly beaten-down days; quality names: from any day, so low-volatility compounders naturally score lower), sampled every 5 trading days and shrunk toward the group mean; n = windows. A historical frequency, not a forecast.",
       sort_hint:"Click to sort · Shift+click adds a secondary key",
       // Quality compounders
-      ql_title:"👑 Quality · long-term pool + mispricing whitelist — catch them low, don't chase",
+      ql_title:"Quality · long-term pool + mispricing whitelist — catch them low, don't chase",
       ql_meta_a:"Screened ", ql_meta_b:" · pool ", ql_meta_c:" · 👑 all gates ", ql_meta_d:"",
       ql_col_stock:"Stock", ql_col_ind:"Industry", ql_col_score:"Score", ql_col_gates:"Hard gates",
       ql_col_q4:"4Q profit YoY", ql_col_y4:"Annual profit YoY", ql_col_dom:"Position", ql_col_rd:"R&D%",
