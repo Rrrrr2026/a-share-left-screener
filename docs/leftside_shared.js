@@ -6,6 +6,7 @@ LS.init = function(ctx){
   const {$, t, isNum, escH, tagClass, tagText, dash, getData, openDetail, getCur, market} = ctx;
   // ---------- 📊 信号回测 ----------
   function btOpen(code){
+    mergeQLProfiles();
     const c=(getData().candidates||[]).find(x=>x.code===code);
     if(c){ openDetail(c); return; }
     const prof = window.__QL__ && __QL__.profiles && __QL__.profiles[code];   // 优质榜档案: 主表同款弹窗
@@ -119,7 +120,17 @@ LS.init = function(ctx){
   // ---------- 👑 优质公司推荐 ----------
   function qlLink(code){ return market.qlLink(code); }
   const qlGet=(p,k)=>({score:p.score, up:p.upside, mcap:p.mcap_b, pe:p.pe, roe:p.roe, q4:(p.ni_q4||[]).slice(-1)[0], y4:(p.ni_y4||[]).slice(-1)[0], dom:(isNum(p.dom_rank)? -p.dom_rank : null), rd:p.rd, p20:p.p20, n_pass:Object.values(p.gates||{}).filter(Boolean).length, name:p.code, ind:p.industry})[k];
+  function mergeQLProfiles(){
+    try{
+      const Q = window.__QL__, D = getData();
+      if(Q && Q.deep_profiles && D){
+        D.profiles = D.profiles || {};
+        for(const [c, pr] of Object.entries(Q.deep_profiles)) if(!D.profiles[c]) D.profiles[c] = pr;
+      }
+    }catch(e){}
+  }
   function renderQuality(){
+    mergeQLProfiles();
     const card=$("#qlCard"); if(!card) return;
     const Q=window.__QL__;
     if(!Q||!Q.picks||!Q.picks.length){ card.classList.add("hidden"); return; }
@@ -141,7 +152,7 @@ LS.init = function(ctx){
         `<td class="text-slate-400 text-xs">${escH(p.industry||dash)}</td>`+
         `<td class="text-right font-bold text-emerald-300">${p.score??dash}</td>`+
         `<td class="pl-3">${gates}</td>`+
-        `<td class="text-right ${isNum(p.upside)&&p.upside>=20?"text-emerald-300 font-semibold":"text-slate-400"}">${isNum(p.upside)?(p.upside>0?"+":"")+p.upside.toFixed(0)+"%":dash}</td>`+
+        `<td class="text-right ${isNum(p.upside)&&p.upside>=20?"text-emerald-300 font-semibold":"text-slate-400"}">${isNum(p.upside)?(p.upside>0?"+":"")+p.upside.toFixed(0)+"%":dash}${p.val_model?` <span class="text-[9px] text-slate-500">${escH(p.val_model)}</span>`:""}</td>`+
         `<td class="text-right ${isNum(p.pe)&&p.pe<31?"text-emerald-300":"text-slate-400"}">${isNum(p.pe)?p.pe:dash}</td>`+
         `<td class="text-right ${isNum(p.roe)&&p.roe>=15?"text-emerald-300":"text-slate-400"}">${isNum(p.roe)?p.roe:dash}</td>`+
         `<td class="text-right text-xs">${q4||dash}</td>`+

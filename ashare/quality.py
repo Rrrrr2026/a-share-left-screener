@@ -51,6 +51,41 @@ CAP_MIN = 300e8          # 蓝筹门槛: 总市值 >= 300亿
 UPSIDE_MIN = 20.0        # 盈利空间门槛 (PEG法模型值) >= 20%
 JUSTIFIED_PE_LO, JUSTIFIED_PE_HI = 10.0, 35.0
 
+
+CYCLICAL_KEYS = ("有色", "煤炭", "钢铁", "化工", "化学原料", "化学制品", "化学纤维",
+                 "石油", "航运", "航空",
+                 "养殖", "农牧", "船舶", "贵金属", "小金属", "能源金属", "工业金属",
+                 "水泥", "玻璃", "猪")
+FIN_PB_KEYS = ("银行", "保险")
+
+
+def _fair_upside(industry, pe, pb, roe_a, g_latest, mv, ni_annual):
+    """按行业性质选估值模型 -> (空间%, 模型名)。全部是模型值, 非券商目标价。
+    银行/保险: PB-ROE (合理PB=ROE/10, 夹0.5-2.5) —— 盈利受拨备调节, PE失真;
+    周期/重资产: 三年正常化盈利PE (合理PE=15) —— 单年盈利在周期顶/底都会骗人;
+    高增长(>=25%): PEG (合理PE=增速, 夹10-35);
+    稳定增长: PE回归 (合理PE=增速夹10-22)。"""
+    ind = industry or ""
+    if any(k in ind for k in FIN_PB_KEYS):
+        if pb and pb > 0 and roe_a:
+            fair_pb = max(0.5, min(2.5, roe_a / 10.0))
+            return (fair_pb / pb - 1.0) * 100.0, "PB-ROE"
+        return None, None
+    if any(k in ind for k in CYCLICAL_KEYS):
+        if mv and ni_annual and len(ni_annual) >= 3:
+            ni_norm = sum(ni_annual[-3:]) / 3.0
+            if ni_norm > 0:
+                return (15.0 / (mv / ni_norm) - 1.0) * 100.0, "周期正常化"
+        return None, None
+    if pe and pe > 0 and g_latest is not None:
+        if g_latest >= 25.0:
+            justified = min(JUSTIFIED_PE_HI, max(JUSTIFIED_PE_LO, g_latest))
+            return (justified / pe - 1.0) * 100.0, "PEG"
+        justified = min(22.0, max(10.0, g_latest))
+        return (justified / pe - 1.0) * 100.0, "PE回归"
+    return None, None
+
+
 _PREV_Q = {"03": None, "06": "03", "09": "06", "12": "09"}
 
 
@@ -210,10 +245,15 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
         g_cap = bool(mv is not None and mv >= CAP_MIN)
         # 盈利空间 (PEG法, 模型值): 合理PE = 最近年度增速夹在 [10,35], 空间 = 合理PE/当前PE - 1。
         # A股没有干净的一致预期目标价, 这是"如果估值向增速回归"的保守模型, 前端明确标注。
-        upside = None
-        if pe and pe > 0 and ni_y4:
-            justified = min(JUSTIFIED_PE_HI, max(JUSTIFIED_PE_LO, ni_y4[0][1]))
-            upside = min((justified / pe - 1.0) * 100.0, 100.0)   # 模型值封顶100%, 防止低PE股显示离谱数字
+        pb_v = sp.get("pb")
+        pb_v = float(pb_v) if isinstance(pb_v, (int, float)) and pb_v == pb_v else None
+        ni_annual = [v for pp, v in sorted(zip(rep["periods"], rep["ni_cum"]))
+                     if pp.endswith("12-31") and v is not None]
+        upside, val_model = _fair_upside(ind_of.get(code) or sp.get("industry"),
+                                         pe, pb_v, roe_a,
+                                         ni_y4[0][1] if ni_y4 else None, mv, ni_annual)
+        if upside is not None:
+            upside = min(upside, 100.0)               # 模型值封顶100%
         g_up = bool(upside is not None and upside >= UPSIDE_MIN)
         gates = {"q4": g_q4, "y4": g_y4, "roe": g_roe, "pe": g_pe, "dom": g_dom,
                  "cap": g_cap, "up": g_up}
@@ -242,7 +282,9 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
             if accel:
                 score += 8.0
         rows.append({
-            "code": code, "name": name, "industry": ind_of.get(code),
+            "code": code, "name": name,
+            "industry": ind_of.get(code) or (sp.get("industry") if isinstance(sp.get("industry"), str) else None),
+            "val_model": val_model,
             "pe": round(pe, 1) if pe is not None else None,
             "roe": round(roe_a, 1) if roe_a is not None else None,
             "roe_year": roe_y,
@@ -297,7 +339,12 @@ def build_quality(top_n: int = TOP_N) -> dict | None:
     except Exception as e:
         log.warning("优质榜历史落盘失败: %s", e)
     try:
+        result["deep_profiles"] = _deep_profiles(picks)
+    except Exception as e:
+        log.warning("优质深度档案失败(不影响榜单): %s", e)
+    try:
         result["profiles"] = _drawer_profiles(picks, reports)
+        _merge_fundamental_fields(result["profiles"])
     except Exception as e:
         log.warning("优质榜弹窗档案失败(不影响榜单): %s", e)
     with open(QL_JS, "w", encoding="utf-8") as f:
@@ -412,3 +459,83 @@ def _drawer_profiles(picks: list, reports: dict | None = None) -> dict:
             log.debug("优质档案 %s 失败: %s", code, e)
     log.info("优质榜弹窗档案: %d/%d", len(out), len(picks))
     return out
+
+
+def _deep_profiles(picks: list, budget_sec: int = 480) -> dict:
+    """优质榜标的深度档案 (公司简介/主营/现金流/风险/消息): 库里最近的直接复用,
+    没有或超过7天的在预算内现场补拉并入库 -> 弹窗四个页签不再空白。"""
+    import sqlite3
+    import time
+    from .config import DB_PATH
+    from . import module6_profile as m6
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    out = {}
+    t0 = time.time()
+    today = dt.date.today()
+    for p in picks:
+        code = p.get("code")
+        prof, age = None, 999
+        try:
+            row = conn.execute(
+                "SELECT run_date, profile_json FROM profile WHERE code=? "
+                "ORDER BY run_date DESC LIMIT 1", (code,)).fetchone()
+            if row and row["profile_json"]:
+                prof = json.loads(row["profile_json"])
+                age = (today - dt.date.fromisoformat(str(row["run_date"])[:10])).days
+        except Exception:
+            prof = None
+        if (prof is None or age > 7) and time.time() - t0 < budget_sec:
+            try:
+                fresh = m6.pull_profile(code, sector=p.get("industry"))
+                if fresh and (fresh.get("summary") or fresh.get("revenue") or fresh.get("cashflow")):
+                    prof = fresh
+                    conn.execute("INSERT OR REPLACE INTO profile(run_date,code,profile_json) "
+                                 "VALUES(?,?,?)",
+                                 (today.isoformat(), code, json.dumps(fresh, ensure_ascii=False)))
+                    conn.commit()
+            except Exception as e:
+                log.debug("优质深度档案 %s: %s", code, e)
+        if prof:
+            out[code] = prof
+    conn.close()
+    log.info("优质榜深度档案: %d/%d", len(out), len(picks))
+    return out
+
+
+def _merge_fundamental_fields(profiles: dict) -> int:
+    """曾进过候选池的股票, fundamental 表已有逐股财务字段 -> 补进弹窗档案空位。"""
+    import sqlite3
+    from .config import DB_PATH
+    FIELDS = ("eps", "gross_margin", "debt_ratio", "dividend_yield", "pe_pct",
+              "pb_pct", "pe_industry_median", "pe_vs_industry", "eps_yoy", "fcf_yield")
+    JSONF = (("roe_trend_json", "roe_trend"), ("roe_trend_q_json", "roe_trend_q"),
+             ("fund_flags_json", "fund_flags"))
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    n = 0
+    for code, prof in profiles.items():
+        try:
+            row = conn.execute("SELECT * FROM fundamental WHERE code=? "
+                               "ORDER BY run_date DESC LIMIT 1", (code,)).fetchone()
+        except Exception:
+            row = None
+        if not row:
+            continue
+        hit = False
+        for f in FIELDS:
+            if prof.get(f) is None and row[f] is not None:
+                prof[f] = row[f]
+                hit = True
+        for jf, key in JSONF:
+            if prof.get(key) is None and row[jf]:
+                try:
+                    prof[key] = json.loads(row[jf])
+                    hit = True
+                except Exception:
+                    pass
+        if hit:
+            n += 1
+    conn.close()
+    log.info("优质档案合并库内财务字段: %d 只", n)
+    return n
