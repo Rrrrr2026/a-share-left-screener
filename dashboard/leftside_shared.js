@@ -310,35 +310,13 @@ LS.init = function(ctx){
       </div>
       <div class="typeline"><span id="deckLine"></span><span class="tcaret" id="deckCaret"></span></div>
     </div>`;
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function countUp(id, target, suffix){
-      if(target==null || !$("#"+id)) return;
-      if(reduced){ $("#"+id).innerHTML = Math.round(target) + (suffix||""); return; }
-      const t0 = performance.now();
-      (function tick(now){
-        const n = $("#"+id); if(!n) return;          // 重复渲染后旧动画链自然终止
-        const p = Math.min(1,(now-t0)/850), e = 1-Math.pow(1-p,3);
-        n.innerHTML = Math.round(target*e) + (suffix||"");
-        if(p<1) setTimeout(()=>tick(performance.now()), 16); else n.innerHTML = Math.round(target) + (suffix||"");
-      })(t0);
-    }
-    if(temp!=null) countUp("deckTemp", temp);
-    countUp("deckCs", cs, "<small> </small>");
+    const tEl = $("#deckTemp"); if(tEl && temp!=null) tEl.innerHTML = Math.round(temp);
+    const cEl = $("#deckCs"); if(cEl) cEl.innerHTML = cs + "<small> </small>";
     const segTag = Object.entries(((window.__BT__||{}).agg||{}).by_tag||{}).find(([k])=>k.indexOf("深跌")>=0);
     const segWin = segTag && isNum(segTag[1].win10) ? (segTag[1].win10*100).toFixed(0) : null;
-    const lineHtml = `${t(isUS?"deck_temp_us":"deck_temp_a")} <b>${temp==null?dash:temp.toFixed(0)} → ${pos[0]}</b>` +
+    const lineEl = $("#deckLine");
+    if(lineEl) lineEl.innerHTML = `${t(isUS?"deck_temp_us":"deck_temp_a")} <b>${temp==null?dash:temp.toFixed(0)} → ${pos[0]}</b>` +
       (segWin? `；${t("deck_line_seg")} <b>${segWin}%</b>`:"") + `；${t("deck_cs")} <b>${cs}</b>`;
-    if(!$("#deckLine")) return;
-    if(reduced){ $("#deckLine").innerHTML = lineHtml; const c=$("#deckCaret"); if(c) c.style.display="none"; return; }
-    const plain = lineHtml.replace(/<[^>]+>/g,"");
-    let i = 0;
-    (function step(){
-      const lineEl = $("#deckLine"); if(!lineEl) return;
-      i += 1 + Math.floor(Math.random()*2);
-      if(i >= plain.length){ lineEl.innerHTML = lineHtml; setTimeout(()=>{ const c=$("#deckCaret"); if(c) c.style.display="none"; }, 1200); return; }
-      lineEl.textContent = plain.slice(0, i);
-      setTimeout(step, 16 + Math.random()*22);
-    })();
   }
 
   // ---------- 📆 双周量化组合 (biweekly_data.js -> window.__BW__) ----------
