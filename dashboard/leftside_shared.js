@@ -6,6 +6,8 @@ LS.init = function(ctx){
   const {$, t, isNum, escH, tagClass, tagText, dash, getData, openDetail, getCur, market} = ctx;
   // 历史回看时 getData() 是旧快照; 模拟盘入账/现价必须用"最新一天"的数据
   const getLive = ctx.getLive || getData;
+  // 登录闸: 主站(fairvalpha.com)未登录时, 个人功能(日志/模拟盘)先弹登录; 镜像站不拦
+  const gate = () => !window.fvGate || window.fvGate();
   // ---------- 📊 信号回测 ----------
   function btOpen(code){
     mergeQLProfiles();
@@ -213,6 +215,7 @@ LS.init = function(ctx){
   function jnSave(arr){ try{ localStorage.setItem(JN_KEY, JSON.stringify(arr)); }catch(e){} }
   function jnPrice(code){ const c=(getData().candidates||[]).find(x=>x.code===code); return c&&isNum(c.price)? c.price : null; }
   function jnAdd(c){
+    if(!gate()) return;
     const p=c.plan||{}; const tgt=(p.targets&&p.targets.base)||{};
     const entry = isNum(p.entry_ref)? p.entry_ref : c.price;
     const rec={ id:Date.now().toString(36), code:c.code, name:c.name||"", tag:c.tag||"",
@@ -286,7 +289,7 @@ LS.init = function(ctx){
     $("#jnNote").textContent = t("jn_note");
   }
   $("#jnExport").onclick = ()=>{ const blob=new Blob([JSON.stringify(jnLoad(),null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="journal.json"; a.click(); };
-  $("#jnImport").onchange = (e)=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const arr=JSON.parse(rd.result); if(Array.isArray(arr)){ const cur=jnLoad(); const ids=new Set(cur.map(x=>x.id)); arr.forEach(x=>{ if(x&&x.id&&!ids.has(x.id)) cur.push(x); }); jnSave(cur); renderJournal(); } }catch(err){ alert("bad json"); } }; rd.readAsText(f); e.target.value=""; };
+  $("#jnImport").onchange = (e)=>{ if(!gate()){ e.target.value=""; return; } const f=e.target.files&&e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const arr=JSON.parse(rd.result); if(Array.isArray(arr)){ const cur=jnLoad(); const ids=new Set(cur.map(x=>x.id)); arr.forEach(x=>{ if(x&&x.id&&!ids.has(x.id)) cur.push(x); }); jnSave(cur); renderJournal(); } }catch(err){ alert("bad json"); } }; rd.readAsText(f); e.target.value=""; };
   $("#jnAddBtn").onclick = ()=>{ if(getCur()) jnAdd(getCur()); };
 
 
@@ -421,11 +424,13 @@ LS.init = function(ctx){
       <div class="border-t border-slate-700/50 my-3"></div>`;
     el.querySelectorAll("button[data-id]").forEach(b=>{ b.onclick=()=>{ LS._cpfSel=b.dataset.id; renderCustomPf(); }; });
     const nb = el.querySelector("#cpfNew");
-    if(nb) nb.onclick = ()=>{ const nm = prompt(t("cpf_new_ph"), t("cpf_default_name")+(pfs.length+1)); if(!nm) return;
+    if(nb) nb.onclick = ()=>{ if(!gate()) return;
+      const nm = prompt(t("cpf_new_ph"), t("cpf_default_name")+(pfs.length+1)); if(!nm) return;
       const id = "pf"+Date.now(); pfs.push({id, name:nm, positions:[]}); cpfSave(pfs); LS._cpfSel=id; renderCustomPf(); };
     if(cur){
       const ab = el.querySelector("#cpfAdd");
       ab.onclick = ()=>{
+        if(!gate()) return;
         const code = (el.querySelector("#cpfCode").value||"").trim().toUpperCase();
         if(!code) return;
         const live = cpfPrice(code);
@@ -436,12 +441,12 @@ LS.init = function(ctx){
         cpfSave(pfs); renderCustomPf();
       };
       el.querySelector("#cpfCode").onkeydown = (e)=>{ if(e.key==="Enter") ab.onclick(); };
-      el.querySelectorAll(".cpfDel").forEach(b=>{ b.onclick=()=>{ cur.positions.splice(+b.dataset.i,1); cpfSave(pfs); renderCustomPf(); }; });
+      el.querySelectorAll(".cpfDel").forEach(b=>{ b.onclick=()=>{ if(!gate()) return; cur.positions.splice(+b.dataset.i,1); cpfSave(pfs); renderCustomPf(); }; });
       const lb = el.querySelector("#cpfLive");
       if(lb) lb.onclick = ()=>{ lb.disabled=true; lb.textContent="…";
         fetchLiveA((cur.positions||[]).map(po=>po.code), ()=>renderCustomPf()); };
-      el.querySelector("#cpfRen").onclick = ()=>{ const nm=prompt(t("cpf_rename"), cur.name); if(nm){ cur.name=nm; cpfSave(pfs); renderCustomPf(); } };
-      el.querySelector("#cpfDelPf").onclick = ()=>{ if(confirm(t("cpf_del_confirm"))){ const i=pfs.findIndex(p=>p.id===cur.id); pfs.splice(i,1); cpfSave(pfs); LS._cpfSel=(pfs[0]&&pfs[0].id)||""; renderCustomPf(); } };
+      el.querySelector("#cpfRen").onclick = ()=>{ if(!gate()) return; const nm=prompt(t("cpf_rename"), cur.name); if(nm){ cur.name=nm; cpfSave(pfs); renderCustomPf(); } };
+      el.querySelector("#cpfDelPf").onclick = ()=>{ if(!gate()) return; if(confirm(t("cpf_del_confirm"))){ const i=pfs.findIndex(p=>p.id===cur.id); pfs.splice(i,1); cpfSave(pfs); LS._cpfSel=(pfs[0]&&pfs[0].id)||""; renderCustomPf(); } };
     }
   }
 

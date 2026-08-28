@@ -452,6 +452,7 @@
       <input id="auPw2" type="password" class="w-full mb-2 hidden" data-i18n-ph="auth_pw2_ph" placeholder="再输一遍密码"/>
       <div id="auErr" class="text-xs mb-2" style="color:#f87171;min-height:16px"></div>
       <button id="auGo" class="w-full segbtn on" style="padding:8px" data-i18n="auth_login">登录</button>
+      <button id="auGoogle" class="w-full segbtn hidden" style="padding:8px;margin-top:8px" data-i18n="auth_google">用 Google 登录</button>
       <div class="text-[11px] mt-2 leading-relaxed" style="color:var(--muted)" data-i18n="auth_note">登录后：自选股、自建模拟盘、交易日志、列设置与筛选等看盘习惯将同步到云端，换设备登录即恢复。数据存于 fairvalpha.com 自有服务器。</div>
     </div>
   </div>
@@ -634,6 +635,7 @@
       growq_tip:"由 近4年年报归母趋势 × 近4个单季同比 交叉判断: 区分可持续增长与一次性放量",
       // 历史快照
       date_sel_title:"回看历史扫描结果",
+      auth_need:"自选 / 模拟盘 / 交易日志需要登录（数据保存到你的账号，换设备不丢）", auth_google:"用 Google 登录",
       auth_login:"登录", auth_reg:"注册", auth_tip:"登录后自选/模拟盘/看盘习惯云同步",
       auth_logout_confirm:"退出登录？本机数据保留，云端数据不受影响。", auth_logout_tip:"点击退出登录",
       auth_acct_ph:"用户名或邮箱（3-64位）", auth_pw_ph:"密码（至少8位）", auth_pw2_ph:"再输一遍密码",
@@ -832,6 +834,7 @@
       dom_tip:"Market-cap rank & share within the EastMoney industry (a dominance proxy; no free product-level market-share source) · 👑 = #1 with ≥15% share",
       growq_tip:"Cross-check of 4-year annual parent-NI trend × last 4 single-quarter YoY: sustained growth vs one-off spike",
       date_sel_title:"Browse past scan days",
+      auth_need:"Watchlist / paper books / journal need an account (synced, follows you across devices)", auth_google:"Sign in with Google",
       auth_login:"Sign in", auth_reg:"Register", auth_tip:"Sync watchlist / paper books / preferences",
       auth_logout_confirm:"Sign out? Local data stays; cloud data is untouched.", auth_logout_tip:"Click to sign out",
       auth_acct_ph:"Username or email (3-64 chars)", auth_pw_ph:"Password (8+ chars)", auth_pw2_ph:"Repeat password",
@@ -1293,7 +1296,8 @@
   // ---------- 自选 ----------
   const FAV_KEY="ashare_favs_v1";
   let favs=new Set(); try{ favs=new Set(JSON.parse(localStorage.getItem(FAV_KEY)||"[]")); }catch(e){}
-  function toggleFav(code){ if(favs.has(code)) favs.delete(code); else favs.add(code);
+  function toggleFav(code){ if(window.fvGate && !fvGate()) return;
+    if(favs.has(code)) favs.delete(code); else favs.add(code);
     try{ localStorage.setItem(FAV_KEY, JSON.stringify(Array.from(favs))); }catch(e){}
     try{ renderWL(); }catch(e){}
     render(); updateStrip(); }
@@ -2523,6 +2527,17 @@
       }
     }catch(e){}
   }
+  function fvGate(){
+    if(!FV_HOST) return true;              // 镜像/本地开发不拦
+    if(FV_USER) return true;
+    const m = document.getElementById("authModal");
+    if(m){ m.classList.remove("hidden");
+      const er = document.getElementById("auErr");
+      if(er){ er.style.color = "var(--dim)"; er.textContent = t("auth_need"); }
+      const a = document.getElementById("auAcct"); if(a) a.focus(); }
+    return false;
+  }
+  window.fvGate = fvGate;
   function fvUI(){
     const b = document.getElementById("authBtn"); if(!b) return;
     if(!FV_HOST){ b.style.display = "none"; return; }
@@ -2531,12 +2546,14 @@
         fvApi("logout", {method:"POST"}).finally(()=>{ FV_USER=null; sessionStorage.removeItem("fv_pulled_at"); location.reload(); }); }; }
     else { b.textContent = "👤 " + t("auth_login"); b.title = t("auth_tip");
       b.onclick = ()=>{ const m=document.getElementById("authModal"); m.classList.remove("hidden");
-        document.getElementById("auErr").textContent=""; document.getElementById("auAcct").focus(); }; }
+        const er=document.getElementById("auErr"); er.textContent=""; er.style.color="#f87171";
+        document.getElementById("auAcct").focus(); }; }
   }
   async function fvSubmit(mode){
     const acct=(document.getElementById("auAcct").value||"").trim();
     const pw=document.getElementById("auPw").value||"";
     const er=document.getElementById("auErr");
+    er.style.color="#f87171";
     if(!/^[A-Za-z0-9_.@+\-]{3,64}$/.test(acct)){ er.textContent=t("auth_e_acct"); return; }
     if(pw.length<8){ er.textContent=t("auth_e_pw"); return; }
     if(mode==="register" && pw!==document.getElementById("auPw2").value){ er.textContent=t("auth_e_pw2"); return; }
@@ -2574,6 +2591,10 @@
       if(!FV_HOST){ fvUI(); return; }
       try{ JSON.parse(sessionStorage.getItem("fv_pend")||"[]").forEach(([k, o])=>{
         fvPend.set(k, o); fvDirty.add(k); }); }catch(e){}
+      fvApi("config").then(r=>r.ok?r.json():null).then(cfg=>{
+        if(cfg && cfg.google){ const g=document.getElementById("auGoogle");
+          if(g){ g.classList.remove("hidden"); g.onclick=()=>{ location.href="/api/auth/google"; }; } }
+      }).catch(()=>{});
       try{ const r = await fvApi("me");
         if(r.ok){ FV_USER = (await r.json()).acct; fvUI();
           if(fvPend.size) await fvFlush(false);   // 上一页残留的改动先推
