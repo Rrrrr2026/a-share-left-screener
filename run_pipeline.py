@@ -405,6 +405,7 @@ def run(full_market: bool, use_cache: bool):
     ex.write_history_snapshot(run_date)
     try:
         ex.write_watch_js()
+        ex.write_starmap_js()
     except Exception as e:
         log.warning("watch_data 导出失败: %s", e)
     try:

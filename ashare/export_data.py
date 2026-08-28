@@ -331,3 +331,34 @@ def write_watch_js() -> None:
         log.info("全市场迷你行情: %d 只 -> watch_data.js", len(out))
     except Exception as e:
         log.warning("全市场迷你行情导出失败: %s", e)
+
+
+def write_starmap_js(top_n: int = 1200) -> None:
+    """大盘星图数据 -> dashboard/starmap_data.js: 按行业分组的 [名称, 涨跌%, 市值亿]。
+    取市值前 top_n 只 (覆盖 ~85% 总市值, 视觉上与全量无异), 控制文件体积。"""
+    from . import datasource as ds
+    from .config import DASHBOARD_DIR
+    try:
+        spot = ds.fetch_spot_snapshot()
+        if spot is None or spot.empty or "industry" not in spot.columns:
+            return
+        df = spot.dropna(subset=["total_mv"]).copy()
+        df = df[df["total_mv"] > 0].sort_values("total_mv", ascending=False).head(top_n)
+        out = {}
+        for _, r in df.iterrows():
+            ind = str(r.get("industry") or "其他")
+            try:
+                chg = float(r.get("pct_chg"))
+            except (TypeError, ValueError):
+                chg = None
+            out.setdefault(ind, []).append([
+                str(r.get("name") or r.get("code")),
+                round(chg, 2) if chg is not None and chg == chg else None,
+                round(float(r["total_mv"]) / 1e8, 1),
+            ])
+        path = os.path.join(DASHBOARD_DIR, "starmap_data.js")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("window.__STAR__ = " + json.dumps(out, ensure_ascii=False) + ";\n")
+        log.info("大盘星图: %d 行业 / %d 只 -> starmap_data.js", len(out), int(len(df)))
+    except Exception as e:
+        log.warning("大盘星图导出失败: %s", e)

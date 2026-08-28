@@ -25,6 +25,7 @@ if exist "dashboard\quality_data.js" copy /Y "dashboard\quality_data.js" "docs\q
 if exist "dashboard\paper_data.js" copy /Y "dashboard\paper_data.js" "docs\paper_data.js" >nul
 if exist "dashboard\biweekly_data.js" copy /Y "dashboard\biweekly_data.js" "docs\biweekly_data.js" >nul
 if exist "dashboard\watch_data.js" copy /Y "dashboard\watch_data.js" "docs\watch_data.js" >nul
+if exist "dashboard\starmap_data.js" copy /Y "dashboard\starmap_data.js" "docs\starmap_data.js" >nul
 if exist "..\stock-core\dashboard\leftside_shared.js" copy /Y "..\stock-core\dashboard\leftside_shared.js" "dashboard\leftside_shared.js" >nul
 if exist "dashboard\leftside_shared.js" copy /Y "dashboard\leftside_shared.js" "docs\leftside_shared.js" >nul
 robocopy "dashboard\history" "docs\history" /MIR /NJH /NJS /NDL /NFL >nul 2>&1

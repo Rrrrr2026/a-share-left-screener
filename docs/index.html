@@ -12,6 +12,7 @@
 <script src="paper_data.js"></script>
 <script src="biweekly_data.js"></script>
 <script src="watch_data.js"></script>
+<script src="starmap_data.js"></script>
 <script src="leftside_shared.js"></script>
 <style>
   :root{
@@ -2187,6 +2188,47 @@
         tbl.insertBefore(d, tbl.children[1]); }
     }, 60);
   })();
+  // ---- 大盘星图 (原生 ECharts treemap: 行业分块 · 市值面积 · 红涨绿跌) ----
+  function starColor(chg, light){
+    if(chg==null || chg!==chg) return light? "#cbd2dd" : "#3a3f4d";
+    const ups   = light? ["#f3c5c5","#e89a9a","#d96a6a","#c53d3d","#a31d1d"]
+                       : ["#5a3038","#7a3440","#9c3a3a","#bd4040","#e04b4b"];
+    const downs = light? ["#c6e4d4","#94cdb0","#5fb389","#359a68","#127a49"]
+                       : ["#2c4a3c","#2f5d47","#33774f","#2f9159","#26ab63"];
+    const a = Math.min(4, Math.floor(Math.abs(chg) / 2));
+    return chg >= 0 ? ups[a] : downs[a];
+  }
+  function renderStarmap(){
+    const el = document.getElementById("tvHeat");
+    if(!el || !window.__STAR__ || !window.echarts) return;
+    el.style.height = "380px";
+    const light = document.body.classList.contains("light");
+    const data = Object.entries(window.__STAR__).map(([ind, arr])=>({
+      name: ind,
+      value: arr.reduce((a2,x)=>a2+(x[2]||0), 0),
+      children: arr.map(x=>({ name: x[0], value: x[2]||0.1, chg: x[1],
+        itemStyle: { color: starColor(x[1], light) } })),
+    }));
+    const chart = echarts.init(el, null, {renderer:"canvas"});
+    chart.setOption({
+      tooltip: { formatter: p2 => p2.data.chg!=null
+        ? `${p2.name}<br/>涨跌 <b>${p2.data.chg>0?"+":""}${p2.data.chg}%</b> · 市值 ${Math.round(p2.value)}亿`
+        : `${p2.name} · ${Math.round(p2.value)}亿` },
+      series: [{
+        type: "treemap", roam: false, nodeClick: false, breadcrumb: {show:false},
+        width: "100%", height: "100%", top: 0, left: 0,
+        label: { show: true, formatter: p2 => p2.data.chg!=null ? `${p2.name}\n${p2.data.chg>0?"+":""}${p2.data.chg}%` : p2.name,
+                 fontSize: 11, color: "#fff", textShadowColor: "rgba(0,0,0,.6)", textShadowBlur: 2 },
+        upperLabel: { show: true, height: 18, fontSize: 11,
+                      color: light? "#475569" : "#9aa4b8", backgroundColor: "transparent" },
+        itemStyle: { borderColor: light? "#e6eaf2" : "#12151f", borderWidth: 1, gapWidth: 1 },
+        levels: [ {itemStyle:{borderWidth:0, gapWidth:2}}, {itemStyle:{gapWidth:1}} ],
+        data
+      }]
+    });
+    if(!window.__starResize){ window.__starResize = true;
+      window.addEventListener("resize", ()=>{ const c = echarts.getInstanceByDom(el); if(c) c.resize(); }); }
+  }
   // ---- TradingView 官方嵌入组件 (保留署名, 免费授权) ----
   const TV_TAPE = [{proName:"SSE:000001",title:"上证指数"},{proName:"SZSE:399001",title:"深证成指"},{proName:"SZSE:399006",title:"创业板指"},{proName:"TVC:HSI",title:"恒生指数"},{proName:"TVC:GOLD",title:"黄金"},{proName:"FX_IDC:USDCNH",title:"离岸人民币"}];
   function tvTheme(){ return document.body.classList.contains("light") ? "light" : "dark"; }
@@ -2202,9 +2244,7 @@
   function tvRefresh(){
     tvMount(document.getElementById("tvTape"), "embed-widget-ticker-tape.js",
       {symbols: TV_TAPE, showSymbolLogo: true, colorTheme: tvTheme(), isTransparent: true, displayMode: "adaptive", locale: "zh_CN"});
-    tvMount(document.getElementById("tvHeat"), "embed-widget-stock-heatmap.js",
-      {dataSource: "AllCN", blockSize: "market_cap_basic", blockColor: "change", grouping: "sector",
-       locale: "zh_CN", hasTopBar: false, isZoomEnabled: true, colorTheme: tvTheme(), width: "100%", height: "100%"});
+    renderStarmap();
   }
   window.tvMountGauge = (code)=>{
     tvMount(document.getElementById("tvGauge"), "embed-widget-technical-analysis.js",
