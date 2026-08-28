@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>A股 · 左侧支撑位筛选监控台</title>
+<title>FairValpha · A股工作台</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="dashboard_data.js"></script>
@@ -126,14 +126,21 @@
 
   /* ===== 左侧导航 ===== */
   #sideNav{ position:fixed; left:0; top:0; bottom:0; width:132px; z-index:45; background:var(--card);
-    border-right:1px solid var(--border); padding:52px 8px 12px; display:flex; flex-direction:column; gap:2px;
+    border-right:1px solid var(--border); padding:14px 8px 12px; display:flex; flex-direction:column; gap:2px;
     transition:transform .25s ease; }
   body.navClosed #sideNav{ transform:translateX(-132px); }
   #sideNav a{ display:block; padding:7px 10px; border-radius:6px; color:var(--dim); font-size:13px;
     text-decoration:none; }
   #sideNav a:hover{ background:var(--rowhover); color:var(--text); }
-  #navToggle{ position:fixed; left:10px; top:9px; z-index:60; border:1px solid var(--inputborder);
-    background:var(--input); color:var(--dim); border-radius:6px; padding:3px 9px; cursor:pointer; font-size:14px; }
+  #navToggle{ position:fixed; left:132px; top:50%; transform:translateY(-50%); z-index:60;
+    width:14px; height:72px; padding:0; border:1px solid var(--inputborder); border-left:0;
+    border-radius:0 8px 8px 0; background:var(--input); color:var(--muted); cursor:pointer;
+    font-size:0; transition:left .25s ease; }
+  #navToggle::before{ content:""; display:block; width:6px; height:34px; margin:0 auto;
+    border-left:1.5px solid var(--muted); border-right:1.5px solid var(--muted);
+    background:linear-gradient(var(--muted),var(--muted)) center/1.5px 100% no-repeat; }
+  body.navClosed #navToggle{ left:0; }
+  #navToggle:hover{ color:var(--dim); background:var(--rowhover); }
   body:not(.navClosed){ padding-left:132px; }
   body:not(.navClosed) header{ margin-left:-1rem; }
   section{ scroll-margin-top:64px; }
@@ -155,7 +162,7 @@
 </style>
 </head>
 <body class="min-h-screen">
-<button id="navToggle" title="收起/展开导航">☰</button>
+<button id="navToggle" title="收起/展开导航" aria-label="toggle nav">⋮</button>
 <nav id="sideNav"><a href="#deckCard" data-i18n="nav_state">市场状态</a><a href="#btCard" data-i18n="nav_bt">信号回测</a><a href="#qlCard" data-i18n="nav_ql">优质公司</a><a href="#indCard" data-i18n="nav_ind">板块景气</a><a href="#tblCard" data-i18n="nav_tbl">候选主表</a><a href="#jnCard" data-i18n="nav_jn">交易日志</a></nav>
 <div class="max-w-[1900px] mx-auto px-4 md:px-6 py-5">
 
@@ -351,6 +358,7 @@
     </div>
     <div id="bwWrap" class="mb-1"></div>
     <div id="ppWrap" class="mb-1"></div>
+    <div id="cpfWrap" class="mb-1"></div>
     <div id="jnStats" class="flex flex-wrap gap-2 mb-2"></div>
     <div class="overflow-x-auto"><table class="w-full text-[13px]" id="jnOpen"></table></div>
     <div class="overflow-x-auto mt-3"><table class="w-full text-[13px]" id="jnClosed"></table></div>
@@ -496,7 +504,7 @@
   if(LANG!=="en") LANG="zh";
   const T = {
     zh:{
-      title:"A股 · 「左侧支撑位」筛选与监控台",
+      title:"FairValpha · A股工作台",
       subtitle:"高景气行业内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分",
       updated:"最后更新：", datasource:"数据源：akshare（东财行业 · 前复权日线）· 价格单位 人民币￥",
       disclaimer:'⚠️ <b>免责声明</b>：本系统仅对A股做技术/基本面数据的自动化整理与形态筛选，<b>不构成任何投资建议</b>。“左侧买入”是在下跌中、支撑确认前进场，风险天然更高（可能继续下跌或破位）。所有标的需<b>人工复核</b>，使用者自负盈亏与风控。',
@@ -572,7 +580,7 @@
       bt_cs:"💎 错杀≥60", bt_cselig:"过门槛<60", bt_noncs:"其它",
       bt_how:"怎么读：系统每天给出的买卖点，事后用真实行情检验。「达标」= 按建议买入后 20 个交易日内先涨到 +10%（而不是先碰止损）；「达标率」= 同类信号过去达标的比例；「平均净收益」= 含成本的每笔平均结果。", bt_details:"详情：按标签 · 按市场温度/成长质量 · 最近了结 · 方法说明",
       deck_title:"今日作战台", deck_temp_a:"市场温度", deck_temp_us:"风险偏好", deck_full:"满仓档", deck_half:"半仓档", deck_cash:"空仓档", deck_prolonged:"持续恐慌 · 狙击窗口", deck_prolonged_tip:"35年数据唯一显著机会：恐慌持续后3个月中位+6.7%", deck_acute:"新恐慌 · 勿接飞刀", deck_acute_tip:"刚恐慌=掷硬币且左尾−15%，等企稳", deck_calm:"情绪平静", deck_cs:"错杀候选", deck_focus:"双周组合本期:", deck_nofocus:"本期空仓或无达标信号", deck_lamp:"恐慌状态", deck_bw:"双周组合本期", deck_line_seg:"深跌承接类信号历史达标率",
-      bt_info_tip:"点击查看算法说明", bthelp_n_t:"已验证信号", bthelp_n:"算法：只统计「完整窗口」——信号成交后满 20 个交易日才计入（提前止损/达标的也要等窗口走完）。为什么：如果把窗口未满的也算进来，最近的信号里只有跑得快的赢家先被统计，胜率会被严重高估（截尾偏差，实测会把 45% 抬到 71%）。", bthelp_fill_t:"触发率", bthelp_fill:"算法：发出的买点建议中，实际达成成交条件的比例。突破单需盘中站上箱体上沿且开盘不高于追高带；回踩单需回踩到买入区；开盘即破止损的直接放弃（不接飞刀）；A股一字涨停买不进也算未触发。", bthelp_win_t:"达标率", bthelp_win:"算法：成交后 20 个交易日内，盘中最高价先触及 +10%（早于触及止损价）的比例。同日双触发按先止损处理（保守）。注意：这是同类信号的历史频率，不是对单只股票的预测；样本 n 越小该数字越不可靠。", bthelp_ret_t:"平均净收益", bthelp_ret:"算法：每笔从成交价到离场价的收益率均值，已扣往返交易成本（A股约0.3%、美股约0.2%）；持仓中的按当前价计并只扣买入侧成本。离场 = 止损 / 达标 / 20日到期收盘。", bthelp_days_t:"中位持有天数", bthelp_days:"算法：从成交日到离场日的交易日数取中位数。用中位数而不用平均，是因为个别长期横盘的样本会把平均值拖长，中位数更能代表典型体验。", deck_more:"市场状态详情（机会温度计 / 风险偏好）", nav_state:"市场状态", nav_bt:"信号回测", nav_ql:"优质公司", nav_ind:"板块景气", nav_tbl:"候选主表", nav_jn:"交易日志", col_btn:"列 ▾", col_panel_tip:"勾选=显示；取消勾选即删除该列，随时勾回来", fb_title:"自定义条件（全部满足，可叠加多条）", fb_add:"＋ 加一条", bt_all:"全部信号", bt_seg_showing:"当前只看:", pp_click_cat:"点击查看该类全部持仓明细", pp_close_drill:"收起明细", pp_col_sig:"信号日", pp_col_exitd:"离场日", pp_broke:"未入场破位", pp_no_positions:"该类暂无持仓记录（数据将在下次流水线更新后出现）", seg_chip_tip:"该信号类型的历史达标率（20个交易日内先涨到+10%）", coil_demote_tip:"9年回测：追突破中位收益为负——仅作观察参考，不构成买入理由", warn_neg_tip:"两市回测中唯一的负期望标签：技术面好但基本面弱，谨慎", bt_findings:"<b>📌 九年研究结论速览：</b>① A股追突破中位收益为负——这是均值回归市场，深跌承接优于追涨；② 基本面最优公司的突破表现反而最差（27.9%达标）——优质名单的正确用法是'跌下来敢接的白名单'；③ 熊市里突破平均为负——温度门是纪律不是参考；④ 极紧箱体（≤10%）更差——'越紧越好'是迷信；⑤ 缩量蓄势在美股有增益（21.8%→26.1%），在A股没有。",
+      bt_info_tip:"点击查看算法说明", pp_tiers:"达标 10/15/20:", pp_col_maxg:"最高涨幅", cpf_title:"自建模拟盘", cpf_new:"新建", cpf_new_ph:"给模拟盘起个名字", cpf_default_name:"模拟盘", cpf_add:"买入", cpf_code_ph:"输代码 回车", cpf_date:"买入日", cpf_avg:"平均收益", cpf_rename:"重命名", cpf_delete:"删除该盘", cpf_del_confirm:"删除这个模拟盘及其全部持仓？", cpf_entry_ph:"该代码不在今日数据里，请手动输入买入价：", cpf_bad_entry:"价格无效", cpf_no_live:"该代码不在今日数据中，无现价", cpf_note:"存在本浏览器 · 按当日数据价买入 · 现价来自每日更新", bthelp_n_t:"已验证信号", bthelp_n:"算法：只统计「完整窗口」——信号成交后满 20 个交易日才计入（提前止损/达标的也要等窗口走完）。为什么：如果把窗口未满的也算进来，最近的信号里只有跑得快的赢家先被统计，胜率会被严重高估（截尾偏差，实测会把 45% 抬到 71%）。", bthelp_fill_t:"触发率", bthelp_fill:"算法：发出的买点建议中，实际达成成交条件的比例。突破单需盘中站上箱体上沿且开盘不高于追高带；回踩单需回踩到买入区；开盘即破止损的直接放弃（不接飞刀）；A股一字涨停买不进也算未触发。", bthelp_win_t:"达标率", bthelp_win:"算法：成交后 20 个交易日内，盘中最高价先触及 +10%（早于触及止损价）的比例。同日双触发按先止损处理（保守）。注意：这是同类信号的历史频率，不是对单只股票的预测；样本 n 越小该数字越不可靠。", bthelp_ret_t:"平均净收益", bthelp_ret:"算法：每笔从成交价到离场价的收益率均值，已扣往返交易成本（A股约0.3%、美股约0.2%）；持仓中的按当前价计并只扣买入侧成本。离场 = 止损 / 达标 / 20日到期收盘。", bthelp_days_t:"中位持有天数", bthelp_days:"算法：从成交日到离场日的交易日数取中位数。用中位数而不用平均，是因为个别长期横盘的样本会把平均值拖长，中位数更能代表典型体验。", deck_more:"市场状态详情（机会温度计 / 风险偏好）", nav_state:"市场状态", nav_bt:"信号回测", nav_ql:"优质公司", nav_ind:"板块景气", nav_tbl:"候选主表", nav_jn:"交易日志", col_btn:"列 ▾", col_panel_tip:"勾选=显示；取消勾选即删除该列，随时勾回来", fb_title:"自定义条件（全部满足，可叠加多条）", fb_add:"＋ 加一条", bt_all:"全部信号", bt_seg_showing:"当前只看:", pp_click_cat:"点击查看该类全部持仓明细", pp_close_drill:"收起明细", pp_col_sig:"信号日", pp_col_exitd:"离场日", pp_broke:"未入场破位", pp_no_positions:"该类暂无持仓记录（数据将在下次流水线更新后出现）", seg_chip_tip:"该信号类型的历史达标率（20个交易日内先涨到+10%）", coil_demote_tip:"9年回测：追突破中位收益为负——仅作观察参考，不构成买入理由", warn_neg_tip:"两市回测中唯一的负期望标签：技术面好但基本面弱，谨慎", bt_findings:"<b>📌 九年研究结论速览：</b>① A股追突破中位收益为负——这是均值回归市场，深跌承接优于追涨；② 基本面最优公司的突破表现反而最差（27.9%达标）——优质名单的正确用法是'跌下来敢接的白名单'；③ 熊市里突破平均为负——温度门是纪律不是参考；④ 极紧箱体（≤10%）更差——'越紧越好'是迷信；⑤ 缩量蓄势在美股有增益（21.8%→26.1%），在A股没有。",
       pp_title:"自动模拟组合", pp_sub:"四类榜单信号首次出现即自动买入 __B__（按买卖点建议成交）", pp_total:"合计盈亏", pp_open:"持仓", pp_resolved:"已了结", pp_win:"胜率", pp_avg:"均每笔", pp_cat_quality:"👑 优质公司", pp_cat_cuosha:"💎 错杀候选", pp_cat_coil:"🎯 蓄势待发", pp_cat_dip:"🕳 深跌抄底", pp_details:"持仓与最近了结明细", pp_open_title:"持仓中", pp_closed_title:"最近了结", pp_col_stock:"标的", pp_col_fill:"成交日", pp_col_dates:"成交 → 离场", pp_col_entry:"成交价", pp_col_now:"现价", pp_col_exit:"离场价", pp_col_ret:"收益率", pp_col_pnl:"盈亏", pp_col_status:"结果", pp_won:"🎯 达标", pp_stopped:"⛔ 止损", pp_expired:"⏳ 到期", pp_empty:"暂无成交 —— 新信号出现后会自动买入并在这里跟踪", pp_note:"规则：优质公司 / 错杀候选 / 蓄势待发 / 深跌抄底 首次上榜自动注册，按买卖点建议模拟成交（突破单需站上箱体上沿、回踩限价、市价次日开盘；A股含T+1与一字板限制；开盘已破止损不接飞刀；含交易成本）。离场 = 止损 / +10%目标 / 20个交易日到期，同一股票同类信号30天冷却。规则与下方“信号回测”完全一致；纸面推演，非实盘、非建议。",
       bw_title:"双周量化组合", bw_sub:"每10个交易日一期 · 按信号历史战绩选股 · 温度门控制仓位 · 纸面推演", bw_total:"累计盈亏", bw_u_cycles:"期已结", bw_win_cycles:"盈利期", bw_u_stocks:"只", bw_cycle_at:"本期开仓", bw_col_ind:"行业", bw_col_score:"评分", bw_col_now:"现价/结算价", bw_stopped:"⛔ 止损", bw_cycle_end:"🏁 期末结算", bw_open:"持仓中", bw_pending:"待成交", bw_no_fill:"一字板放弃", bw_empty:"本期空仓（温度门）或无达标信号", bw_note:"规则：每期从当日候选选≤6只（信号类型历史达标率≥45%、样本≥12、期内不出财报、每行业≤2只），次日开盘等额买入，止损单保护，第10个交易日收盘全部结算；市场温度≥55满仓、40-55半仓、<40空仓。含交易成本，纸面推演非实盘。",
       bt_reco_seg:"信号类型", bt_reco_hist:"过去达标率", bt_reco_vs:"全部信号",
@@ -753,7 +761,7 @@
       bt_cs:"💎 Mispriced ≥60", bt_cselig:"Gate-passed <60", bt_noncs:"Others",
       bt_how:"How to read: every day's published entry/stop/target is checked against what prices did next. 'Hit' = after buying per the plan, the stock reached +10% within 20 trading days before touching the stop; 'hit rate' = share of past signals of that type that hit; 'avg net return' = average per-trade result after costs.", bt_details:"Details: by tag · by market temp / growth quality · recently resolved · method",
       deck_title:"Action deck", deck_temp_a:"Market temp", deck_temp_us:"Risk appetite", deck_full:"Full size", deck_half:"Half size", deck_cash:"Cash", deck_prolonged:"Prolonged panic · window", deck_prolonged_tip:"The one CI-solid edge in 35y: +6.7% median 3M after prolonged panic", deck_acute:"Fresh panic · no knives", deck_acute_tip:"Fresh panic = coin flip with −15% left tail; wait for stabilization", deck_calm:"Calm", deck_cs:"Mispriced", deck_focus:"Bi-weekly picks:", deck_nofocus:"cycle in cash or no qualifying signals", deck_lamp:"Panic state", deck_bw:"Bi-weekly cycle", deck_line_seg:"deep-dip signals hit rate",
-      bt_info_tip:"Click for methodology", bthelp_n_t:"Verified signals", bthelp_n:"Method: only complete-window episodes count — a signal enters statistics 20 trading days after its fill, even if it hit the stop or target earlier. Why: counting unfinished windows lets early winners in first and inflates the win rate badly (censoring bias; measured 45%→71%).", bthelp_fill_t:"Fill rate", bthelp_fill:"Method: share of published entries whose fill condition was actually met. Breakouts must clear the box top intraday without opening beyond the chase cap; pullback limits must be touched; entries are abandoned if the open already breaches the stop; sealed limit-up bars (A-shares) count as unfilled.", bthelp_win_t:"Hit rate", bthelp_win:"Method: share of fills whose intraday high touched +10% within 20 trading days BEFORE touching the stop. Same-bar double triggers count as stopped (conservative). This is a historical frequency of the signal type, not a per-stock prediction; small n makes it unreliable.", bthelp_ret_t:"Avg net return", bthelp_ret:"Method: mean per-trade return from fill to exit, after round-trip costs (~0.3% A-shares / ~0.2% US); open positions are marked at the latest close with only the buy-side cost. Exit = stop / target / 20-day expiry close.", bthelp_days_t:"Median holding days", bthelp_days:"Method: median trading days from fill to exit. Median (not mean) because a few long sideways episodes drag the mean; the median reflects the typical experience.", deck_more:"Market state details (thermometer / risk appetite)", nav_state:"Market", nav_bt:"Backtest", nav_ql:"Quality", nav_ind:"Industries", nav_tbl:"Candidates", nav_jn:"Journal", col_btn:"Cols ▾", col_panel_tip:"Checked = visible; uncheck to remove, recheck to restore", fb_title:"Custom conditions (all must hold)", fb_add:"+ Add", bt_all:"All signals", bt_seg_showing:"Showing:", pp_click_cat:"Click for full position detail of this category", pp_close_drill:"close", pp_col_sig:"Signal", pp_col_exitd:"Exit day", pp_broke:"Broke down (no entry)", pp_no_positions:"No positions recorded yet for this category", seg_chip_tip:"This signal type's historical hit rate (+10% within 20 trading days, before the stop)", coil_demote_tip:"9y backtest: breakout chasing has negative median return — observation only", warn_neg_tip:"The only negative-expectancy tag in both markets: good technicals, weak fundamentals", bt_findings:"<b>📌 9-year research findings:</b> ① A-share breakout chasing has negative median returns — a mean-reversion market where deep-dip entries beat momentum; ② the best-fundamental companies perform WORST after breakouts (27.9% hit) — the quality list is a 'catch list', not a chase list; ③ bear-market breakouts average negative — the temperature gate is discipline; ④ ultra-tight boxes (≤10%) do worse — tighter is not better; ⑤ volume contraction helps in the US (21.8%→26.1%), not in A-shares.",
+      bt_info_tip:"Click for methodology", pp_tiers:"Hit 10/15/20:", pp_col_maxg:"Max gain", cpf_title:"My paper books", cpf_new:"New", cpf_new_ph:"Name this book", cpf_default_name:"Book ", cpf_add:"Buy", cpf_code_ph:"code + Enter", cpf_date:"Bought", cpf_avg:"Avg return", cpf_rename:"Rename", cpf_delete:"Delete book", cpf_del_confirm:"Delete this book and all its positions?", cpf_entry_ph:"Code not in todays data; enter your entry price:", cpf_bad_entry:"Invalid price", cpf_no_live:"Not in todays data; no live price", cpf_note:"stored in this browser · live prices from daily data", bthelp_n_t:"Verified signals", bthelp_n:"Method: only complete-window episodes count — a signal enters statistics 20 trading days after its fill, even if it hit the stop or target earlier. Why: counting unfinished windows lets early winners in first and inflates the win rate badly (censoring bias; measured 45%→71%).", bthelp_fill_t:"Fill rate", bthelp_fill:"Method: share of published entries whose fill condition was actually met. Breakouts must clear the box top intraday without opening beyond the chase cap; pullback limits must be touched; entries are abandoned if the open already breaches the stop; sealed limit-up bars (A-shares) count as unfilled.", bthelp_win_t:"Hit rate", bthelp_win:"Method: share of fills whose intraday high touched +10% within 20 trading days BEFORE touching the stop. Same-bar double triggers count as stopped (conservative). This is a historical frequency of the signal type, not a per-stock prediction; small n makes it unreliable.", bthelp_ret_t:"Avg net return", bthelp_ret:"Method: mean per-trade return from fill to exit, after round-trip costs (~0.3% A-shares / ~0.2% US); open positions are marked at the latest close with only the buy-side cost. Exit = stop / target / 20-day expiry close.", bthelp_days_t:"Median holding days", bthelp_days:"Method: median trading days from fill to exit. Median (not mean) because a few long sideways episodes drag the mean; the median reflects the typical experience.", deck_more:"Market state details (thermometer / risk appetite)", nav_state:"Market", nav_bt:"Backtest", nav_ql:"Quality", nav_ind:"Industries", nav_tbl:"Candidates", nav_jn:"Journal", col_btn:"Cols ▾", col_panel_tip:"Checked = visible; uncheck to remove, recheck to restore", fb_title:"Custom conditions (all must hold)", fb_add:"+ Add", bt_all:"All signals", bt_seg_showing:"Showing:", pp_click_cat:"Click for full position detail of this category", pp_close_drill:"close", pp_col_sig:"Signal", pp_col_exitd:"Exit day", pp_broke:"Broke down (no entry)", pp_no_positions:"No positions recorded yet for this category", seg_chip_tip:"This signal type's historical hit rate (+10% within 20 trading days, before the stop)", coil_demote_tip:"9y backtest: breakout chasing has negative median return — observation only", warn_neg_tip:"The only negative-expectancy tag in both markets: good technicals, weak fundamentals", bt_findings:"<b>📌 9-year research findings:</b> ① A-share breakout chasing has negative median returns — a mean-reversion market where deep-dip entries beat momentum; ② the best-fundamental companies perform WORST after breakouts (27.9% hit) — the quality list is a 'catch list', not a chase list; ③ bear-market breakouts average negative — the temperature gate is discipline; ④ ultra-tight boxes (≤10%) do worse — tighter is not better; ⑤ volume contraction helps in the US (21.8%→26.1%), not in A-shares.",
       pp_title:"Auto paper portfolio", pp_sub:"every first-time signal auto-buys __B__ per the trade plan", pp_total:"Total P&L", pp_open:"open", pp_resolved:"resolved", pp_win:"win", pp_avg:"avg", pp_cat_quality:"👑 Quality", pp_cat_cuosha:"💎 Mispriced", pp_cat_coil:"🎯 Coiling", pp_cat_dip:"🕳 Deep dip", pp_details:"Open positions & recent exits", pp_open_title:"Open", pp_closed_title:"Recently resolved", pp_col_stock:"Stock", pp_col_fill:"Filled", pp_col_dates:"Fill → exit", pp_col_entry:"Entry", pp_col_now:"Now", pp_col_exit:"Exit", pp_col_ret:"Return", pp_col_pnl:"P&L", pp_col_status:"Result", pp_won:"🎯 Target", pp_stopped:"⛔ Stopped", pp_expired:"⏳ Expired", pp_empty:"No fills yet — new signals will be bought automatically and tracked here", pp_note:"Rules: first appearance on Quality / Mispriced / Coiling / Deep-dip auto-registers a paper buy per the published trade plan (breakout stop-order, pullback limit, or next-open market; T+1 and sealed limit boards for A-shares; no entry if the open already breaches the stop; costs included). Exit = stop / +10% target / 20-trading-day expiry; 30-day cooldown per stock per signal type. Identical rules to the Signal Backtest below. Paper simulation — not real trading, not advice.",
       bw_title:"Bi-weekly quant portfolio", bw_sub:"one cycle per 10 trading days · picks by signal track record · temperature-gated sizing · paper only", bw_total:"Total P&L", bw_u_cycles:"cycles closed", bw_win_cycles:"winning", bw_u_stocks:"stocks", bw_cycle_at:"Current cycle", bw_col_ind:"Industry", bw_col_score:"Score", bw_col_now:"Now/settle", bw_stopped:"⛔ Stopped", bw_cycle_end:"🏁 Settled", bw_open:"Open", bw_pending:"Pending", bw_no_fill:"Limit-up skip", bw_empty:"Cycle in cash (temperature gate) or no qualifying signals", bw_note:"Rules: up to 6 picks per cycle (signal-type hit rate >=45%, n>=12, no earnings in window, max 2 per industry), equal-sized buys at next open, stop-loss protection, full settlement at close of trading day 10; market temperature >=55 full size, 40-55 half, <40 cash. Costs included; paper only.",
       bt_reco_seg:"Signal type", bt_reco_hist:"past hit rate", bt_reco_vs:"all signals",
@@ -1034,6 +1042,7 @@
     setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderPaper(); }, 0);
     setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderBiweekly(); }, 0);
     setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderDeck(); }, 0);
+    setTimeout(()=>{ if(window.LS&&LS.ready) LS.renderCustomPf(); }, 0);
   }
   // ---------- 🌡️ 机会温度计 ----------
   function renderOpp(o){
@@ -2135,9 +2144,18 @@
     if(addBtn){ addBtn.onclick=()=>{ state.fb.push({k:(FB_FIELDS()[0]||{}).k, op:">=", v:""}); persist(); renderFb(); }; renderFb(); }
     // 导航收起
     const nt = document.getElementById("navToggle");
+    function applyNav(){
+      const closed = document.body.classList.contains("navClosed");
+      const nav = document.getElementById("sideNav");
+      const narrow = innerWidth < 960;
+      if(nav) nav.style.transform = (closed||narrow) ? "translateX(-132px)" : "";
+      if(nt){ nt.style.left = (closed||narrow) ? "0px" : "132px"; nt.style.display = narrow ? "none" : ""; }
+      document.body.style.paddingLeft = (closed||narrow) ? "0px" : "132px";
+    }
     if(nt){ if(localStorage.getItem("navClosed")==="1") document.body.classList.add("navClosed");
       nt.onclick=()=>{ document.body.classList.toggle("navClosed");
-        localStorage.setItem("navClosed", document.body.classList.contains("navClosed")?"1":"0"); }; }
+        localStorage.setItem("navClosed", document.body.classList.contains("navClosed")?"1":"0"); applyNav(); };
+      window.addEventListener("resize", applyNav); applyNav(); }
     // 迷你统计 (原横条隐藏)
     function ovMini(){ const el=document.getElementById("ovMini"); if(!el||!DATA||!DATA.meta) return;
       const m=DATA.meta; el.innerHTML = `${t("ov_scanned")} <b>${m.n_scanned??"—"}</b> · ${t("ov_hit")} <b>${m.n_hit??"—"}</b> · ${t("ov_date")} <b>${m.run_date||m.data_date||"—"}</b>`; }
@@ -2158,7 +2176,7 @@
     }, 60);
   })();
   LS.init({$, t, isNum, escH, tagClass, tagText, dash, getData:()=>DATA, openDetail, getCur:()=>curC, market: LS_MARKET});
-  setTimeout(()=>{ LS.renderBacktest(); LS.renderCuosha(); LS.renderQuality(); LS.renderJournal(); LS.renderPaper(); LS.renderBiweekly(); LS.renderDeck(); }, 0);
+  setTimeout(()=>{ LS.renderBacktest(); LS.renderCuosha(); LS.renderQuality(); LS.renderJournal(); LS.renderPaper(); LS.renderBiweekly(); LS.renderDeck(); LS.renderCustomPf(); }, 0);
 })();
 </script>
 </body>

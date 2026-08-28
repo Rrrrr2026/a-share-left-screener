@@ -349,6 +349,77 @@ LS.init = function(ctx){
       <div class="border-t border-slate-700/50 my-3"></div>`;
   }
 
+
+  // ---------- 🗂 自建模拟盘 (浏览器本地, 多个自定义组合) ----------
+  const CPF_KEY = "custom_pf_v1:" + ((market&&market.key)||"x");
+  function cpfLoad(){ try{ const a=JSON.parse(localStorage.getItem(CPF_KEY)||"[]"); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+  function cpfSave(a){ try{ localStorage.setItem(CPF_KEY, JSON.stringify(a)); }catch(e){} }
+  function cpfPrice(code){
+    const c=(getData().candidates||[]).find(x=>x.code===code);
+    if(c && isNum(c.price)) return {price:c.price, name:c.name};
+    const prof = window.__QL__ && __QL__.profiles && __QL__.profiles[code];
+    if(prof && isNum(prof.price)) return {price:prof.price, name:prof.name};
+    return null;
+  }
+  function renderCustomPf(){
+    const el = $("#cpfWrap"); if(!el) return;
+    const pfs = cpfLoad();
+    LS._cpfSel = LS._cpfSel===undefined ? (pfs[0]&&pfs[0].id||"") : LS._cpfSel;
+    const cur = pfs.find(p=>p.id===LS._cpfSel) || pfs[0];
+    if(cur) LS._cpfSel = cur.id;
+    const tabs = pfs.map(p=>`<button class="segbtn ${cur&&p.id===cur.id?"on":""}" data-id="${escH(p.id)}">${escH(p.name)}</button>`).join(" ");
+    let body = "";
+    if(cur){
+      const rows = (cur.positions||[]).map((po,i)=>{
+        const live = cpfPrice(po.code);
+        const now = live? live.price : null;
+        const pnl = (isNum(now)&&isNum(po.entry)&&po.entry>0)? (now/po.entry-1)*100 : null;
+        return `<tr class="border-t border-slate-700/40"><td class="py-1"><b>${escH(po.name||po.code)}</b> <span class="font-mono text-xs text-slate-400">${escH(po.code)}</span></td>
+          <td class="text-xs text-slate-400">${escH(po.date||"")}</td>
+          <td class="text-right">${isNum(po.entry)?po.entry:dash}</td>
+          <td class="text-right">${isNum(now)?now:`<span title="${t("cpf_no_live")}">${dash}</span>`}</td>
+          <td class="text-right font-semibold ${pnl>0?"text-emerald-300":(pnl<0?"text-rose-300":"")}">${pnl==null?dash:(pnl>0?"+":"")+pnl.toFixed(1)+"%"}</td>
+          <td class="text-right"><button class="segbtn cpfDel" data-i="${i}">✕</button></td></tr>`;
+      }).join("");
+      const vals = (cur.positions||[]).map(po=>{ const lv=cpfPrice(po.code); return (lv&&isNum(po.entry)&&po.entry>0)? lv.price/po.entry-1 : null; }).filter(x=>x!=null);
+      const avg = vals.length? (vals.reduce((a,b)=>a+b,0)/vals.length*100) : null;
+      body = `<div class="flex items-center gap-2 flex-wrap mb-1 mt-1">
+          <input id="cpfCode" class="w-28" placeholder="${t("cpf_code_ph")}"/>
+          <button id="cpfAdd" class="segbtn">${t("cpf_add")}</button>
+          <span class="text-xs" style="color:var(--muted)">${t("cpf_avg")} <b class="${avg>0?"text-emerald-300":(avg<0?"text-rose-300":"")}">${avg==null?dash:(avg>0?"+":"")+avg.toFixed(1)+"%"}</b> · ${(cur.positions||[]).length} ${t("bw_u_stocks")}</span>
+          <button id="cpfRen" class="segbtn">${t("cpf_rename")}</button>
+          <button id="cpfDelPf" class="segbtn">${t("cpf_delete")}</button></div>
+        <div class="overflow-x-auto"><table class="w-full text-[12.5px]">
+          <tr class="text-slate-400 text-[11px]"><th class="text-left py-1">${t("pp_col_stock")}</th><th class="text-left">${t("cpf_date")}</th><th class="text-right">${t("pp_col_entry")}</th><th class="text-right">${t("pp_col_now")}</th><th class="text-right">${t("pp_col_ret")}</th><th></th></tr>${rows}</table></div>`;
+    }
+    el.innerHTML = `<div class="flex items-center gap-2 flex-wrap">
+        <span class="text-sm font-semibold text-teal-300">${t("cpf_title")}</span>
+        ${tabs} <button id="cpfNew" class="segbtn">＋ ${t("cpf_new")}</button>
+        <span class="text-[11px]" style="color:var(--muted)">${t("cpf_note")}</span></div>${body}
+      <div class="border-t border-slate-700/50 my-3"></div>`;
+    el.querySelectorAll("button[data-id]").forEach(b=>{ b.onclick=()=>{ LS._cpfSel=b.dataset.id; renderCustomPf(); }; });
+    const nb = el.querySelector("#cpfNew");
+    if(nb) nb.onclick = ()=>{ const nm = prompt(t("cpf_new_ph"), t("cpf_default_name")+(pfs.length+1)); if(!nm) return;
+      const id = "pf"+Date.now(); pfs.push({id, name:nm, positions:[]}); cpfSave(pfs); LS._cpfSel=id; renderCustomPf(); };
+    if(cur){
+      const ab = el.querySelector("#cpfAdd");
+      ab.onclick = ()=>{
+        const code = (el.querySelector("#cpfCode").value||"").trim().toUpperCase();
+        if(!code) return;
+        const live = cpfPrice(code);
+        let entry = live? live.price : parseFloat(prompt(t("cpf_entry_ph"))||"");
+        if(!isNum(entry)||entry<=0) { alert(t("cpf_bad_entry")); return; }
+        cur.positions.push({code, name: live?live.name:code, entry: entry,
+          date: ((getData().meta||{}).run_date)||new Date().toISOString().slice(0,10)});
+        cpfSave(pfs); renderCustomPf();
+      };
+      el.querySelector("#cpfCode").onkeydown = (e)=>{ if(e.key==="Enter") ab.onclick(); };
+      el.querySelectorAll(".cpfDel").forEach(b=>{ b.onclick=()=>{ cur.positions.splice(+b.dataset.i,1); cpfSave(pfs); renderCustomPf(); }; });
+      el.querySelector("#cpfRen").onclick = ()=>{ const nm=prompt(t("cpf_rename"), cur.name); if(nm){ cur.name=nm; cpfSave(pfs); renderCustomPf(); } };
+      el.querySelector("#cpfDelPf").onclick = ()=>{ if(confirm(t("cpf_del_confirm"))){ const i=pfs.findIndex(p=>p.id===cur.id); pfs.splice(i,1); cpfSave(pfs); LS._cpfSel=(pfs[0]&&pfs[0].id)||""; renderCustomPf(); } };
+    }
+  }
+
   // ---------- 🤖 自动模拟组合 (paper_data.js -> window.__PP__) ----------
   function renderPaper(){
     const el = $("#ppWrap");
@@ -368,7 +439,8 @@ LS.init = function(ctx){
       const sel = LS._ppCat===k;
       return `<div data-cat="${escH(k)}" class="ppcat rounded-lg border ${sel?"border-sky-400":"border-slate-700/60"} bg-slate-800/40 px-2.5 py-1.5 text-xs cursor-pointer hover:border-sky-500/70" title="${t("pp_click_cat")}">
         <div class="text-slate-400">${CATN[k]||k}</div>
-        <div class="mt-0.5 text-slate-300">${t("pp_open")} <b>${a.n_open}</b> · ${t("pp_resolved")} <b>${a.n_resolved}</b>${a.win_rate!=null?` · ${t("pp_win")} <b class="${a.win_rate>=50?"text-emerald-300":"text-amber-300"}">${a.win_rate}%</b>`:""}</div>
+        <div class="mt-0.5 text-slate-300">${t("pp_open")} <b>${a.n_open}</b> · ${t("pp_resolved")} <b>${a.n_resolved}</b></div>
+        ${a.win10!=null?`<div class="mt-0.5 text-[11px]" style="color:var(--muted)">${t("pp_tiers")} <b class="text-emerald-300">${a.win10}%</b> / <b class="text-emerald-300">${a.win15}%</b> / <b class="text-emerald-300">${a.win20}%</b></div>`:""}
         <div class="font-semibold ${pnl>0?"text-emerald-300":(pnl<0?"text-rose-300":"text-slate-300")}">${money(pnl)}${a.avg_ret!=null?` <span class="text-[10px] text-slate-500 font-normal">${t("pp_avg")} ${pcx(a.avg_ret)}</span>`:""}</div>
       </div>`;
     }).join("");
@@ -400,7 +472,7 @@ LS.init = function(ctx){
       catDrill = `<div class="mt-2 rounded-lg border border-sky-500/30 p-2">
         <div class="text-xs mb-1 flex items-center gap-2 flex-wrap" style="color:var(--muted)">${escH(CATN[LS._ppCat]||LS._ppCat)} · ${rows.length}/${all.length} ${t("bw_u_stocks")} <span class="ppStChips flex gap-1 flex-wrap">${stChips}</span> <span class="cursor-pointer text-sky-400" onclick="LS._ppCat='';LS._ppStatus='';LS.renderPaper()">✕ ${t("pp_close_drill")}</span></div>
         <div class="overflow-x-auto"><table class="w-full text-[12.5px]">
-        <tr class="text-slate-400 text-[11px]"><th class="text-left py-1">${t("pp_col_stock")}</th><th class="text-left">${t("pp_col_sig")}</th><th class="text-left">${t("pp_col_fill")}</th><th class="text-right">${t("pp_col_entry")}</th><th class="text-left">${t("pp_col_exitd")}</th><th class="text-right">${t("pp_col_exit")}</th><th class="text-right">${t("pp_col_ret")}</th><th class="text-right">${t("pp_col_status")}</th></tr>` +
+        <tr class="text-slate-400 text-[11px]"><th class="text-left py-1">${t("pp_col_stock")}</th><th class="text-left">${t("pp_col_sig")}</th><th class="text-left">${t("pp_col_fill")}</th><th class="text-right">${t("pp_col_entry")}</th><th class="text-left">${t("pp_col_exitd")}</th><th class="text-right">${t("pp_col_exit")}</th><th class="text-right">${t("pp_col_ret")}</th><th class="text-right">${t("pp_col_maxg")}</th><th class="text-right">${t("pp_col_status")}</th></tr>` +
         rows.map(r=>`<tr class="border-t border-slate-700/40">
           <td class="py-1"><b>${escH(r.name||"")}</b> <span class="font-mono text-[11px] text-slate-400">${escH(r.code)}</span></td>
           <td class="text-[11px] text-slate-400">${escH(r.sig_date||"")}</td>
@@ -409,6 +481,7 @@ LS.init = function(ctx){
           <td class="text-[11px] text-slate-400">${escH(r.exit_date||dash)}</td>
           <td class="text-right">${isNum(r.exit_px)?r.exit_px:dash}</td>
           <td class="text-right font-semibold ${r.ret>0?"text-emerald-300":(r.ret<0?"text-rose-300":"")}">${isNum(r.ret)?pcx(r.ret*100):dash}</td>
+          <td class="text-right">${isNum(r.max_gain)?`<span class="${(r.hits||[]).length?"text-emerald-300":""}">${pcx(r.max_gain*100)}</span>${(r.hits||[]).length?` <span class="text-[10px] text-emerald-400">✓${Math.max(...r.hits)}%</span>`:""}`:dash}</td>
           <td class="text-right">${STN2[r.status]||r.status||dash}</td></tr>`).join("") + `</table></div></div>`;
     } else if(LS._ppCat){ catDrill = `<div class="text-xs mt-2" style="color:var(--muted)">${t("pp_no_positions")}</div>`; }
     el.innerHTML = `
@@ -433,6 +506,6 @@ LS.init = function(ctx){
   }
   window.btOpen = btOpen;
   LS.renderBacktest = renderBacktest; LS.renderCuosha = renderCuosha; LS.renderQuality = renderQuality;
-  LS.renderJournal = renderJournal; LS.renderPaper = renderPaper; LS.renderBiweekly = renderBiweekly; LS.renderDeck = renderDeck; LS.btOpen = btOpen;
+  LS.renderJournal = renderJournal; LS.renderPaper = renderPaper; LS.renderBiweekly = renderBiweekly; LS.renderDeck = renderDeck; LS.renderCustomPf = renderCustomPf; LS.btOpen = btOpen;
   LS.ready = true;
 };
