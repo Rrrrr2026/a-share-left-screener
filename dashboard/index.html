@@ -2434,9 +2434,14 @@
   function fvExpired(){            // 会话过期: 明示掉线, 不再默默丢改动
     FV_USER = null; fvPend.clear(); fvUI();
   }
+  function fvSavePend(){
+    try{ if(fvPend.size) sessionStorage.setItem("fv_pend", JSON.stringify(Array.from(fvPend)));
+         else sessionStorage.removeItem("fv_pend"); }catch(e){}
+  }
   function fvQueue(k, v){
     fvDirty.add(k);
     fvPend.set(k, {v: v, t: Date.now()});
+    fvSavePend();
     clearTimeout(fvTimer);
     fvTimer = setTimeout(()=>fvFlush(false), 1500);
   }
@@ -2455,7 +2460,7 @@
     }catch(e){
       items.forEach(it=>{ if(!fvPend.has(it.k)) fvPend.set(it.k, {v: it.v, t: it.t}); });
       clearTimeout(fvTimer); fvTimer = setTimeout(()=>fvFlush(false), 10000);
-    }finally{ fvFlushing = false; }
+    }finally{ fvFlushing = false; fvSavePend(); }
   }
   if(FV_HOST){
     _stP.setItem = function(k, v){ _oSet.call(this, k, v);
@@ -2511,6 +2516,7 @@
         writes.forEach(w=>_rawSet(w.k, w.v));
         const last = +(sessionStorage.getItem("fv_pulled_at")||0);
         if(Date.now()-last > 20000){       // reload 限速: 防对端持续写入导致刷新循环
+          if(fvPend.size){ clearTimeout(fvTimer); await fvFlush(false); }  // 先推干净再刷新
           sessionStorage.setItem("fv_pulled_at", String(Date.now()));
           location.reload();
         }
@@ -2566,8 +2572,12 @@
       document.getElementById(id).onkeydown = (e)=>{ if(e.key==="Enter") fvSubmit(mode); }; });
     (async ()=>{
       if(!FV_HOST){ fvUI(); return; }
+      try{ JSON.parse(sessionStorage.getItem("fv_pend")||"[]").forEach(([k, o])=>{
+        fvPend.set(k, o); fvDirty.add(k); }); }catch(e){}
       try{ const r = await fvApi("me");
-        if(r.ok){ FV_USER = (await r.json()).acct; fvUI(); await fvPull(false); }
+        if(r.ok){ FV_USER = (await r.json()).acct; fvUI();
+          if(fvPend.size) await fvFlush(false);   // 上一页残留的改动先推
+          await fvPull(false); }
         else fvUI();
       }catch(e){ fvUI(); }
     })();
