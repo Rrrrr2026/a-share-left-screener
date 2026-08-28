@@ -142,7 +142,7 @@ LS.init = function(ctx){
     const th=`<tr class="text-slate-400 text-[11px]"><th class="text-left py-1">#</th>${sortTh("ql","name",t("ql_col_stock"))}${sortTh("ql","ind",t("ql_col_ind"))}${sortTh("ql","score",t("ql_col_score"),"text-right")}${sortTh("ql","n_pass",t("ql_col_gates"),"text-left pl-3")}${sortTh("ql","up",t("ql_col_up2"),"text-right")}${sortTh("ql","pe","PE","text-right")}${sortTh("ql","roe","ROE%","text-right")}${sortTh("ql","q4",t("ql_col_q4"),"text-right")}${sortTh("ql","y4",t("ql_col_y4"),"text-right")}${sortTh("ql","dom",t("ql_col_dom"),"text-left pl-2")}${sortTh("ql","rd",t("ql_col_rd"),"text-right")}${sortTh("ql","p20",t("ql_col_p20"),"text-right")}</tr>`;
     $("#qlTbl").innerHTML = th + picks.map((p,i)=>{
       const crown = GK.every(k=>p.gates&&p.gates[k]) ? "👑 " : "";
-      const gates = GK.map(k=>{ const ok=p.gates&&p.gates[k]; return `<span class="badge ${ok?"tag-strong":"tag-watch"} !text-[10px] !px-1.5 ${ok?"":"opacity-50"}" title="${t("ql_g_"+k)}">${ok?"✓":"✗"}${t("ql_g_"+k)}</span>`; }).join(" ");
+      const gates = `<span class="gquiet">` + GK.map(k=>{ const ok=p.gates&&p.gates[k]; return ok? escH(t("ql_g_"+k)) : `<span class="miss" title="${t("ql_g_"+k)}">${escH(t("ql_g_"+k))}</span>`; }).join(" · ") + `</span>`;
       const q4=(p.ni_q4||[]).map(v=>(v>0?"+":"")+v.toFixed(0)).join("›");
       const y4=(p.ni_y4||[]).map(v=>(v>0?"+":"")+v.toFixed(0)).join("›");
       const domt = isNum(p.dom_rank)? `${market.domFmt(p.dom_rank)}${isNum(p.dom_share)?` · ${p.dom_share}%`:""}` : dash;
@@ -277,30 +277,68 @@ LS.init = function(ctx){
     let temp = null;
     if(isUS){ const S = window.__SENT__; temp = (S && isNum(S.score)) ? S.score : null; }
     else { const opp = D.meta && D.meta.opp; temp = (opp && isNum(opp.score)) ? opp.score : null; }
-    const pos = temp==null ? [dash, "text-slate-400"]
-      : temp>=55 ? [t("deck_full"), "text-emerald-300"]
-      : temp>=40 ? [t("deck_half"), "text-amber-300"]
-      : [t("deck_cash"), "text-rose-300"];
-    let lamp = "";
+    const pos = temp==null ? [dash, "mid"] : temp>=55 ? [t("deck_full"),"ok"] : temp>=40 ? [t("deck_half"),"mid"] : [t("deck_cash"),"no"];
+    let lampStat = "";
     if(isUS){
       const ph = String((window.__SENT__||{}).phase||"");
-      lamp = (/prolonged|持续/.test(ph)) ? `<span class="badge tag-dip" title="${t("deck_prolonged_tip")}">🎯 ${t("deck_prolonged")}</span>`
-           : (/acute|急|新恐慌/.test(ph)) ? `<span class="badge tag-warn" title="${t("deck_acute_tip")}">⚠️ ${t("deck_acute")}</span>`
-           : `<span class="badge tag-watch">🟢 ${t("deck_calm")}</span>`;
+      const L = (/prolonged|持续/.test(ph)) ? [t("deck_prolonged"),"ok",t("deck_prolonged_tip")]
+             : (/acute|急|新恐慌/.test(ph)) ? [t("deck_acute"),"no",t("deck_acute_tip")]
+             : [t("deck_calm"),"mid",""];
+      lampStat = `<div><div class="statK">${t("deck_lamp")}</div><div class="statV" style="font-size:19px;line-height:1.5">${escH(L[0])}</div><span class="dpill ${L[1]}" title="${escH(L[2])}">VIX</span></div>`;
     }
     const B = window.__BW__;
     const cyc = (B && B.cycles && B.cycles.length) ? B.cycles[B.cycles.length-1] : null;
-    const focus = (cyc && cyc.picks && cyc.picks.length)
-      ? cyc.picks.map(p=>`<span class="badge tag-dip !text-[11px]">${escH(p.name||p.code)}</span>`).join(" ")
-      : `<span class="text-slate-500 text-xs">${t("deck_nofocus")}</span>`;
+    let bwStat = "";
+    if(cyc && cyc.summary){
+      const sm = cyc.summary, used = (cyc.picks||[]).reduce((a,p)=>a+(((p.result||{}).used)||0),0);
+      const pnl = (sm.pnl_done||0)+(sm.pnl_open||0);
+      const pct = used>0 ? (pnl/used*100) : null;
+      bwStat = `<div><div class="statK">${t("deck_bw")}</div><div class="statV num ${pct>0?"":""}">${pct==null?dash:(pct>0?"+":"")+pct.toFixed(1)}<small>%</small></div><span class="dpill mid">${(cyc.picks||[]).length} ${t("bw_u_stocks")}</span></div>`;
+    }
     const cs = (D.candidates||[]).filter(c=>c.cuosha_score).length;
-    el.innerHTML = `<div class="card px-3 py-2 flex flex-wrap items-center gap-x-5 gap-y-1.5" style="border-color:rgba(52,211,153,.45)">
-      <span class="text-sm font-semibold text-emerald-300">${t("deck_title")}</span>
-      <span class="text-xs text-slate-300">${t(isUS?"deck_temp_us":"deck_temp_a")} <b class="font-mono">${temp==null?dash:temp.toFixed(0)}</b> → <b class="${pos[1]}">${pos[0]}</b></span>
-      ${lamp}
-      <span class="text-xs text-slate-300">💎 ${t("deck_cs")} <b class="text-amber-300">${cs}</b></span>
-      <span class="text-xs text-slate-300 flex items-center gap-1.5 flex-wrap">📆 ${t("deck_focus")} ${focus}</span>
+    const focus = (cyc && cyc.picks && cyc.picks.length)
+      ? cyc.picks.slice(0,6).map(p=>`<span class="fchip"><b>${escH(p.name||p.code)}</b></span>`).join("")
+      : `<span class="text-xs" style="color:var(--muted)">${t("deck_nofocus")}</span>`;
+    el.innerHTML = `<div class="card p-4">
+      <div class="text-[11px] font-semibold tracking-widest mb-3" style="color:var(--muted)"><span class="spark">✦</span> ${t("deck_title")}</div>
+      <div class="deckGrid">
+        <div><div class="statK">${t(isUS?"deck_temp_us":"deck_temp_a")}</div><div class="statV grad num" id="deckTemp">${temp==null?dash:"0"}</div><span class="dpill ${pos[1]}">${pos[0]}</span></div>
+        ${lampStat}
+        <div><div class="statK">${t("deck_cs")}</div><div class="statV num" id="deckCs">0<small> </small></div></div>
+        ${bwStat}
+        <div style="min-width:230px"><div class="statK">${t("deck_focus")}</div><div>${focus}</div></div>
+      </div>
+      <div class="typeline"><span id="deckLine"></span><span class="tcaret" id="deckCaret"></span></div>
     </div>`;
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function countUp(id, target, suffix){
+      if(target==null || !$("#"+id)) return;
+      if(reduced){ $("#"+id).innerHTML = Math.round(target) + (suffix||""); return; }
+      const t0 = performance.now();
+      (function tick(now){
+        const n = $("#"+id); if(!n) return;          // 重复渲染后旧动画链自然终止
+        const p = Math.min(1,(now-t0)/850), e = 1-Math.pow(1-p,3);
+        n.innerHTML = Math.round(target*e) + (suffix||"");
+        if(p<1) setTimeout(()=>tick(performance.now()), 16); else n.innerHTML = Math.round(target) + (suffix||"");
+      })(t0);
+    }
+    if(temp!=null) countUp("deckTemp", temp);
+    countUp("deckCs", cs, "<small> </small>");
+    const segTag = Object.entries(((window.__BT__||{}).agg||{}).by_tag||{}).find(([k])=>k.indexOf("深跌")>=0);
+    const segWin = segTag && isNum(segTag[1].win10) ? (segTag[1].win10*100).toFixed(0) : null;
+    const lineHtml = `${t(isUS?"deck_temp_us":"deck_temp_a")} <b>${temp==null?dash:temp.toFixed(0)} → ${pos[0]}</b>` +
+      (segWin? `；${t("deck_line_seg")} <b>${segWin}%</b>`:"") + `；${t("deck_cs")} <b>${cs}</b>`;
+    if(!$("#deckLine")) return;
+    if(reduced){ $("#deckLine").innerHTML = lineHtml; const c=$("#deckCaret"); if(c) c.style.display="none"; return; }
+    const plain = lineHtml.replace(/<[^>]+>/g,"");
+    let i = 0;
+    (function step(){
+      const lineEl = $("#deckLine"); if(!lineEl) return;
+      i += 1 + Math.floor(Math.random()*2);
+      if(i >= plain.length){ lineEl.innerHTML = lineHtml; setTimeout(()=>{ const c=$("#deckCaret"); if(c) c.style.display="none"; }, 1200); return; }
+      lineEl.textContent = plain.slice(0, i);
+      setTimeout(step, 16 + Math.random()*22);
+    })();
   }
 
   // ---------- 📆 双周量化组合 (biweekly_data.js -> window.__BW__) ----------
