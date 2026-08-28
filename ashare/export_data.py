@@ -304,3 +304,30 @@ def _loads(s, default=None):
         return json.loads(s)
     except Exception:
         return default
+
+
+def write_watch_js() -> None:
+    """全市场迷你行情表 -> dashboard/watch_data.js (自建模拟盘/自选股可引用任意股票)。"""
+    from . import datasource as ds
+    from .config import DASHBOARD_DIR
+    try:
+        spot = ds.fetch_spot_snapshot()
+        if spot is None or spot.empty:
+            return
+        out = {}
+        for _, r in spot.iterrows():
+            code = str(r.get("code", "")).zfill(6)
+            try:
+                px = float(r.get("price"))
+                chg = float(r.get("pct_chg")) if r.get("pct_chg") == r.get("pct_chg") else None
+            except (TypeError, ValueError):
+                continue
+            if px > 0:
+                out[code] = [str(r.get("name") or ""), round(px, 2),
+                             round(chg, 2) if chg is not None else None]
+        path = os.path.join(DASHBOARD_DIR, "watch_data.js")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("window.__ALL__ = " + json.dumps(out, ensure_ascii=False) + ";\n")
+        log.info("全市场迷你行情: %d 只 -> watch_data.js", len(out))
+    except Exception as e:
+        log.warning("全市场迷你行情导出失败: %s", e)

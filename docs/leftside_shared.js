@@ -354,12 +354,31 @@ LS.init = function(ctx){
   const CPF_KEY = "custom_pf_v1:" + ((market&&market.key)||"x");
   function cpfLoad(){ try{ const a=JSON.parse(localStorage.getItem(CPF_KEY)||"[]"); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
   function cpfSave(a){ try{ localStorage.setItem(CPF_KEY, JSON.stringify(a)); }catch(e){} }
+  const LIVE = {};                       // A股实时价缓存 (腾讯行情, 点"实时"按钮填充)
   function cpfPrice(code){
+    if(LIVE[code] && isNum(LIVE[code].price)) return LIVE[code];
     const c=(getData().candidates||[]).find(x=>x.code===code);
     if(c && isNum(c.price)) return {price:c.price, name:c.name};
     const prof = window.__QL__ && __QL__.profiles && __QL__.profiles[code];
     if(prof && isNum(prof.price)) return {price:prof.price, name:prof.name};
+    const a = window.__ALL__ && __ALL__[code];
+    if(a && isNum(a[1])) return {price:a[1], name:a[0], chg:a[2]};
     return null;
+  }
+  function fetchLiveA(codes, done){
+    // 腾讯行情脚本接口 (跨域可用): v_sh600519="1~贵州茅台~600519~1302.80~..."
+    const syms = codes.map(c=>(/^(6|9)/.test(c)?"sh":"sz")+c).join(",");
+    const sc = document.createElement("script");
+    sc.src = "https://qt.gtimg.cn/q=" + syms + "&_=" + Date.now();
+    sc.onload = ()=>{ codes.forEach(c=>{
+        const v = window["v_" + (/^(6|9)/.test(c)?"sh":"sz") + c];
+        if(v){ const f = v.split("~");
+          const px = parseFloat(f[3]), chg = parseFloat(f[32]);
+          if(isNum(px) && px > 0) LIVE[c] = {price: px, name: f[1], chg: isNum(chg)?chg:null, live: true};
+        } });
+      sc.remove(); done && done(); };
+    sc.onerror = ()=>{ sc.remove(); done && done(); };
+    document.head.appendChild(sc);
   }
   function renderCustomPf(){
     const el = $("#cpfWrap"); if(!el) return;
@@ -387,6 +406,7 @@ LS.init = function(ctx){
           <input id="cpfCode" class="w-28" placeholder="${t("cpf_code_ph")}"/>
           <button id="cpfAdd" class="segbtn">${t("cpf_add")}</button>
           <span class="text-xs" style="color:var(--muted)">${t("cpf_avg")} <b class="${avg>0?"text-emerald-300":(avg<0?"text-rose-300":"")}">${avg==null?dash:(avg>0?"+":"")+avg.toFixed(1)+"%"}</b> · ${(cur.positions||[]).length} ${t("bw_u_stocks")}</span>
+          ${(market&&market.key)==="ashare"?`<button id="cpfLive" class="segbtn" title="${t("cpf_live_tip")}">↻ ${t("cpf_live")}</button>`:""}
           <button id="cpfRen" class="segbtn">${t("cpf_rename")}</button>
           <button id="cpfDelPf" class="segbtn">${t("cpf_delete")}</button></div>
         <div class="overflow-x-auto"><table class="w-full text-[12.5px]">
@@ -415,6 +435,9 @@ LS.init = function(ctx){
       };
       el.querySelector("#cpfCode").onkeydown = (e)=>{ if(e.key==="Enter") ab.onclick(); };
       el.querySelectorAll(".cpfDel").forEach(b=>{ b.onclick=()=>{ cur.positions.splice(+b.dataset.i,1); cpfSave(pfs); renderCustomPf(); }; });
+      const lb = el.querySelector("#cpfLive");
+      if(lb) lb.onclick = ()=>{ lb.disabled=true; lb.textContent="…";
+        fetchLiveA((cur.positions||[]).map(po=>po.code), ()=>renderCustomPf()); };
       el.querySelector("#cpfRen").onclick = ()=>{ const nm=prompt(t("cpf_rename"), cur.name); if(nm){ cur.name=nm; cpfSave(pfs); renderCustomPf(); } };
       el.querySelector("#cpfDelPf").onclick = ()=>{ if(confirm(t("cpf_del_confirm"))){ const i=pfs.findIndex(p=>p.id===cur.id); pfs.splice(i,1); cpfSave(pfs); LS._cpfSel=(pfs[0]&&pfs[0].id)||""; renderCustomPf(); } };
     }

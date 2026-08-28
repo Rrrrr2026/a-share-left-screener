@@ -404,6 +404,10 @@ def run(full_market: bool, use_cache: bool):
     ex.write_csv(run_date)
     ex.write_history_snapshot(run_date)
     try:
+        ex.write_watch_js()
+    except Exception as e:
+        log.warning("watch_data 导出失败: %s", e)
+    try:
         from ashare import backtest as bt
         bt.run_backtest()
     except Exception as e:
