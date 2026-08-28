@@ -166,7 +166,6 @@
   #tvTape{ min-height:46px; margin-bottom:8px; }
   #deckMoreBody{ display:grid; grid-template-columns:repeat(auto-fit,minmax(430px,1fr)); gap:12px; align-items:start; }
   #tvHeat{ height:300px; }
-  #tvGauge{ height:380px; }
   .tradingview-widget-container{ height:100%; }
 </style>
 </head>
@@ -432,7 +431,6 @@
         </div>
         <div id="tvWrap" style="height:440px;border:1px solid var(--border);border-radius:12px;overflow:hidden;"></div>
       </div>
-      <div id="tvGauge" class="mt-4"></div>
       <h4 class="sec-title mt-5 mb-2" data-i18n="fund_glance">基本面速览</h4>
       <div id="dFund" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 mb-2">
@@ -1862,7 +1860,6 @@
   }
 
   function openDetail(c, keepGran){
-    try{ if(window.tvMountGauge) tvMountGauge(c.code); }catch(e){}
     curC = c; if(!keepGran) resetGran(); curP = (DATA.profiles||{})[c.code] || null;
     disposeProf();
     switchTab("tabOv");
@@ -2246,11 +2243,6 @@
       {symbols: TV_TAPE, showSymbolLogo: true, colorTheme: tvTheme(), isTransparent: true, displayMode: "adaptive", locale: "zh_CN"});
     renderStarmap();
   }
-  window.tvMountGauge = (code)=>{
-    tvMount(document.getElementById("tvGauge"), "embed-widget-technical-analysis.js",
-      {symbol: tvEmbedSym(code), interval: "1D", colorTheme: tvTheme(), isTransparent: true,
-       locale: "zh_CN", width: "100%", height: 360, showIntervalTabs: true});
-  };
   setTimeout(tvRefresh, 120);
   (function(){ let last = tvTheme();
     new MutationObserver(()=>{ if(tvTheme() !== last){ last = tvTheme(); clearTimeout(window.__tvT);
