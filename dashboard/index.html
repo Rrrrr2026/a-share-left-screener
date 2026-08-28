@@ -2424,73 +2424,97 @@
   let FV_USER = null;
   const _stP = Storage.prototype, _oSet = _stP.setItem, _oDel = _stP.removeItem;
   const _rawSet = (k, v) => _oSet.call(localStorage, k, v);
-  const fvPend = new Map();
-  let fvTimer = null;
+  const fvPend = new Map();       // k -> {v, t}  t=改动发生时刻 (重试不重打时间戳)
+  const fvDirty = new Set();      // 本次会话用户改过的键: 拉取一律不覆盖
+  let fvTimer = null, fvFlushing = false;
   function fvApi(path, opt){
     return fetch("/api/"+path, Object.assign({credentials:"same-origin",
       headers:{"Content-Type":"application/json"}}, opt||{}));
   }
-  function fvQueue(k, v){
-    fvPend.set(k, v);
-    clearTimeout(fvTimer);
-    fvTimer = setTimeout(fvFlush, 1500);
+  function fvExpired(){            // 会话过期: 明示掉线, 不再默默丢改动
+    FV_USER = null; fvPend.clear(); fvUI();
   }
-  async function fvFlush(){
-    if(!FV_USER || !fvPend.size) return;
-    const items = Array.from(fvPend, ([k, v]) => ({k, v, t: Date.now()}));
+  function fvQueue(k, v){
+    fvDirty.add(k);
+    fvPend.set(k, {v: v, t: Date.now()});
+    clearTimeout(fvTimer);
+    fvTimer = setTimeout(()=>fvFlush(false), 1500);
+  }
+  async function fvFlush(unload){
+    if(!FV_USER || !fvPend.size || fvFlushing) return;
+    fvFlushing = true;
+    const items = Array.from(fvPend, ([k, o]) => ({k, v: o.v, t: o.t}));
     fvPend.clear();
     try{
       for(let i=0; i<items.length; i+=50){
-        const r = await fvApi("state", {method:"PUT", body: JSON.stringify({items: items.slice(i, i+50)})});
+        const r = await fvApi("state", {method:"PUT", keepalive: !!unload,
+          body: JSON.stringify({items: items.slice(i, i+50)})});
+        if(r.status===401){ fvExpired(); return; }
         if(!r.ok) throw new Error("HTTP "+r.status);
       }
-    }catch(e){ items.forEach(it=>{ if(!fvPend.has(it.k)) fvPend.set(it.k, it.v); });
-      clearTimeout(fvTimer); fvTimer = setTimeout(fvFlush, 10000); }
+    }catch(e){
+      items.forEach(it=>{ if(!fvPend.has(it.k)) fvPend.set(it.k, {v: it.v, t: it.t}); });
+      clearTimeout(fvTimer); fvTimer = setTimeout(()=>fvFlush(false), 10000);
+    }finally{ fvFlushing = false; }
   }
   if(FV_HOST){
     _stP.setItem = function(k, v){ _oSet.call(this, k, v);
       if(this===localStorage && FV_USER && SYNC_RE.test(k)) fvQueue(k, String(v)); };
     _stP.removeItem = function(k){ _oDel.call(this, k);
       if(this===localStorage && FV_USER && SYNC_RE.test(k)) fvQueue(k, null); };
-    window.addEventListener("beforeunload", ()=>{ if(fvPend.size) fvFlush(); });
+    window.addEventListener("beforeunload", ()=>{
+      if(fvPend.size){ clearTimeout(fvTimer); fvFlush(true); } });
   }
   function fvMerge(k, sv, lv, union){
     if(lv==null) return sv;
     if(sv==null) return lv;
-    if(sv===lv || !union) return sv;      // 平时: 云端为准 (改动会即时推上云)
-    try{                                   // 首次登录: 云端∪本地, 两边都不丢
+    if(sv===lv || !union) return sv;      // 平时: 云端为准 (本地新改动有 fvDirty 保护)
+    try{                                   // 登录合并: 两边并集
       if(/_favs_v1$/.test(k)){
         const a=new Set(JSON.parse(sv)); JSON.parse(lv).forEach(x=>a.add(x));
         return JSON.stringify(Array.from(a));
       }
       if(/^custom_pf_v1:/.test(k) || /^leftside_journal_v1:/.test(k)){
-        const s=JSON.parse(sv), l=JSON.parse(lv), ids=new Set(s.map(x=>x.id));
-        l.forEach(x=>{ if(!ids.has(x.id)) s.push(x); });
-        return JSON.stringify(s);
+        const l=JSON.parse(lv), s=JSON.parse(sv), ids=new Set(l.map(x=>x.id));
+        s.forEach(x=>{ if(!ids.has(x.id)) l.push(x); });   // 同id以本机为准 (刚登录=本机较新)
+        return JSON.stringify(l);
       }
     }catch(e){}
     return sv;
   }
   async function fvPull(union){
     try{
-      const r = await fvApi("state"); if(!r.ok) return;
+      const r = await fvApi("state");
+      if(r.status===401){ fvExpired(); return; }
+      if(!r.ok) return;
       const st = (await r.json()).states || {};
-      let changed = false;
-      const up = [];
+      const writes = [], up = [];
       for(const k in st){
+        if(fvDirty.has(k)) continue;       // 用户刚改过的键: 本地优先, 由队列上推
         const lv = localStorage.getItem(k);
         const merged = fvMerge(k, st[k].v, lv, union);
-        if(merged !== lv){ _rawSet(k, merged); changed = true; }
+        if(merged !== lv) writes.push({k, v: merged});
         if(merged !== st[k].v) up.push({k, v: merged, t: Date.now()});
       }
       for(let i=0; i<localStorage.length; i++){
         const k = localStorage.key(i);
-        if(SYNC_RE.test(k) && !(k in st)) up.push({k, v: localStorage.getItem(k), t: Date.now()});
+        if(SYNC_RE.test(k) && !(k in st) && !fvPend.has(k))
+          up.push({k, v: localStorage.getItem(k), t: Date.now()});
       }
-      for(let i=0; i<up.length; i+=50)
-        await fvApi("state", {method:"PUT", body: JSON.stringify({items: up.slice(i, i+50)})});
-      if(changed && !sessionStorage.getItem("fv_pulled")){ sessionStorage.setItem("fv_pulled","1"); location.reload(); return; }
-      if(!changed) sessionStorage.removeItem("fv_pulled");
+      for(let i=0; i<up.length; i+=50){    // 先推云端, 全部成功才落地本机 (失败不丢本地)
+        const r2 = await fvApi("state", {method:"PUT",
+          body: JSON.stringify({items: up.slice(i, i+50)})});
+        if(r2.status===401){ fvExpired(); return; }
+        if(!r2.ok) return;
+      }
+      if(writes.length){
+        writes.forEach(w=>_rawSet(w.k, w.v));
+        const last = +(sessionStorage.getItem("fv_pulled_at")||0);
+        if(Date.now()-last > 20000){       // reload 限速: 防对端持续写入导致刷新循环
+          sessionStorage.setItem("fv_pulled_at", String(Date.now()));
+          location.reload();
+        }
+      }
     }catch(e){}
   }
   function fvUI(){
@@ -2498,7 +2522,7 @@
     if(!FV_HOST){ b.style.display = "none"; return; }
     if(FV_USER){ b.textContent = "👤 " + FV_USER; b.title = t("auth_logout_tip");
       b.onclick = ()=>{ if(confirm(t("auth_logout_confirm")))
-        fvApi("logout", {method:"POST"}).finally(()=>{ FV_USER=null; sessionStorage.removeItem("fv_pulled"); location.reload(); }); }; }
+        fvApi("logout", {method:"POST"}).finally(()=>{ FV_USER=null; sessionStorage.removeItem("fv_pulled_at"); location.reload(); }); }; }
     else { b.textContent = "👤 " + t("auth_login"); b.title = t("auth_tip");
       b.onclick = ()=>{ const m=document.getElementById("authModal"); m.classList.remove("hidden");
         document.getElementById("auErr").textContent=""; document.getElementById("auAcct").focus(); }; }
@@ -2515,7 +2539,7 @@
       if(r.ok){
         FV_USER = (await r.json()).acct;
         document.getElementById("authModal").classList.add("hidden");
-        fvUI(); sessionStorage.removeItem("fv_pulled");
+        fvUI(); sessionStorage.removeItem("fv_pulled_at");
         await fvPull(true);
         fvUI();
       } else {
