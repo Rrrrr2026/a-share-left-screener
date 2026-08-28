@@ -167,6 +167,18 @@
   #deckMoreBody{ display:grid; grid-template-columns:repeat(auto-fit,minmax(430px,1fr)); gap:12px; align-items:start; }
   #tvHeat{ height:300px; }
   .tradingview-widget-container{ height:100%; }
+
+  /* ===== 详情弹窗标签页 ===== */
+  #dTabs{ display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
+  #dTabs .dtabchip{ display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:3px 9px;
+    border-radius:5px; background:var(--input); border:1px solid var(--inputborder); color:var(--dim);
+    cursor:pointer; user-select:none; }
+  #dTabs .dtabchip.on{ background:#2962ff; border-color:#2962ff; color:#fff; }
+  #dTabs .dtabchip .x{ opacity:.6; font-size:11px; padding:0 1px; }
+  #dTabs .dtabchip .x:hover{ opacity:1; }
+  .dnavbtn{ border:1px solid var(--inputborder); background:var(--input); color:var(--dim);
+    border-radius:5px; padding:2px 9px; cursor:pointer; font-size:13px; }
+  .dnavbtn:hover{ color:var(--text); }
 </style>
 </head>
 <body class="min-h-screen">
@@ -384,6 +396,7 @@
 <div id="overlay" class="fixed inset-0 bg-black/60 hidden z-40"></div>
 <aside id="drawer" class="drawer fixed top-0 right-0 h-full w-full md:w-[68%] lg:w-[60%] border-l z-50 translate-x-full overflow-y-auto" style="background:var(--drawer);border-color:var(--border)">
   <div class="p-5">
+    <div id="dTabs"></div>
     <div class="flex items-start justify-between mb-2">
       <div>
         <h3 id="dTitle" class="text-xl font-bold text-white">—</h3>
@@ -1860,6 +1873,14 @@
   }
 
   function openDetail(c, keepGran){
+    try{
+      DTABS.cur = c.code;
+      const i = DTABS.list.findIndex(x=>x.code===c.code);
+      if(i>=0){ DTABS.list[i].c = c; }
+      else{ DTABS.list.push({code:c.code, name:(c.name||c.code), c:c});
+            if(DTABS.list.length>DTABS.MAX) DTABS.list.shift(); }
+      dtabsRender();
+    }catch(e){}
     curC = c; if(!keepGran) resetGran(); curP = (DATA.profiles||{})[c.code] || null;
     disposeProf();
     switchTab("tabOv");
@@ -2248,6 +2269,38 @@
     new MutationObserver(()=>{ if(tvTheme() !== last){ last = tvTheme(); clearTimeout(window.__tvT);
       window.__tvT = setTimeout(tvRefresh, 250); } }).observe(document.body, {attributes:true, attributeFilter:["class"]});
   })();
+  // ---- 详情弹窗标签页 + 挨个翻页 ----
+  const DTABS = { list: [], cur: null, MAX: 8 };
+  function dtabsRender(){
+    const el = document.getElementById("dTabs"); if(!el) return;
+    el.innerHTML = DTABS.list.map(x=>`<span class="dtabchip ${x.code===DTABS.cur?"on":""}" data-c="${x.code}">${x.name||x.code}<span class="x" data-x="${x.code}">✕</span></span>`).join("")
+      + (DTABS.list.length>1? `<button class="dnavbtn" id="dPrev" title="上一个 (←)">◀</button><button class="dnavbtn" id="dNext" title="下一个 (→)">▶</button>`:"");
+    el.querySelectorAll(".dtabchip").forEach(ch=>{ ch.onclick=(e)=>{ if(e.target.dataset.x) return;
+      const it = DTABS.list.find(x=>x.code===ch.dataset.c); if(it) openDetail(it.c); }; });
+    el.querySelectorAll(".x").forEach(x=>{ x.onclick=(e)=>{ e.stopPropagation();
+      const i = DTABS.list.findIndex(t=>t.code===x.dataset.x);
+      if(i>=0){ const wasCur = DTABS.list[i].code===DTABS.cur; DTABS.list.splice(i,1);
+        if(wasCur && DTABS.list.length){ openDetail(DTABS.list[Math.min(i, DTABS.list.length-1)].c); }
+        else dtabsRender(); } }; });
+    const pv=document.getElementById("dPrev"), nx=document.getElementById("dNext");
+    if(pv) pv.onclick=()=>dtabsStep(-1);
+    if(nx) nx.onclick=()=>dtabsStep(1);
+  }
+  function dtabsStep(d){
+    // 优先按主表当前筛选顺序翻; 当前股票不在主表里则按标签顺序翻
+    const rows = currentRows();
+    const ri = rows.findIndex(c=>c.code===DTABS.cur);
+    if(ri>=0){ const nc = rows[(ri+d+rows.length)%rows.length]; if(nc){ openDetail(nc); return; } }
+    const ti = DTABS.list.findIndex(x=>x.code===DTABS.cur);
+    if(ti>=0 && DTABS.list.length>1){ openDetail(DTABS.list[(ti+d+DTABS.list.length)%DTABS.list.length].c); }
+  }
+  window.addEventListener("keydown", (e)=>{
+    const dr = document.getElementById("drawer");
+    if(!dr || dr.classList.contains("translate-x-full")) return;
+    if(/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||"")) return;
+    if(e.key==="ArrowLeft"){ e.preventDefault(); dtabsStep(-1); }
+    if(e.key==="ArrowRight"){ e.preventDefault(); dtabsStep(1); }
+  });
   LS.init({$, t, isNum, escH, tagClass, tagText, dash, getData:()=>DATA, openDetail, getCur:()=>curC, market: LS_MARKET});
   setTimeout(()=>{ LS.renderBacktest(); LS.renderCuosha(); LS.renderQuality(); LS.renderJournal(); LS.renderPaper(); LS.renderBiweekly(); LS.renderDeck(); LS.renderCustomPf(); }, 0);
 })();
