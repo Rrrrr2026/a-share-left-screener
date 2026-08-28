@@ -247,6 +247,9 @@ def update_portfolio() -> dict | None:
                  "market": m.name, "as_of": as_of},
         "total": total, "by_cat": by_cat,
         "open": sorted(open_rows, key=lambda r: r["fill_date"], reverse=True),
+        "positions": [{k: r.get(k) for k in ("cat", "code", "name", "sig_date", "status",
+                        "fill_date", "fill_px", "exit_date", "exit_px", "ret", "pnl")}
+                       for r in rows],
         "recent": sorted(resolved, key=lambda r: r["exit_date"] or "", reverse=True)[:15],
         "daily": state["daily"],
     }

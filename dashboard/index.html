@@ -123,15 +123,44 @@
   .tcaret{ display:none; }
   .gquiet{ color:var(--muted); font-size:11.5px; letter-spacing:.02em; }
   .gquiet .miss{ color:var(--inputborder); text-decoration:line-through; opacity:.8; }
+
+  /* ===== 左侧导航 ===== */
+  #sideNav{ position:fixed; left:0; top:0; bottom:0; width:132px; z-index:45; background:var(--card);
+    border-right:1px solid var(--border); padding:52px 8px 12px; display:flex; flex-direction:column; gap:2px;
+    transition:transform .25s ease; }
+  body.navClosed #sideNav{ transform:translateX(-132px); }
+  #sideNav a{ display:block; padding:7px 10px; border-radius:6px; color:var(--dim); font-size:13px;
+    text-decoration:none; }
+  #sideNav a:hover{ background:var(--rowhover); color:var(--text); }
+  #navToggle{ position:fixed; left:10px; top:9px; z-index:60; border:1px solid var(--inputborder);
+    background:var(--input); color:var(--dim); border-radius:6px; padding:3px 9px; cursor:pointer; font-size:14px; }
+  body:not(.navClosed){ padding-left:132px; }
+  body:not(.navClosed) header{ margin-left:-1rem; }
+  section{ scroll-margin-top:64px; }
+  @media (max-width: 960px){ #sideNav{ display:none; } body:not(.navClosed){ padding-left:0; } #navToggle{ display:none; } }
+  #ovMini{ font-size:11px; color:var(--muted); font-weight:400; margin-left:12px; white-space:nowrap; }
+  #ovMini b{ color:var(--dim); font-weight:600; }
+  .merged-into-deck{ border:0!important; padding:0!important; margin:0 0 8px!important; box-shadow:none!important;
+    background:transparent!important; animation:none!important; }
+  .merged-into-deck::before{ display:none!important; }
+  .merged-into-deck h4, .merged-into-deck .sec-title{ font-size:13px!important; }
+  #colPanel{ position:absolute; right:0; top:100%; z-index:30; background:var(--card); border:1px solid var(--inputborder);
+    border-radius:8px; padding:10px 12px; width:280px; max-height:340px; overflow-y:auto; box-shadow:0 12px 40px rgba(0,0,0,.45); }
+  #colPanel label{ display:flex; gap:6px; align-items:center; font-size:12.5px; color:var(--dim); padding:2px 0; cursor:pointer; }
+  .fbrow{ display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+  .fbrow select,.fbrow input{ font-size:12.5px; padding:3px 8px; }
+  .fbrow input{ width:90px; }
 </style>
 </head>
 <body class="min-h-screen">
+<button id="navToggle" title="收起/展开导航">☰</button>
+<nav id="sideNav"><a href="#deckCard" data-i18n="nav_state">市场状态</a><a href="#btCard" data-i18n="nav_bt">信号回测</a><a href="#qlCard" data-i18n="nav_ql">优质公司</a><a href="#indCard" data-i18n="nav_ind">板块景气</a><a href="#tblCard" data-i18n="nav_tbl">候选主表</a><a href="#jnCard" data-i18n="nav_jn">交易日志</a></nav>
 <div class="max-w-[1900px] mx-auto px-4 md:px-6 py-5">
 
   <!-- 标题 -->
   <header class="flex items-center justify-between flex-wrap gap-3 mb-4">
     <div>
-      <h1 class="text-2xl font-bold text-white" data-i18n="title">美股 · 「左侧支撑位」筛选与监控台</h1>
+      <h1 class="text-2xl font-bold text-white" data-i18n="title">美股 · 「左侧支撑位」筛选与监控台</h1><span id="ovMini"></span>
       <p class="text-sm text-slate-400 mt-1" data-i18n="subtitle">全美股(市值≥$1亿) · 高景气板块内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分</p>
     </div>
     <div class="flex items-center gap-1" id="mktTabs">
@@ -162,8 +191,13 @@
   <div id="staleBanner" class="hidden card border-rose-500/50 bg-rose-500/10 px-4 py-2 mb-4 text-[13px] leading-relaxed text-rose-200"></div>
 
   <!-- 概览卡 -->
-  <section id="deckWrap" class="mb-2"></section>
-  <section class="card px-3 py-1.5 mb-2 text-[12px] flex flex-wrap items-center gap-x-5 gap-y-1">
+  <section id="deckCard" class="card p-3 mb-2">
+    <div class="text-[11px] font-semibold tracking-widest mb-2" style="color:var(--muted)" data-i18n="deck_title">今日作战台</div>
+    <div id="deckMain"></div>
+    <details class="mt-1"><summary class="text-xs cursor-pointer select-none hover:text-sky-300" style="color:var(--muted)" data-i18n="deck_more">市场状态详情（机会温度计 / 风险偏好）</summary>
+      <div id="deckMoreBody" class="mt-2"></div></details>
+  </section>
+  <section class="card px-3 py-1.5 mb-2 text-[12px] hidden flex-wrap items-center gap-x-5 gap-y-1">
     <span class="text-slate-400"><span data-i18n="ov_scanned">今日扫描数</span> <b id="ovScanned" class="text-white">—</b></span>
     <span class="text-slate-400"><span data-i18n="ov_hit">命中候选数</span> <b id="ovHit" class="text-sky-300">—</b></span>
     <span class="text-slate-400"><span data-i18n="ov_inds">入选景气板块</span> <b id="ovInds" class="text-emerald-300">—</b></span>
@@ -199,6 +233,7 @@
       <span id="btMeta" class="text-xs text-slate-400"></span>
     </div>
     <div class="text-[11px] text-slate-400 mb-2 leading-snug" data-i18n="bt_how">怎么读：系统每天给出的买卖点，事后用真实行情检验。「达标」= 按建议买入后 20 个交易日内先涨到 +10%（而不是先碰止损）；「达标率」= 同类信号过去达标的比例；「平均净收益」= 含成本的每笔平均结果。</div>
+    <div id="btSel" class="flex flex-wrap gap-1.5 mb-2"></div>
     <div id="btStats" class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2"></div>
     <div class="text-xs text-slate-400 mb-1" data-i18n="bt_reco_title">📈 回测优选 — 今日候选中，其信号类型过去达标率最高的</div>
     <div id="btRecos" class="flex flex-wrap gap-2"></div>
@@ -222,22 +257,22 @@
 
   <!-- 👑 优质公司推荐 -->
   <section id="qlCard" class="card p-4 mb-5 hidden" style="border-color:rgba(52,211,153,.5)">
-    <details>
-      <summary class="cursor-pointer select-none hover:opacity-80"><div class="flex items-center justify-between flex-wrap gap-2 ">
+    <div>
+      <div><div class="flex items-center justify-between flex-wrap gap-2 ">
       <h4 class="sec-title" data-i18n="ql_title">👑 优质公司 · 每日推荐 — 连续增长·龙头·高ROE·低估值</h4>
       <span id="qlMeta" class="text-xs text-slate-400"></span>
-    </div></summary>
+    </div></div>
       <div class="mt-2">
     <div class="overflow-x-auto"><table class="w-full text-[13px]" id="qlTbl"></table></div>
     <div id="qlNote" class="text-xs text-slate-500 mt-2 leading-relaxed"></div>
   </div>
-    </details>
+    </div>
   </section>
 
 
 
   <!-- 行业景气榜 -->
-  <section class="card p-4 mb-5">
+  <section id="indCard" class="card p-3 mb-3">
     <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
       <h2 class="text-lg font-semibold text-white" data-i18n="sec_board">板块景气榜</h2>
       <div class="flex items-center gap-2">
@@ -246,11 +281,11 @@
         <button class="segbtn" id="segTree" data-i18n="seg_tree">矩形树图</button>
       </div>
     </div>
-    <div id="industryChart" style="width:100%;height:220px;"></div>
+    <div id="industryChart" style="width:100%;height:150px;"></div>
   </section>
 
   <!-- 权重实验室 -->
-  <section class="card p-4 mb-5">
+  <section id="wlabCard" class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
       <h2 class="text-lg font-semibold text-white" data-i18n="wlab_title">综合分权重实验室</h2>
       <div class="flex items-center gap-3">
@@ -266,7 +301,7 @@
   </section>
 
   <!-- 候选股主表 -->
-  <section class="card p-4 mb-5">
+  <section id="tblCard" class="card p-4 mb-5">
     <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
       <h2 class="text-lg font-semibold text-white"><span data-i18n="tbl_title">候选股主表</span> <span id="rowCount" class="text-sm text-slate-400 font-normal"></span></h2>
       <div class="flex items-center gap-2 flex-wrap text-sm">
@@ -281,7 +316,7 @@
           <option value="🚀 蓄势待发">🚀 蓄势待发</option>
           <option value="🔎 观察">🔎 观察</option>
         </select>
-        <button id="advBtn" class="segbtn" data-i18n="adv_btn">高级筛选 ▾</button>
+        <span class="relative inline-block"><button id="colBtn" class="segbtn" data-i18n="col_btn">列 ▾</button><div id="colPanel" class="hidden"></div></span> <button id="advBtn" class="segbtn" data-i18n="adv_btn">高级筛选 ▾</button>
         <label class="flex items-center gap-1 text-slate-300 cursor-pointer select-none"><input id="favOnly" type="checkbox" class="w-auto"/> <span data-i18n="fav_only">只看自选</span></label>
         <button id="exportBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg" data-i18n="export">导出CSV</button>
       </div>
@@ -291,6 +326,7 @@
       <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_score">综合分 ≥</span><span id="fScoreV">0</span></div><input id="fScore" type="range" min="0" max="100" value="0" class="w-full"/></div>
       <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_dist">距支撑绝对值 ≤</span><span id="fDistV">不限</span></div><input id="fDist" type="range" min="0" max="30" value="30" class="w-full"/></div>
       <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_roe">ROE ≥</span><span id="fRoeV">不限</span></div><input id="fRoe" type="range" min="-10" max="40" value="-10" class="w-full"/></div>
+      <div class="col-span-full" id="fbWrap"><div class="text-xs text-slate-400 mb-1" data-i18n="fb_title">自定义条件（全部满足）</div><div id="fbRows"></div><button id="fbAdd" class="segbtn" data-i18n="fb_add">＋ 加一条</button></div>
       <div><div class="flex justify-between text-xs text-slate-400 mb-1"><span data-i18n="f_up">最大回撤劣于 ≥</span><span id="fUpV">不限</span></div><input id="fUp" type="range" min="-80" max="0" value="-80" class="w-full"/></div>
     </div>
     <div class="overflow-x-auto" style="max-height:64vh;">
@@ -534,7 +570,7 @@
       bt_recent:"最近了结", bt_open_pos:"进行中",
       bt_cs:"💎 错杀≥60", bt_cselig:"过门槛<60", bt_noncs:"其它",
       bt_how:"怎么读：系统每天给出的买卖点，事后用真实行情检验。「达标」= 按建议买入后 20 个交易日内先涨到 +10%（而不是先碰止损）；「达标率」= 同类信号过去达标的比例；「平均净收益」= 含成本的每笔平均结果。", bt_details:"详情：按标签 · 按市场温度/成长质量 · 最近了结 · 方法说明",
-      deck_title:"今日作战台", deck_temp_a:"市场温度", deck_temp_us:"风险偏好", deck_full:"满仓档", deck_half:"半仓档", deck_cash:"空仓档", deck_prolonged:"持续恐慌 · 狙击窗口", deck_prolonged_tip:"35年数据唯一显著机会：恐慌持续后3个月中位+6.7%", deck_acute:"新恐慌 · 勿接飞刀", deck_acute_tip:"刚恐慌=掷硬币且左尾−15%，等企稳", deck_calm:"情绪平静", deck_cs:"错杀候选", deck_focus:"双周组合本期:", deck_nofocus:"本期空仓或无达标信号", deck_lamp:"恐慌状态", deck_bw:"双周组合本期", deck_line_seg:"深跌承接类信号历史达标率", seg_chip_tip:"该信号类型的历史达标率（20个交易日内先涨到+10%）", coil_demote_tip:"9年回测：追突破中位收益为负——仅作观察参考，不构成买入理由", warn_neg_tip:"两市回测中唯一的负期望标签：技术面好但基本面弱，谨慎", bt_findings:"<b>📌 九年研究结论速览：</b>① A股追突破中位收益为负——这是均值回归市场，深跌承接优于追涨；② 基本面最优公司的突破表现反而最差（27.9%达标）——优质名单的正确用法是'跌下来敢接的白名单'；③ 熊市里突破平均为负——温度门是纪律不是参考；④ 极紧箱体（≤10%）更差——'越紧越好'是迷信；⑤ 缩量蓄势在美股有增益（21.8%→26.1%），在A股没有。",
+      deck_title:"今日作战台", deck_temp_a:"市场温度", deck_temp_us:"风险偏好", deck_full:"满仓档", deck_half:"半仓档", deck_cash:"空仓档", deck_prolonged:"持续恐慌 · 狙击窗口", deck_prolonged_tip:"35年数据唯一显著机会：恐慌持续后3个月中位+6.7%", deck_acute:"新恐慌 · 勿接飞刀", deck_acute_tip:"刚恐慌=掷硬币且左尾−15%，等企稳", deck_calm:"情绪平静", deck_cs:"错杀候选", deck_focus:"双周组合本期:", deck_nofocus:"本期空仓或无达标信号", deck_lamp:"恐慌状态", deck_bw:"双周组合本期", deck_line_seg:"深跌承接类信号历史达标率", deck_more:"市场状态详情（机会温度计 / 风险偏好）", nav_state:"市场状态", nav_bt:"信号回测", nav_ql:"优质公司", nav_ind:"板块景气", nav_tbl:"候选主表", nav_jn:"交易日志", col_btn:"列 ▾", col_panel_tip:"勾选=显示；取消勾选即删除该列，随时勾回来", fb_title:"自定义条件（全部满足，可叠加多条）", fb_add:"＋ 加一条", bt_all:"全部信号", bt_seg_showing:"当前只看:", pp_click_cat:"点击查看该类全部持仓明细", pp_close_drill:"收起明细", pp_col_sig:"信号日", pp_col_exitd:"离场日", pp_broke:"未入场破位", pp_no_positions:"该类暂无持仓记录（数据将在下次流水线更新后出现）", seg_chip_tip:"该信号类型的历史达标率（20个交易日内先涨到+10%）", coil_demote_tip:"9年回测：追突破中位收益为负——仅作观察参考，不构成买入理由", warn_neg_tip:"两市回测中唯一的负期望标签：技术面好但基本面弱，谨慎", bt_findings:"<b>📌 九年研究结论速览：</b>① A股追突破中位收益为负——这是均值回归市场，深跌承接优于追涨；② 基本面最优公司的突破表现反而最差（27.9%达标）——优质名单的正确用法是'跌下来敢接的白名单'；③ 熊市里突破平均为负——温度门是纪律不是参考；④ 极紧箱体（≤10%）更差——'越紧越好'是迷信；⑤ 缩量蓄势在美股有增益（21.8%→26.1%），在A股没有。",
       pp_title:"自动模拟组合", pp_sub:"四类榜单信号首次出现即自动买入 __B__（按买卖点建议成交）", pp_total:"合计盈亏", pp_open:"持仓", pp_resolved:"已了结", pp_win:"胜率", pp_avg:"均每笔", pp_cat_quality:"👑 优质公司", pp_cat_cuosha:"💎 错杀候选", pp_cat_coil:"🎯 蓄势待发", pp_cat_dip:"🕳 深跌抄底", pp_details:"持仓与最近了结明细", pp_open_title:"持仓中", pp_closed_title:"最近了结", pp_col_stock:"标的", pp_col_fill:"成交日", pp_col_dates:"成交 → 离场", pp_col_entry:"成交价", pp_col_now:"现价", pp_col_exit:"离场价", pp_col_ret:"收益率", pp_col_pnl:"盈亏", pp_col_status:"结果", pp_won:"🎯 达标", pp_stopped:"⛔ 止损", pp_expired:"⏳ 到期", pp_empty:"暂无成交 —— 新信号出现后会自动买入并在这里跟踪", pp_note:"规则：优质公司 / 错杀候选 / 蓄势待发 / 深跌抄底 首次上榜自动注册，按买卖点建议模拟成交（突破单需站上箱体上沿、回踩限价、市价次日开盘；A股含T+1与一字板限制；开盘已破止损不接飞刀；含交易成本）。离场 = 止损 / +10%目标 / 20个交易日到期，同一股票同类信号30天冷却。规则与下方“信号回测”完全一致；纸面推演，非实盘、非建议。",
       bw_title:"双周量化组合", bw_sub:"每10个交易日一期 · 按信号历史战绩选股 · 温度门控制仓位 · 纸面推演", bw_total:"累计盈亏", bw_u_cycles:"期已结", bw_win_cycles:"盈利期", bw_u_stocks:"只", bw_cycle_at:"本期开仓", bw_col_ind:"行业", bw_col_score:"评分", bw_col_now:"现价/结算价", bw_stopped:"⛔ 止损", bw_cycle_end:"🏁 期末结算", bw_open:"持仓中", bw_pending:"待成交", bw_no_fill:"一字板放弃", bw_empty:"本期空仓（温度门）或无达标信号", bw_note:"规则：每期从当日候选选≤6只（信号类型历史达标率≥45%、样本≥12、期内不出财报、每行业≤2只），次日开盘等额买入，止损单保护，第10个交易日收盘全部结算；市场温度≥55满仓、40-55半仓、<40空仓。含交易成本，纸面推演非实盘。",
       bt_reco_seg:"信号类型", bt_reco_hist:"过去达标率", bt_reco_vs:"全部信号",
@@ -714,7 +750,7 @@
       bt_recent:"Recently resolved", bt_open_pos:"open",
       bt_cs:"💎 Mispriced ≥60", bt_cselig:"Gate-passed <60", bt_noncs:"Others",
       bt_how:"How to read: every day's published entry/stop/target is checked against what prices did next. 'Hit' = after buying per the plan, the stock reached +10% within 20 trading days before touching the stop; 'hit rate' = share of past signals of that type that hit; 'avg net return' = average per-trade result after costs.", bt_details:"Details: by tag · by market temp / growth quality · recently resolved · method",
-      deck_title:"Action deck", deck_temp_a:"Market temp", deck_temp_us:"Risk appetite", deck_full:"Full size", deck_half:"Half size", deck_cash:"Cash", deck_prolonged:"Prolonged panic · window", deck_prolonged_tip:"The one CI-solid edge in 35y: +6.7% median 3M after prolonged panic", deck_acute:"Fresh panic · no knives", deck_acute_tip:"Fresh panic = coin flip with −15% left tail; wait for stabilization", deck_calm:"Calm", deck_cs:"Mispriced", deck_focus:"Bi-weekly picks:", deck_nofocus:"cycle in cash or no qualifying signals", deck_lamp:"Panic state", deck_bw:"Bi-weekly cycle", deck_line_seg:"deep-dip signals hit rate", seg_chip_tip:"This signal type's historical hit rate (+10% within 20 trading days, before the stop)", coil_demote_tip:"9y backtest: breakout chasing has negative median return — observation only", warn_neg_tip:"The only negative-expectancy tag in both markets: good technicals, weak fundamentals", bt_findings:"<b>📌 9-year research findings:</b> ① A-share breakout chasing has negative median returns — a mean-reversion market where deep-dip entries beat momentum; ② the best-fundamental companies perform WORST after breakouts (27.9% hit) — the quality list is a 'catch list', not a chase list; ③ bear-market breakouts average negative — the temperature gate is discipline; ④ ultra-tight boxes (≤10%) do worse — tighter is not better; ⑤ volume contraction helps in the US (21.8%→26.1%), not in A-shares.",
+      deck_title:"Action deck", deck_temp_a:"Market temp", deck_temp_us:"Risk appetite", deck_full:"Full size", deck_half:"Half size", deck_cash:"Cash", deck_prolonged:"Prolonged panic · window", deck_prolonged_tip:"The one CI-solid edge in 35y: +6.7% median 3M after prolonged panic", deck_acute:"Fresh panic · no knives", deck_acute_tip:"Fresh panic = coin flip with −15% left tail; wait for stabilization", deck_calm:"Calm", deck_cs:"Mispriced", deck_focus:"Bi-weekly picks:", deck_nofocus:"cycle in cash or no qualifying signals", deck_lamp:"Panic state", deck_bw:"Bi-weekly cycle", deck_line_seg:"deep-dip signals hit rate", deck_more:"Market state details (thermometer / risk appetite)", nav_state:"Market", nav_bt:"Backtest", nav_ql:"Quality", nav_ind:"Industries", nav_tbl:"Candidates", nav_jn:"Journal", col_btn:"Cols ▾", col_panel_tip:"Checked = visible; uncheck to remove, recheck to restore", fb_title:"Custom conditions (all must hold)", fb_add:"+ Add", bt_all:"All signals", bt_seg_showing:"Showing:", pp_click_cat:"Click for full position detail of this category", pp_close_drill:"close", pp_col_sig:"Signal", pp_col_exitd:"Exit day", pp_broke:"Broke down (no entry)", pp_no_positions:"No positions recorded yet for this category", seg_chip_tip:"This signal type's historical hit rate (+10% within 20 trading days, before the stop)", coil_demote_tip:"9y backtest: breakout chasing has negative median return — observation only", warn_neg_tip:"The only negative-expectancy tag in both markets: good technicals, weak fundamentals", bt_findings:"<b>📌 9-year research findings:</b> ① A-share breakout chasing has negative median returns — a mean-reversion market where deep-dip entries beat momentum; ② the best-fundamental companies perform WORST after breakouts (27.9% hit) — the quality list is a 'catch list', not a chase list; ③ bear-market breakouts average negative — the temperature gate is discipline; ④ ultra-tight boxes (≤10%) do worse — tighter is not better; ⑤ volume contraction helps in the US (21.8%→26.1%), not in A-shares.",
       pp_title:"Auto paper portfolio", pp_sub:"every first-time signal auto-buys __B__ per the trade plan", pp_total:"Total P&L", pp_open:"open", pp_resolved:"resolved", pp_win:"win", pp_avg:"avg", pp_cat_quality:"👑 Quality", pp_cat_cuosha:"💎 Mispriced", pp_cat_coil:"🎯 Coiling", pp_cat_dip:"🕳 Deep dip", pp_details:"Open positions & recent exits", pp_open_title:"Open", pp_closed_title:"Recently resolved", pp_col_stock:"Stock", pp_col_fill:"Filled", pp_col_dates:"Fill → exit", pp_col_entry:"Entry", pp_col_now:"Now", pp_col_exit:"Exit", pp_col_ret:"Return", pp_col_pnl:"P&L", pp_col_status:"Result", pp_won:"🎯 Target", pp_stopped:"⛔ Stopped", pp_expired:"⏳ Expired", pp_empty:"No fills yet — new signals will be bought automatically and tracked here", pp_note:"Rules: first appearance on Quality / Mispriced / Coiling / Deep-dip auto-registers a paper buy per the published trade plan (breakout stop-order, pullback limit, or next-open market; T+1 and sealed limit boards for A-shares; no entry if the open already breaches the stop; costs included). Exit = stop / +10% target / 20-trading-day expiry; 30-day cooldown per stock per signal type. Identical rules to the Signal Backtest below. Paper simulation — not real trading, not advice.",
       bw_title:"Bi-weekly quant portfolio", bw_sub:"one cycle per 10 trading days · picks by signal track record · temperature-gated sizing · paper only", bw_total:"Total P&L", bw_u_cycles:"cycles closed", bw_win_cycles:"winning", bw_u_stocks:"stocks", bw_cycle_at:"Current cycle", bw_col_ind:"Industry", bw_col_score:"Score", bw_col_now:"Now/settle", bw_stopped:"⛔ Stopped", bw_cycle_end:"🏁 Settled", bw_open:"Open", bw_pending:"Pending", bw_no_fill:"Limit-up skip", bw_empty:"Cycle in cash (temperature gate) or no qualifying signals", bw_note:"Rules: up to 6 picks per cycle (signal-type hit rate >=45%, n>=12, no earnings in window, max 2 per industry), equal-sized buys at next open, stop-loss protection, full settlement at close of trading day 10; market temperature >=55 full size, 40-55 half, <40 cash. Costs included; paper only.",
       bt_reco_seg:"Signal type", bt_reco_hist:"past hit rate", bt_reco_vs:"all signals",
@@ -1067,7 +1103,7 @@
           itemStyle:{borderColor:(document.body.classList.contains("light")?"#eef2f8":"#0b1220"),borderWidth:2,gapWidth:2}, data }]
       });
     } else {
-      const arr = inds.slice(0,12).slice().reverse();
+      const arr = inds.slice(0,8).slice().reverse();
       const names = arr.map(d=>d.industry);
       const scores = arr.map(d=> isNum(d.prosperity_score)? +d.prosperity_score.toFixed(1) : 0);
       const colors = arr.map(d=> d.selected? "#16a34a" : C.base);
@@ -1108,6 +1144,16 @@
     "breakdown_price","pos_52w_pct","ret_1m_pct","ret_half_year_pct","avg_amt20_yi","dividend_yield","pb","eps","roe",
     "streak","upside_pct","target_price","analyst_count","atr_pct","max_dd_pct","beta","boll_low","volume_ratio","turnover",
     "ni_ttm_yoy","rev_ttm_yoy","dom_share","dominance_disp","cuosha_score","cuosha_upside","cuosha_p20"]);
+  const HIDDEN_KEY = COLORDER_KEY.replace("colorder","hiddencols");
+  let HIDDEN = new Set(); try{ HIDDEN = new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY)||"[]")); }catch(e){}
+  function saveHidden(){ try{ localStorage.setItem(HIDDEN_KEY, JSON.stringify(Array.from(HIDDEN))); }catch(e){} }
+  function buildColPanel(){
+    const el = document.getElementById("colPanel"); if(!el) return;
+    el.innerHTML = `<div class="text-xs mb-1" style="color:var(--muted)">` + t("col_panel_tip") + `</div>` +
+      COLS.map(c=>`<label><input type="checkbox" data-k="${c.key}" ${HIDDEN.has(c.key)?"":"checked"}/> ${colLabel(c)}</label>`).join("");
+    el.querySelectorAll("input").forEach(cb=>{ cb.onchange=()=>{ const k=cb.dataset.k;
+      if(cb.checked) HIDDEN.delete(k); else HIDDEN.add(k); saveHidden(); render(); }; });
+  }
   try{ const saved=JSON.parse(localStorage.getItem(COLORDER_KEY)||"null");
     if(Array.isArray(saved)&&saved.length){ COLS.sort((a,b)=>{ let ia=saved.indexOf(a.key), ib=saved.indexOf(b.key); return (ia<0?999:ia)-(ib<0?999:ib); }); } }catch(e){}
 
@@ -1173,7 +1219,7 @@
   function buildHead(){
     const tr = $("#headRow"); tr.innerHTML="";
     const star=document.createElement("th"); star.textContent="★"; star.title=t("star_col"); star.style.width="30px"; tr.appendChild(star);
-    COLS.forEach(c=>{
+    COLS.filter(c=>!HIDDEN.has(c.key)).forEach(c=>{
       const th=document.createElement("th");
       th.className="sortable"; th.dataset.key=c.key; th.draggable=true;
       th.title=t("th_sort");
@@ -1285,6 +1331,11 @@
     if(state.maxDist<30) rows = rows.filter(c=> isNum(c.dist_support_pct) && Math.abs(c.dist_support_pct)<=state.maxDist);
     if(state.minRoe>-10) rows = rows.filter(c=> isNum(c.roe) && c.roe>=state.minRoe);
     if(state.minUp>-80) rows = rows.filter(c=> isNum(c.max_dd_pct) && c.max_dd_pct>=state.minUp);
+    for(const fb of (state.fb||[])){
+      if(!fb.k || fb.v==="" || fb.v==null) continue;
+      const vv = parseFloat(fb.v); if(!isFinite(vv)) continue;
+      rows = rows.filter(c=>{ const x=getVal(c,fb.k); return isNum(x) && (fb.op==="<=" ? x<=vv : x>=vv); });
+    }
     const k=state.sortKey, dir=state.sortDir==="asc"?1:-1;
     rows.sort((a,b)=>{
       let x=getVal(a,k), y=getVal(b,k);
@@ -1310,7 +1361,7 @@
       tr.style.background = tint;
       const on = favs.has(c.code);
       const starTd = `<td><span class="star ${on?'on':''}" data-code="${c.code}" title="${t('star_col')}">${on?'★':'☆'}</span></td>`;
-      tr.innerHTML = starTd + COLS.map(col=>`<td class="${NUMERIC.has(col.key)?'num':''}">${cellHTML(c,col.key)}</td>`).join("");
+      tr.innerHTML = starTd + COLS.filter(cc=>!HIDDEN.has(cc.key)).map(col=>`<td class="${NUMERIC.has(col.key)?'num':''}">${cellHTML(c,col.key)}</td>`).join("");
       tr.querySelector(".star").onclick = e=>{ e.stopPropagation(); toggleFav(c.code); };
       tr.onclick=()=>openDetail(c);
       frag.appendChild(tr);
@@ -2059,6 +2110,50 @@
   updateStrip();
   render();
   // 共用看板功能初始化 (必须在主脚本所有 const 工具函数定义之后)
+  // ---- 列面板/筛选生成器/区块搬运/迷你统计 ----
+  (function(){
+    const cbtn = document.getElementById("colBtn");
+    if(cbtn){ cbtn.onclick = (e)=>{ e.stopPropagation(); buildColPanel(); document.getElementById("colPanel").classList.toggle("hidden"); };
+      document.addEventListener("click", (e)=>{ const p=document.getElementById("colPanel");
+        if(p && !p.classList.contains("hidden") && !p.contains(e.target) && e.target!==cbtn) p.classList.add("hidden"); }); }
+    if(!Array.isArray(state.fb)) state.fb = [];
+    const FB_FIELDS = ()=> COLS.filter(c=>NUMERIC.has(c.key)).map(c=>({k:c.key, label:colLabel(c)}));
+    function renderFb(){
+      const el = document.getElementById("fbRows"); if(!el) return;
+      el.innerHTML = state.fb.map((fb,i)=>`<div class="fbrow">
+        <select data-i="${i}" data-r="k">${FB_FIELDS().map(f=>`<option value="${f.k}" ${fb.k===f.k?"selected":""}>${f.label}</option>`).join("")}</select>
+        <select data-i="${i}" data-r="op"><option value=">=" ${fb.op!=="<="?"selected":""}>≥</option><option value="<=" ${fb.op==="<="?"selected":""}>≤</option></select>
+        <input type="number" step="any" data-i="${i}" data-r="v" value="${fb.v??""}"/>
+        <button class="segbtn" data-i="${i}" data-r="x">✕</button></div>`).join("");
+      el.querySelectorAll("select,input").forEach(x=>{ x.onchange=()=>{ state.fb[+x.dataset.i][x.dataset.r]=x.value; persist(); render(); }; });
+      el.querySelectorAll("button").forEach(b=>{ b.onclick=()=>{ state.fb.splice(+b.dataset.i,1); persist(); renderFb(); render(); }; });
+    }
+    const addBtn = document.getElementById("fbAdd");
+    if(addBtn){ addBtn.onclick=()=>{ state.fb.push({k:(FB_FIELDS()[0]||{}).k, op:">=", v:""}); persist(); renderFb(); }; renderFb(); }
+    // 导航收起
+    const nt = document.getElementById("navToggle");
+    if(nt){ if(localStorage.getItem("navClosed")==="1") document.body.classList.add("navClosed");
+      nt.onclick=()=>{ document.body.classList.toggle("navClosed");
+        localStorage.setItem("navClosed", document.body.classList.contains("navClosed")?"1":"0"); }; }
+    // 迷你统计 (原横条隐藏)
+    function ovMini(){ const el=document.getElementById("ovMini"); if(!el||!DATA||!DATA.meta) return;
+      const m=DATA.meta; el.innerHTML = `${t("ov_scanned")} <b>${m.n_scanned??"—"}</b> · ${t("ov_hit")} <b>${m.n_hit??"—"}</b> · ${t("ov_date")} <b>${m.run_date||m.data_date||"—"}</b>`; }
+    setTimeout(ovMini, 0);
+    // 搬运: 温度计/风险偏好 -> 作战台折叠区; 权重实验室 -> 主表折叠区
+    setTimeout(()=>{
+      const more = document.getElementById("deckMoreBody");
+      ["oppCard","sentCard"].forEach(id=>{ const n=document.getElementById(id);
+        if(n && more && !n.dataset.moved){ n.dataset.moved="1"; n.classList.add("merged-into-deck"); more.appendChild(n); } });
+      const og = document.querySelector(".grid.grid-cols-1.lg\\:grid-cols-2.gap-3.mb-3.items-start");
+      if(og && !og.children.length) og.remove();
+      const wl = document.getElementById("wlabCard"), tbl = document.getElementById("tblCard");
+      if(wl && tbl && !wl.dataset.moved){ wl.dataset.moved="1";
+        const d=document.createElement("details"); d.className="mb-3";
+        d.innerHTML = `<summary class="text-xs cursor-pointer select-none hover:text-sky-300" style="color:var(--muted)">${t("wlab_title")}</summary>`;
+        wl.classList.add("merged-into-deck"); d.appendChild(wl);
+        tbl.insertBefore(d, tbl.children[1]); }
+    }, 60);
+  })();
   LS.init({$, t, isNum, escH, tagClass, tagText, dash, getData:()=>DATA, openDetail, getCur:()=>curC, market: LS_MARKET});
   setTimeout(()=>{ LS.renderBacktest(); LS.renderCuosha(); LS.renderQuality(); LS.renderJournal(); LS.renderPaper(); LS.renderBiweekly(); LS.renderDeck(); }, 0);
 })();

@@ -19,13 +19,26 @@ LS.init = function(ctx){
     if(!card) return;
     if(!B || !B.agg || !B.agg.pool || !B.agg.pool.n_resolved){ card.classList.add("hidden"); return; }
     card.classList.remove("hidden");
-    const P=B.agg.pool, M=B.meta||{};
+    const P0=B.agg.pool, M=B.meta||{};
     const pct=(x,d)=>isNum(x)?(x*100).toFixed(d==null?0:d)+"%":dash;
+    // 信号类型选择器: 选中后统计/优选/最近了结都切到该类
+    LS._btTag = LS._btTag || "";
+    const tagKeys = Object.entries(B.agg.by_tag||{}).sort((a,b)=>(b[1].n_resolved||0)-(a[1].n_resolved||0)).map(([k])=>k);
+    const selEl = $("#btSel");
+    if(selEl){
+      selEl.innerHTML = [`<button class="segbtn ${LS._btTag===""?"on":""}" data-tag="">${t("bt_all")}</button>`]
+        .concat(tagKeys.map(k=>`<button class="segbtn ${LS._btTag===k?"on":""}" data-tag="${escH(k)}">${escH(tagText(k))}</button>`)).join(" ");
+      selEl.querySelectorAll("button").forEach(b=>{ b.onclick=()=>{ LS._btTag=b.dataset.tag; renderBacktest(); }; });
+    }
+    const SEG = LS._btTag && (B.agg.by_tag||{})[LS._btTag];
+    const P = SEG || P0;
     $("#btMeta").textContent = `${M.first_day} → ${M.last_day} · ${M.n_days}${t("bt_days")} · ${t("bt_hz")}${M.horizon}${t("bt_hz2")}`;
     const stat=(lab,val,sub,col)=>`<div class="rounded-lg p-2.5" style="background:rgba(148,163,184,.07)"><div class="text-[11px] text-slate-400">${lab}</div><div class="text-xl font-bold ${col||"text-white"}">${val}</div>${sub?`<div class="text-[10px] text-slate-500">${sub}</div>`:""}</div>`;
+    const fillR = isNum(P.fill_rate) ? P.fill_rate : (P.n_signals ? (P.n_filled||0)/P.n_signals : null);
     $("#btStats").innerHTML =
+      (LS._btTag? `<div class="col-span-full text-xs" style="color:var(--muted)">${t("bt_seg_showing")} <span class="badge ${tagClass(LS._btTag)}">${escH(tagText(LS._btTag))}</span> · ${t("bt_reco_vs")} ${pct(B.agg.p0)}</div>`:"") +
       stat(t("bt_n"), P.n_resolved, `${t("bt_n_open")} ${P.n_open||0}`) +
-      stat(t("bt_fill"), pct(P.fill_rate)) +
+      stat(t("bt_fill"), pct(fillR)) +
       stat(t("bt_win"), pct(P.win10), t("bt_win_sub"), P.win10>=0.6?"text-emerald-300":"text-amber-300") +
       stat(t("bt_ret"), (P.avg_ret>0?"+":"")+pct(P.avg_ret,1), t("bt_ret_sub"), P.avg_ret>0?"text-emerald-300":"text-rose-300") +
       stat(t("bt_days_med"), isNum(P.med_days)?P.med_days:dash, t("bt_days_sub"));
@@ -44,7 +57,7 @@ LS.init = function(ctx){
        dim(t("bt_g_G"),G.G), dim(t("bt_g_M"),G.M), dim(t("bt_g_W"),G.W),
        dim(t("bt_cs"),CS.cs), dim(t("bt_cselig"),CS.elig), dim(t("bt_noncs"),CS.other),
        dim(t("bt_reg_bull"),(B.agg.by_regime||{}).bull), dim(t("bt_reg_bear"),(B.agg.by_regime||{}).bear)].filter(Boolean).join("");
-    const rec=(B.recos||[]).slice(0,20);
+    const rec=(B.recos||[]).filter(r=>!LS._btTag || r.tag===LS._btTag).slice(0,20);
     // 胜率是"信号类型"的历史频率而非个股预测: 按类型分组, 类型只标一次, 个股显示各自综合分
     const groups={};
     rec.forEach(r=>{ const key=(r.seg_kind==="combo")? `${r.tag}|${r.growth}` : (r.tag||"?"); (groups[key]=groups[key]||{r, items:[]}).items.push(r); });
@@ -54,7 +67,7 @@ LS.init = function(ctx){
       return `<div class="w-full"><div class="text-xs text-slate-300 mb-1">${t("bt_reco_seg")} <span class="badge ${tagClass(r.tag)}">${lab}</span> ${t("bt_reco_hist")} <b class="text-emerald-300">${pct(r.seg_win_post)}</b> <span class="text-slate-500">(n=${r.seg_n} · ${t("bt_reco_vs")} ${pct(B.agg.p0)})</span></div><div class="flex flex-wrap gap-2">`+
         g.items.map(x=>`<span class="badge tag-strong cursor-pointer" onclick="btOpen('${escH(x.code)}')" title="${t("bt_reco_tip2")}">${escH(x.code)} ${escH(String(x.name||"").slice(0,10))} <span class="text-[10px] opacity-70">${t("composite")} ${isNum(x.fs)?x.fs.toFixed(1):dash}</span></span>`).join("")+`</div></div>`;
     }).join("") : `<span class="text-xs text-slate-500">${t("bt_reco_none")}</span>`;
-    const rc2=(B.recent||[]).slice(0,10);
+    const rc2=(B.recent||[]).filter(e=>!LS._btTag || e.tag===LS._btTag).slice(0,10);
     $("#btRecent").innerHTML = rc2.length? `<div class="text-xs text-slate-400 mb-1">${t("bt_recent")}</div><div class="flex flex-wrap gap-2">`+rc2.map(e=>{
       const ic=e.status==="won"?"✅":(e.status==="stopped"?"⛔":"⏳");
       const rr=isNum(e.ret)?((e.ret>0?"+":"")+(e.ret*100).toFixed(1)+"%"):dash;
@@ -269,7 +282,7 @@ LS.init = function(ctx){
 
   // ---------- 🎯 今日作战台 (温度→仓位 · 恐慌灯 · 本期焦点) ----------
   function renderDeck(){
-    const el = $("#deckWrap");
+    const el = $("#deckMain") || $("#deckWrap");
     if(!el) return;
     const D = getData();
     if(!D || !D.meta){ el.innerHTML = ""; return; }
@@ -313,9 +326,7 @@ LS.init = function(ctx){
       bwN = (cyc.picks||[]).length;
       if(used>0) bwPct = ((sm.pnl_done||0)+(sm.pnl_open||0))/used*100;
     }
-    el.innerHTML = `<div class="card p-4">
-      <div class="text-[11px] font-semibold tracking-widest mb-3" style="color:var(--muted)">${t("deck_title")}</div>
-      <div class="deckGrid">
+    el.innerHTML = `<div class="deckGrid">
         <div class="deckCell"><div class="statK">${t(isUS?"deck_temp_us":"deck_temp_a")}</div>
           <div class="statV grad" id="deckTemp">${temp==null?dash:Math.round(temp)}</div>
           <div><span class="dpill ${pos[1]}">${pos[0]}</span>${lampBadge}</div></div>
@@ -325,8 +336,7 @@ LS.init = function(ctx){
           <div class="statV">${bwPct==null?dash:(bwPct>0?"+":"")+bwPct.toFixed(1)+"<small>%</small>"}</div>
           <div>${(cyc&&cyc.picks&&cyc.picks.length)? cyc.picks.slice(0,6).map(p2=>`<span class="fchip">${escH(String(p2.name||p2.code).slice(0,10))}</span>`).join("") : `<span class="text-xs" style="color:var(--muted)">${t("deck_nofocus")}</span>`}</div></div>
       </div>
-      <div class="typeline"><span id="deckLine"></span></div>
-    </div>`;
+      <div class="typeline"><span id="deckLine"></span></div>`;
     const segTag = Object.entries(((window.__BT__||{}).agg||{}).by_tag||{}).find(([k])=>k.indexOf("深跌")>=0);
     const segWin = segTag && isNum(segTag[1].win10) ? (segTag[1].win10*100).toFixed(0) : null;
     const lineEl = $("#deckLine");
@@ -388,9 +398,11 @@ LS.init = function(ctx){
     const STN = {won:t("pp_won"), stopped:t("pp_stopped"), expired:t("pp_expired")};
     const tot = P.total, totPnl = (tot.realized||0)+(tot.unrealized||0);
     const budget = (P.meta&&P.meta.budget)? cur+P.meta.budget.toLocaleString() : "";
+    LS._ppCat = LS._ppCat===undefined ? "" : LS._ppCat;
     const chips = Object.entries(P.by_cat||{}).map(([k,a])=>{
       const pnl=(a.realized||0)+(a.unrealized||0);
-      return `<div class="rounded-lg border border-slate-700/60 bg-slate-800/40 px-2.5 py-1.5 text-xs">
+      const sel = LS._ppCat===k;
+      return `<div data-cat="${escH(k)}" class="ppcat rounded-lg border ${sel?"border-sky-400":"border-slate-700/60"} bg-slate-800/40 px-2.5 py-1.5 text-xs cursor-pointer hover:border-sky-500/70" title="${t("pp_click_cat")}">
         <div class="text-slate-400">${CATN[k]||k}</div>
         <div class="mt-0.5 text-slate-300">${t("pp_open")} <b>${a.n_open}</b> · ${t("pp_resolved")} <b>${a.n_resolved}</b>${a.win_rate!=null?` · ${t("pp_win")} <b class="${a.win_rate>=50?"text-emerald-300":"text-amber-300"}">${a.win_rate}%</b>`:""}</div>
         <div class="font-semibold ${pnl>0?"text-emerald-300":(pnl<0?"text-rose-300":"text-slate-300")}">${money(pnl)}${a.avg_ret!=null?` <span class="text-[10px] text-slate-500 font-normal">${t("pp_avg")} ${pcx(a.avg_ret)}</span>`:""}</div>
@@ -410,12 +422,33 @@ LS.init = function(ctx){
       <td class="text-right font-semibold ${r.ret>0?"text-emerald-300":(r.ret<0?"text-rose-300":"")}">${pcx(r.ret*100)}</td>
       <td class="text-right">${STN[r.status]||r.status}</td></tr>`).join("");
     const th = cols => `<tr class="text-slate-400 text-[11px]">${cols.map((c,i)=>`<th class="${i? "text-right":"text-left"} py-1 ${i===1?"!text-left":""}">${c}</th>`).join("")}</tr>`;
+    let catDrill = "";
+    if(LS._ppCat && Array.isArray(P.positions)){
+      const rows = P.positions.filter(r=>r.cat===LS._ppCat).sort((a,b)=>String(b.sig_date).localeCompare(String(a.sig_date)));
+      const STN2 = {won:t("pp_won"), stopped:t("pp_stopped"), expired:t("pp_expired"), open:t("bw_open"),
+                    pending:t("bw_pending"), no_fill:t("bw_no_fill"), broke_down:t("pp_broke"), gap_break:dash,
+                    gap_invalid:dash, no_data:dash, bad_anchor:dash, too_expensive:dash, box_broke:t("pp_broke")};
+      catDrill = `<div class="mt-2 rounded-lg border border-sky-500/30 p-2">
+        <div class="text-xs mb-1" style="color:var(--muted)">${escH(CATN[LS._ppCat]||LS._ppCat)} · ${rows.length} ${t("bw_u_stocks")} <span class="cursor-pointer text-sky-400" onclick="LS._ppCat='';LS.renderPaper()">✕ ${t("pp_close_drill")}</span></div>
+        <div class="overflow-x-auto"><table class="w-full text-[12.5px]">
+        <tr class="text-slate-400 text-[11px]"><th class="text-left py-1">${t("pp_col_stock")}</th><th class="text-left">${t("pp_col_sig")}</th><th class="text-left">${t("pp_col_fill")}</th><th class="text-right">${t("pp_col_entry")}</th><th class="text-left">${t("pp_col_exitd")}</th><th class="text-right">${t("pp_col_exit")}</th><th class="text-right">${t("pp_col_ret")}</th><th class="text-right">${t("pp_col_status")}</th></tr>` +
+        rows.map(r=>`<tr class="border-t border-slate-700/40">
+          <td class="py-1"><b>${escH(r.name||"")}</b> <span class="font-mono text-[11px] text-slate-400">${escH(r.code)}</span></td>
+          <td class="text-[11px] text-slate-400">${escH(r.sig_date||"")}</td>
+          <td class="text-[11px] text-slate-400">${escH(r.fill_date||dash)}</td>
+          <td class="text-right">${isNum(r.fill_px)?r.fill_px:dash}</td>
+          <td class="text-[11px] text-slate-400">${escH(r.exit_date||dash)}</td>
+          <td class="text-right">${isNum(r.exit_px)?r.exit_px:dash}</td>
+          <td class="text-right font-semibold ${r.ret>0?"text-emerald-300":(r.ret<0?"text-rose-300":"")}">${isNum(r.ret)?pcx(r.ret*100):dash}</td>
+          <td class="text-right">${STN2[r.status]||r.status||dash}</td></tr>`).join("") + `</table></div></div>`;
+    } else if(LS._ppCat){ catDrill = `<div class="text-xs mt-2" style="color:var(--muted)">${t("pp_no_positions")}</div>`; }
     el.innerHTML = `
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="text-sm font-semibold text-indigo-300">${t("pp_title")} <span class="text-xs text-slate-400 font-normal">${t("pp_sub").replace("__B__", budget)}</span></div>
         <div class="text-xs ${totPnl>0?"text-emerald-300":(totPnl<0?"text-rose-300":"text-slate-400")}">${t("pp_total")} <b>${money(totPnl)}</b>${tot.win_rate!=null?` · ${t("pp_win")} ${tot.win_rate}%`:""} <span class="text-slate-500">(${P.meta.as_of||""})</span></div>
       </div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">${chips}</div>
+      ${catDrill}
       <details class="mt-2">
         <summary class="text-xs text-slate-400 cursor-pointer select-none hover:text-sky-300">${t("pp_details")} (${(P.open||[]).length} / ${(P.recent||[]).length})</summary>
         ${(P.open||[]).length? `<div class="text-xs text-slate-400 mt-2 mb-1">${t("pp_open_title")}</div>
@@ -426,6 +459,7 @@ LS.init = function(ctx){
         <div class="text-xs text-slate-500 mt-2 leading-relaxed">${t("pp_note")}</div>
       </details>
       <div class="border-t border-slate-700/50 my-3"></div>`;
+    el.querySelectorAll(".ppcat").forEach(d=>{ d.onclick=()=>{ LS._ppCat = LS._ppCat===d.dataset.cat ? "" : d.dataset.cat; renderPaper(); }; });
   }
   window.btOpen = btOpen;
   LS.renderBacktest = renderBacktest; LS.renderCuosha = renderCuosha; LS.renderQuality = renderQuality;
