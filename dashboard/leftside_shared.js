@@ -299,19 +299,34 @@ LS.init = function(ctx){
     const focus = (cyc && cyc.picks && cyc.picks.length)
       ? cyc.picks.slice(0,6).map(p=>`<span class="fchip"><b>${escH(p.name||p.code)}</b></span>`).join("")
       : `<span class="text-xs" style="color:var(--muted)">${t("deck_nofocus")}</span>`;
+    let lampBadge = "";
+    if(isUS){
+      const ph = String((window.__SENT__||{}).phase||"");
+      const L = (/prolonged|持续/.test(ph)) ? [t("deck_prolonged"),"ok",t("deck_prolonged_tip")]
+             : (/acute|急|新恐慌/.test(ph)) ? [t("deck_acute"),"no",t("deck_acute_tip")]
+             : [t("deck_calm"),"mid",""];
+      lampBadge = ` <span class="dpill ${L[1]}" title="${escH(L[2])}">${escH(L[0])}</span>`;
+    }
+    let bwPct = null, bwN = 0;
+    if(cyc && cyc.summary){
+      const sm = cyc.summary, used = (cyc.picks||[]).reduce((a2,p2)=>a2+(((p2.result||{}).used)||0),0);
+      bwN = (cyc.picks||[]).length;
+      if(used>0) bwPct = ((sm.pnl_done||0)+(sm.pnl_open||0))/used*100;
+    }
     el.innerHTML = `<div class="card p-4">
-      <div class="text-[11px] font-semibold tracking-widest mb-3" style="color:var(--muted)"><span class="spark">✦</span> ${t("deck_title")}</div>
+      <div class="text-[11px] font-semibold tracking-widest mb-3" style="color:var(--muted)">${t("deck_title")}</div>
       <div class="deckGrid">
-        <div><div class="statK">${t(isUS?"deck_temp_us":"deck_temp_a")}</div><div class="statV grad num" id="deckTemp">${temp==null?dash:"0"}</div><span class="dpill ${pos[1]}">${pos[0]}</span></div>
-        ${lampStat}
-        <div><div class="statK">${t("deck_cs")}</div><div class="statV num" id="deckCs">0<small> </small></div></div>
-        ${bwStat}
-        <div style="min-width:230px"><div class="statK">${t("deck_focus")}</div><div>${focus}</div></div>
+        <div class="deckCell"><div class="statK">${t(isUS?"deck_temp_us":"deck_temp_a")}</div>
+          <div class="statV grad" id="deckTemp">${temp==null?dash:Math.round(temp)}</div>
+          <div><span class="dpill ${pos[1]}">${pos[0]}</span>${lampBadge}</div></div>
+        <div class="deckCell"><div class="statK">${t("deck_cs")}</div>
+          <div class="statV" id="deckCs">${cs}</div></div>
+        <div class="deckCell" style="min-width:240px"><div class="statK">${t("deck_bw")}${bwN?` · ${bwN} ${t("bw_u_stocks")}`:""}</div>
+          <div class="statV">${bwPct==null?dash:(bwPct>0?"+":"")+bwPct.toFixed(1)+"<small>%</small>"}</div>
+          <div>${(cyc&&cyc.picks&&cyc.picks.length)? cyc.picks.slice(0,6).map(p2=>`<span class="fchip">${escH(String(p2.name||p2.code).slice(0,10))}</span>`).join("") : `<span class="text-xs" style="color:var(--muted)">${t("deck_nofocus")}</span>`}</div></div>
       </div>
-      <div class="typeline"><span id="deckLine"></span><span class="tcaret" id="deckCaret"></span></div>
+      <div class="typeline"><span id="deckLine"></span></div>
     </div>`;
-    const tEl = $("#deckTemp"); if(tEl && temp!=null) tEl.innerHTML = Math.round(temp);
-    const cEl = $("#deckCs"); if(cEl) cEl.innerHTML = cs + "<small> </small>";
     const segTag = Object.entries(((window.__BT__||{}).agg||{}).by_tag||{}).find(([k])=>k.indexOf("深跌")>=0);
     const segWin = segTag && isNum(segTag[1].win10) ? (segTag[1].win10*100).toFixed(0) : null;
     const lineEl = $("#deckLine");
