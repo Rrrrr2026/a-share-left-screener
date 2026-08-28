@@ -33,15 +33,24 @@ LS.init = function(ctx){
     const SEG = LS._btTag && (B.agg.by_tag||{})[LS._btTag];
     const P = SEG || P0;
     $("#btMeta").textContent = `${M.first_day} → ${M.last_day} · ${M.n_days}${t("bt_days")} · ${t("bt_hz")}${M.horizon}${t("bt_hz2")}`;
-    const stat=(lab,val,sub,col)=>`<div class="rounded-lg p-2.5" style="background:rgba(148,163,184,.07)"><div class="text-[11px] text-slate-400">${lab}</div><div class="text-xl font-bold ${col||"text-white"}">${val}</div>${sub?`<div class="text-[10px] text-slate-500">${sub}</div>`:""}</div>`;
+    const INFO=(k)=>` <span class="btInfo cursor-pointer" data-help="${k}" title="${t("bt_info_tip")}">ⓘ</span>`;
+    const stat=(lab,val,sub,col,hk)=>`<div class="rounded-lg p-2.5" style="background:rgba(148,163,184,.07)"><div class="text-[11px] text-slate-400">${lab}${hk?INFO(hk):""}</div><div class="text-xl font-bold ${col||"text-white"}">${val}</div>${sub?`<div class="text-[10px] text-slate-500">${sub}</div>`:""}</div>`;
     const fillR = isNum(P.fill_rate) ? P.fill_rate : (P.n_signals ? (P.n_filled||0)/P.n_signals : null);
     $("#btStats").innerHTML =
       (LS._btTag? `<div class="col-span-full text-xs" style="color:var(--muted)">${t("bt_seg_showing")} <span class="badge ${tagClass(LS._btTag)}">${escH(tagText(LS._btTag))}</span> · ${t("bt_reco_vs")} ${pct(B.agg.p0)}</div>`:"") +
-      stat(t("bt_n"), P.n_resolved, `${t("bt_n_open")} ${P.n_open||0}`) +
-      stat(t("bt_fill"), pct(fillR)) +
-      stat(t("bt_win"), pct(P.win10), t("bt_win_sub"), P.win10>=0.6?"text-emerald-300":"text-amber-300") +
-      stat(t("bt_ret"), (P.avg_ret>0?"+":"")+pct(P.avg_ret,1), t("bt_ret_sub"), P.avg_ret>0?"text-emerald-300":"text-rose-300") +
-      stat(t("bt_days_med"), isNum(P.med_days)?P.med_days:dash, t("bt_days_sub"));
+      stat(t("bt_n"), P.n_resolved, `${t("bt_n_open")} ${P.n_open||0}`, null, "n") +
+      stat(t("bt_fill"), pct(fillR), null, null, "fill") +
+      stat(t("bt_win"), pct(P.win10), t("bt_win_sub"), P.win10>=0.6?"text-emerald-300":"text-amber-300", "win") +
+      stat(t("bt_ret"), (P.avg_ret>0?"+":"")+pct(P.avg_ret,1), t("bt_ret_sub"), P.avg_ret>0?"text-emerald-300":"text-rose-300", "ret") +
+      stat(t("bt_days_med"), isNum(P.med_days)?P.med_days:dash, t("bt_days_sub"), null, "days");
+    card.querySelectorAll(".btInfo").forEach(ic=>{ ic.onclick=(e)=>{ e.stopPropagation();
+      let pop = document.getElementById("btHelpPop");
+      if(!pop){ pop = document.createElement("div"); pop.id = "btHelpPop"; document.body.appendChild(pop);
+        document.addEventListener("click", (ev)=>{ if(!pop.contains(ev.target)) pop.style.display="none"; }); }
+      pop.innerHTML = `<div class="text-[12px] font-semibold mb-1">${t("bthelp_"+ic.dataset.help+"_t")}</div><div class="text-[12px] leading-relaxed" style="color:var(--dim)">${t("bthelp_"+ic.dataset.help)}</div>`;
+      const r = ic.getBoundingClientRect();
+      pop.style.cssText = `display:block;position:fixed;z-index:99;left:${Math.min(r.left, innerWidth-330)}px;top:${r.bottom+6}px;width:320px;background:var(--card);border:1px solid var(--inputborder);border-radius:8px;padding:10px 12px;box-shadow:0 12px 40px rgba(0,0,0,.5)`;
+    }; });
     const rows = Object.entries(B.agg.by_tag||{}).sort((a,b)=>(b[1].n_resolved||0)-(a[1].n_resolved||0));
     const th=`<tr class="text-slate-400 text-[11px]"><th class="text-left py-1">${t("bt_col_tag")}</th><th class="text-right">${t("bt_col_n")}</th><th class="text-right">${t("bt_col_win")}</th><th class="text-right">${t("bt_col_r5")}</th><th class="text-right">${t("bt_col_ret")}</th><th class="text-right">${t("bt_col_d")}</th></tr>`;
     $("#btTagTbl").innerHTML = th + rows.map(([k,s])=>{
@@ -290,58 +299,13 @@ LS.init = function(ctx){
     let temp = null;
     if(isUS){ const S = window.__SENT__; temp = (S && isNum(S.score)) ? S.score : null; }
     else { const opp = D.meta && D.meta.opp; temp = (opp && isNum(opp.score)) ? opp.score : null; }
-    const pos = temp==null ? [dash, "mid"] : temp>=55 ? [t("deck_full"),"ok"] : temp>=40 ? [t("deck_half"),"mid"] : [t("deck_cash"),"no"];
-    let lampStat = "";
-    if(isUS){
-      const ph = String((window.__SENT__||{}).phase||"");
-      const L = (/prolonged|持续/.test(ph)) ? [t("deck_prolonged"),"ok",t("deck_prolonged_tip")]
-             : (/acute|急|新恐慌/.test(ph)) ? [t("deck_acute"),"no",t("deck_acute_tip")]
-             : [t("deck_calm"),"mid",""];
-      lampStat = `<div><div class="statK">${t("deck_lamp")}</div><div class="statV" style="font-size:19px;line-height:1.5">${escH(L[0])}</div><span class="dpill ${L[1]}" title="${escH(L[2])}">VIX</span></div>`;
-    }
-    const B = window.__BW__;
-    const cyc = (B && B.cycles && B.cycles.length) ? B.cycles[B.cycles.length-1] : null;
-    let bwStat = "";
-    if(cyc && cyc.summary){
-      const sm = cyc.summary, used = (cyc.picks||[]).reduce((a,p)=>a+(((p.result||{}).used)||0),0);
-      const pnl = (sm.pnl_done||0)+(sm.pnl_open||0);
-      const pct = used>0 ? (pnl/used*100) : null;
-      bwStat = `<div><div class="statK">${t("deck_bw")}</div><div class="statV num ${pct>0?"":""}">${pct==null?dash:(pct>0?"+":"")+pct.toFixed(1)}<small>%</small></div><span class="dpill mid">${(cyc.picks||[]).length} ${t("bw_u_stocks")}</span></div>`;
-    }
+    const pos = temp==null ? [dash,"mid"] : temp>=55 ? [t("deck_full"),"ok"] : temp>=40 ? [t("deck_half"),"mid"] : [t("deck_cash"),"no"];
     const cs = (D.candidates||[]).filter(c=>c.cuosha_score).length;
-    const focus = (cyc && cyc.picks && cyc.picks.length)
-      ? cyc.picks.slice(0,6).map(p=>`<span class="fchip"><b>${escH(p.name||p.code)}</b></span>`).join("")
-      : `<span class="text-xs" style="color:var(--muted)">${t("deck_nofocus")}</span>`;
-    let lampBadge = "";
-    if(isUS){
-      const ph = String((window.__SENT__||{}).phase||"");
-      const L = (/prolonged|持续/.test(ph)) ? [t("deck_prolonged"),"ok",t("deck_prolonged_tip")]
-             : (/acute|急|新恐慌/.test(ph)) ? [t("deck_acute"),"no",t("deck_acute_tip")]
-             : [t("deck_calm"),"mid",""];
-      lampBadge = ` <span class="dpill ${L[1]}" title="${escH(L[2])}">${escH(L[0])}</span>`;
-    }
-    let bwPct = null, bwN = 0;
-    if(cyc && cyc.summary){
-      const sm = cyc.summary, used = (cyc.picks||[]).reduce((a2,p2)=>a2+(((p2.result||{}).used)||0),0);
-      bwN = (cyc.picks||[]).length;
-      if(used>0) bwPct = ((sm.pnl_done||0)+(sm.pnl_open||0))/used*100;
-    }
-    el.innerHTML = `<div class="deckGrid">
-        <div class="deckCell"><div class="statK">${t(isUS?"deck_temp_us":"deck_temp_a")}</div>
-          <div class="statV grad" id="deckTemp">${temp==null?dash:Math.round(temp)}</div>
-          <div><span class="dpill ${pos[1]}">${pos[0]}</span>${lampBadge}</div></div>
-        <div class="deckCell"><div class="statK">${t("deck_cs")}</div>
-          <div class="statV" id="deckCs">${cs}</div></div>
-        <div class="deckCell" style="min-width:240px"><div class="statK">${t("deck_bw")}${bwN?` · ${bwN} ${t("bw_u_stocks")}`:""}</div>
-          <div class="statV">${bwPct==null?dash:(bwPct>0?"+":"")+bwPct.toFixed(1)+"<small>%</small>"}</div>
-          <div>${(cyc&&cyc.picks&&cyc.picks.length)? cyc.picks.slice(0,6).map(p2=>`<span class="fchip">${escH(String(p2.name||p2.code).slice(0,10))}</span>`).join("") : `<span class="text-xs" style="color:var(--muted)">${t("deck_nofocus")}</span>`}</div></div>
-      </div>
-      <div class="typeline"><span id="deckLine"></span></div>`;
     const segTag = Object.entries(((window.__BT__||{}).agg||{}).by_tag||{}).find(([k])=>k.indexOf("深跌")>=0);
     const segWin = segTag && isNum(segTag[1].win10) ? (segTag[1].win10*100).toFixed(0) : null;
-    const lineEl = $("#deckLine");
-    if(lineEl) lineEl.innerHTML = `${t(isUS?"deck_temp_us":"deck_temp_a")} <b>${temp==null?dash:temp.toFixed(0)} → ${pos[0]}</b>` +
-      (segWin? `；${t("deck_line_seg")} <b>${segWin}%</b>`:"") + `；${t("deck_cs")} <b>${cs}</b>`;
+    el.innerHTML = `<div class="typeline" style="margin-top:0"><span id="deckLine">` +
+      `${t(isUS?"deck_temp_us":"deck_temp_a")} <b>${temp==null?dash:temp.toFixed(0)} → ${pos[0]}</b>` +
+      (segWin? `；${t("deck_line_seg")} <b>${segWin}%</b>`:"") + `；${t("deck_cs")} <b>${cs}</b></span></div>`;
   }
 
   // ---------- 📆 双周量化组合 (biweekly_data.js -> window.__BW__) ----------
@@ -424,12 +388,17 @@ LS.init = function(ctx){
     const th = cols => `<tr class="text-slate-400 text-[11px]">${cols.map((c,i)=>`<th class="${i? "text-right":"text-left"} py-1 ${i===1?"!text-left":""}">${c}</th>`).join("")}</tr>`;
     let catDrill = "";
     if(LS._ppCat && Array.isArray(P.positions)){
-      const rows = P.positions.filter(r=>r.cat===LS._ppCat).sort((a,b)=>String(b.sig_date).localeCompare(String(a.sig_date)));
+      LS._ppStatus = LS._ppStatus || "";
+      const all = P.positions.filter(r=>r.cat===LS._ppCat).sort((a,b)=>String(b.sig_date).localeCompare(String(a.sig_date)));
+      const rows = LS._ppStatus ? all.filter(r=>r.status===LS._ppStatus) : all;
       const STN2 = {won:t("pp_won"), stopped:t("pp_stopped"), expired:t("pp_expired"), open:t("bw_open"),
                     pending:t("bw_pending"), no_fill:t("bw_no_fill"), broke_down:t("pp_broke"), gap_break:dash,
                     gap_invalid:dash, no_data:dash, bad_anchor:dash, too_expensive:dash, box_broke:t("pp_broke")};
+      const stSet = Array.from(new Set(all.map(r=>r.status)));
+      const stChips = [`<button class="segbtn ${LS._ppStatus===""?"on":""}" data-st="">${t("bt_all")}</button>`]
+        .concat(stSet.map(st=>`<button class="segbtn ${LS._ppStatus===st?"on":""}" data-st="${escH(st)}">${STN2[st]||st}</button>`)).join(" ");
       catDrill = `<div class="mt-2 rounded-lg border border-sky-500/30 p-2">
-        <div class="text-xs mb-1" style="color:var(--muted)">${escH(CATN[LS._ppCat]||LS._ppCat)} · ${rows.length} ${t("bw_u_stocks")} <span class="cursor-pointer text-sky-400" onclick="LS._ppCat='';LS.renderPaper()">✕ ${t("pp_close_drill")}</span></div>
+        <div class="text-xs mb-1 flex items-center gap-2 flex-wrap" style="color:var(--muted)">${escH(CATN[LS._ppCat]||LS._ppCat)} · ${rows.length}/${all.length} ${t("bw_u_stocks")} <span class="ppStChips flex gap-1 flex-wrap">${stChips}</span> <span class="cursor-pointer text-sky-400" onclick="LS._ppCat='';LS._ppStatus='';LS.renderPaper()">✕ ${t("pp_close_drill")}</span></div>
         <div class="overflow-x-auto"><table class="w-full text-[12.5px]">
         <tr class="text-slate-400 text-[11px]"><th class="text-left py-1">${t("pp_col_stock")}</th><th class="text-left">${t("pp_col_sig")}</th><th class="text-left">${t("pp_col_fill")}</th><th class="text-right">${t("pp_col_entry")}</th><th class="text-left">${t("pp_col_exitd")}</th><th class="text-right">${t("pp_col_exit")}</th><th class="text-right">${t("pp_col_ret")}</th><th class="text-right">${t("pp_col_status")}</th></tr>` +
         rows.map(r=>`<tr class="border-t border-slate-700/40">
@@ -459,7 +428,8 @@ LS.init = function(ctx){
         <div class="text-xs text-slate-500 mt-2 leading-relaxed">${t("pp_note")}</div>
       </details>
       <div class="border-t border-slate-700/50 my-3"></div>`;
-    el.querySelectorAll(".ppcat").forEach(d=>{ d.onclick=()=>{ LS._ppCat = LS._ppCat===d.dataset.cat ? "" : d.dataset.cat; renderPaper(); }; });
+    el.querySelectorAll(".ppcat").forEach(d=>{ d.onclick=()=>{ LS._ppCat = LS._ppCat===d.dataset.cat ? "" : d.dataset.cat; LS._ppStatus=""; renderPaper(); }; });
+    el.querySelectorAll(".ppStChips button").forEach(b=>{ b.onclick=(e)=>{ e.stopPropagation(); LS._ppStatus=b.dataset.st; renderPaper(); }; });
   }
   window.btOpen = btOpen;
   LS.renderBacktest = renderBacktest; LS.renderCuosha = renderCuosha; LS.renderQuality = renderQuality;
