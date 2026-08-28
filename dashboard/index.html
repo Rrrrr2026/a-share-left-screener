@@ -207,6 +207,12 @@
   .gsrow .gspx{ font-variant-numeric:tabular-nums; font-size:12px; color:var(--dim); margin-left:auto; }
   .gspfmenu{ flex-basis:100%; display:flex; gap:4px; flex-wrap:wrap; padding:2px 0 2px 12px; }
   .gspfmenu.hidden{ display:none; }
+
+  /* ===== 账号登录 ===== */
+  #authModal{ position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.55);
+    display:flex; align-items:center; justify-content:center; }
+  #authModal.hidden{ display:none; }
+  #authModal .aubox{ width:320px; max-width:92vw; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -225,6 +231,7 @@
       <button id="refreshBtn" class="segbtn" title="拉取最新已发布数据（重新扫描需运行本地更新脚本）" data-i18n="refresh_btn">🔄 刷新数据</button>
       <button id="langBtn" class="segbtn" title="中文 / English">EN</button>
       <button id="themeBtn" class="segbtn" title="点击切换：白天 / 黑夜 / 跟随系统">🌙 黑夜</button>
+      <button id="authBtn" class="segbtn">👤 登录</button>
     </div>
     <div class="flex items-center justify-between flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-slate-400">
       <div class="flex items-center gap-x-3 flex-wrap"><span id="ovMini"></span><span class="hidden 2xl:inline" data-i18n="subtitle">全美股(市值≥$1亿) · 高景气板块内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分</span></div>
@@ -432,6 +439,22 @@
 
 <!-- 个股详情抽屉 -->
 <div id="overlay" class="fixed inset-0 bg-black/60 hidden z-40"></div>
+  <!-- 👤 登录 / 注册 -->
+  <div id="authModal" class="hidden">
+    <div class="card p-5 aubox">
+      <div class="flex items-center gap-2 mb-3">
+        <button id="auTabL" class="segbtn on" data-i18n="auth_login">登录</button>
+        <button id="auTabR" class="segbtn" data-i18n="auth_reg">注册</button>
+        <span class="flex-1"></span><button id="auClose" class="segbtn">✕</button>
+      </div>
+      <input id="auAcct" class="w-full mb-2" data-i18n-ph="auth_acct_ph" placeholder="用户名或邮箱（3-64位）" autocomplete="username"/>
+      <input id="auPw" type="password" class="w-full mb-2" data-i18n-ph="auth_pw_ph" placeholder="密码（至少8位）" autocomplete="current-password"/>
+      <input id="auPw2" type="password" class="w-full mb-2 hidden" data-i18n-ph="auth_pw2_ph" placeholder="再输一遍密码"/>
+      <div id="auErr" class="text-xs mb-2" style="color:#f87171;min-height:16px"></div>
+      <button id="auGo" class="w-full segbtn on" style="padding:8px" data-i18n="auth_login">登录</button>
+      <div class="text-[11px] mt-2 leading-relaxed" style="color:var(--muted)" data-i18n="auth_note">登录后：自选股、自建模拟盘、交易日志、列设置与筛选等看盘习惯将同步到云端，换设备登录即恢复。数据存于 fairvalpha.com 自有服务器。</div>
+    </div>
+  </div>
 <aside id="drawer" class="drawer fixed top-0 right-0 h-full w-full md:w-[68%] lg:w-[60%] border-l z-50 translate-x-full overflow-y-auto" style="background:var(--drawer);border-color:var(--border)">
   <div class="p-5">
     <div id="dTabs"></div>
@@ -611,6 +634,14 @@
       growq_tip:"由 近4年年报归母趋势 × 近4个单季同比 交叉判断: 区分可持续增长与一次性放量",
       // 历史快照
       date_sel_title:"回看历史扫描结果",
+      auth_login:"登录", auth_reg:"注册", auth_tip:"登录后自选/模拟盘/看盘习惯云同步",
+      auth_logout_confirm:"退出登录？本机数据保留，云端数据不受影响。", auth_logout_tip:"点击退出登录",
+      auth_acct_ph:"用户名或邮箱（3-64位）", auth_pw_ph:"密码（至少8位）", auth_pw2_ph:"再输一遍密码",
+      auth_e_acct:"账号需3-64位：字母数字或 _ . @ + -", auth_e_pw:"密码至少8位", auth_e_pw2:"两次密码不一致",
+      auth_e_taken:"该账号已被注册", auth_e_rate:"尝试太频繁，请15分钟后再试", auth_e_auth:"账号或密码不对",
+      auth_e_fail:"操作失败，请重试", auth_e_net:"连不上账号服务：请在 fairvalpha.com 主站使用登录",
+      auth_note:"登录后：自选股、自建模拟盘、交易日志、列设置与筛选等看盘习惯将同步到云端，换设备登录即恢复。数据存于 fairvalpha.com 自有服务器。",
+
       nav_state:"市场状态", nav_wl:"自选观察", nav_bt:"信号回测", nav_ql:"优质公司", nav_ind:"板块景气", nav_tbl:"候选主表", nav_jn:"模拟组合",
       wl_title:"⭐ 自选股观察 — 搜索添加或在主表点星 · 本机浏览器保存",
       wl_empty:"还没有自选股：用顶部搜索框添加，或在候选主表行首点 ☆。",
@@ -801,6 +832,14 @@
       dom_tip:"Market-cap rank & share within the EastMoney industry (a dominance proxy; no free product-level market-share source) · 👑 = #1 with ≥15% share",
       growq_tip:"Cross-check of 4-year annual parent-NI trend × last 4 single-quarter YoY: sustained growth vs one-off spike",
       date_sel_title:"Browse past scan days",
+      auth_login:"Sign in", auth_reg:"Register", auth_tip:"Sync watchlist / paper books / preferences",
+      auth_logout_confirm:"Sign out? Local data stays; cloud data is untouched.", auth_logout_tip:"Click to sign out",
+      auth_acct_ph:"Username or email (3-64 chars)", auth_pw_ph:"Password (8+ chars)", auth_pw2_ph:"Repeat password",
+      auth_e_acct:"Account: 3-64 chars, letters/digits or _ . @ + -", auth_e_pw:"Password needs 8+ chars", auth_e_pw2:"Passwords do not match",
+      auth_e_taken:"Account already registered", auth_e_rate:"Too many attempts — wait 15 minutes", auth_e_auth:"Wrong account or password",
+      auth_e_fail:"Failed, please retry", auth_e_net:"Account service unreachable: sign in on fairvalpha.com",
+      auth_note:"After signing in, your watchlist, paper books, journal, column layout and filters sync to the cloud and follow you across devices. Data lives on fairvalpha.com's own server.",
+
       nav_state:"Market", nav_wl:"Watchlist", nav_bt:"Backtest", nav_ql:"Quality", nav_ind:"Sectors", nav_tbl:"Candidates", nav_jn:"Paper Folio",
       wl_title:"⭐ Watchlist — add via search or star rows in the main table · saved in this browser",
       wl_empty:"No stocks yet: add one via the search bar on top, or click ☆ in the main table.",
@@ -2378,6 +2417,137 @@
     setTimeout(()=>{ sx=Math.min(0, track.clientWidth-bars.scrollWidth); clamp(); dsSync(); },0);
   }
 
+
+  // ---------- 👤 账号与云同步 (fairvalpha.com 主站) ----------
+  const FV_HOST = /(^|\.)fairvalpha\.com$/.test(location.hostname);
+  const SYNC_RE = /^(ashare_|us_|custom_pf_v1:|leftside_journal_v1:|navClosed$)/;
+  let FV_USER = null;
+  const _stP = Storage.prototype, _oSet = _stP.setItem, _oDel = _stP.removeItem;
+  const _rawSet = (k, v) => _oSet.call(localStorage, k, v);
+  const fvPend = new Map();
+  let fvTimer = null;
+  function fvApi(path, opt){
+    return fetch("/api/"+path, Object.assign({credentials:"same-origin",
+      headers:{"Content-Type":"application/json"}}, opt||{}));
+  }
+  function fvQueue(k, v){
+    fvPend.set(k, v);
+    clearTimeout(fvTimer);
+    fvTimer = setTimeout(fvFlush, 1500);
+  }
+  async function fvFlush(){
+    if(!FV_USER || !fvPend.size) return;
+    const items = Array.from(fvPend, ([k, v]) => ({k, v, t: Date.now()}));
+    fvPend.clear();
+    try{
+      for(let i=0; i<items.length; i+=50){
+        const r = await fvApi("state", {method:"PUT", body: JSON.stringify({items: items.slice(i, i+50)})});
+        if(!r.ok) throw new Error("HTTP "+r.status);
+      }
+    }catch(e){ items.forEach(it=>{ if(!fvPend.has(it.k)) fvPend.set(it.k, it.v); });
+      clearTimeout(fvTimer); fvTimer = setTimeout(fvFlush, 10000); }
+  }
+  if(FV_HOST){
+    _stP.setItem = function(k, v){ _oSet.call(this, k, v);
+      if(this===localStorage && FV_USER && SYNC_RE.test(k)) fvQueue(k, String(v)); };
+    _stP.removeItem = function(k){ _oDel.call(this, k);
+      if(this===localStorage && FV_USER && SYNC_RE.test(k)) fvQueue(k, null); };
+    window.addEventListener("beforeunload", ()=>{ if(fvPend.size) fvFlush(); });
+  }
+  function fvMerge(k, sv, lv, union){
+    if(lv==null) return sv;
+    if(sv==null) return lv;
+    if(sv===lv || !union) return sv;      // 平时: 云端为准 (改动会即时推上云)
+    try{                                   // 首次登录: 云端∪本地, 两边都不丢
+      if(/_favs_v1$/.test(k)){
+        const a=new Set(JSON.parse(sv)); JSON.parse(lv).forEach(x=>a.add(x));
+        return JSON.stringify(Array.from(a));
+      }
+      if(/^custom_pf_v1:/.test(k) || /^leftside_journal_v1:/.test(k)){
+        const s=JSON.parse(sv), l=JSON.parse(lv), ids=new Set(s.map(x=>x.id));
+        l.forEach(x=>{ if(!ids.has(x.id)) s.push(x); });
+        return JSON.stringify(s);
+      }
+    }catch(e){}
+    return sv;
+  }
+  async function fvPull(union){
+    try{
+      const r = await fvApi("state"); if(!r.ok) return;
+      const st = (await r.json()).states || {};
+      let changed = false;
+      const up = [];
+      for(const k in st){
+        const lv = localStorage.getItem(k);
+        const merged = fvMerge(k, st[k].v, lv, union);
+        if(merged !== lv){ _rawSet(k, merged); changed = true; }
+        if(merged !== st[k].v) up.push({k, v: merged, t: Date.now()});
+      }
+      for(let i=0; i<localStorage.length; i++){
+        const k = localStorage.key(i);
+        if(SYNC_RE.test(k) && !(k in st)) up.push({k, v: localStorage.getItem(k), t: Date.now()});
+      }
+      for(let i=0; i<up.length; i+=50)
+        await fvApi("state", {method:"PUT", body: JSON.stringify({items: up.slice(i, i+50)})});
+      if(changed && !sessionStorage.getItem("fv_pulled")){ sessionStorage.setItem("fv_pulled","1"); location.reload(); return; }
+      if(!changed) sessionStorage.removeItem("fv_pulled");
+    }catch(e){}
+  }
+  function fvUI(){
+    const b = document.getElementById("authBtn"); if(!b) return;
+    if(!FV_HOST){ b.style.display = "none"; return; }
+    if(FV_USER){ b.textContent = "👤 " + FV_USER; b.title = t("auth_logout_tip");
+      b.onclick = ()=>{ if(confirm(t("auth_logout_confirm")))
+        fvApi("logout", {method:"POST"}).finally(()=>{ FV_USER=null; sessionStorage.removeItem("fv_pulled"); location.reload(); }); }; }
+    else { b.textContent = "👤 " + t("auth_login"); b.title = t("auth_tip");
+      b.onclick = ()=>{ const m=document.getElementById("authModal"); m.classList.remove("hidden");
+        document.getElementById("auErr").textContent=""; document.getElementById("auAcct").focus(); }; }
+  }
+  async function fvSubmit(mode){
+    const acct=(document.getElementById("auAcct").value||"").trim();
+    const pw=document.getElementById("auPw").value||"";
+    const er=document.getElementById("auErr");
+    if(!/^[A-Za-z0-9_.@+\-]{3,64}$/.test(acct)){ er.textContent=t("auth_e_acct"); return; }
+    if(pw.length<8){ er.textContent=t("auth_e_pw"); return; }
+    if(mode==="register" && pw!==document.getElementById("auPw2").value){ er.textContent=t("auth_e_pw2"); return; }
+    try{
+      const r = await fvApi(mode, {method:"POST", body: JSON.stringify({acct, pw})});
+      if(r.ok){
+        FV_USER = (await r.json()).acct;
+        document.getElementById("authModal").classList.add("hidden");
+        fvUI(); sessionStorage.removeItem("fv_pulled");
+        await fvPull(true);
+        fvUI();
+      } else {
+        const j = await r.json().catch(()=>({}));
+        er.textContent = j.err==="taken"? t("auth_e_taken") : j.err==="rate"? t("auth_e_rate")
+          : j.err==="auth"? t("auth_e_auth") : t("auth_e_fail");
+      }
+    }catch(e){ er.textContent = t("auth_e_net"); }
+  }
+  (function(){
+    const m = document.getElementById("authModal"); if(!m) return;
+    let mode = "login";
+    const setMode = (md)=>{ mode = md;
+      document.getElementById("auTabL").classList.toggle("on", md==="login");
+      document.getElementById("auTabR").classList.toggle("on", md==="register");
+      document.getElementById("auPw2").classList.toggle("hidden", md==="login");
+      document.getElementById("auGo").textContent = t(md==="login"?"auth_login":"auth_reg"); };
+    document.getElementById("auTabL").onclick = ()=>setMode("login");
+    document.getElementById("auTabR").onclick = ()=>setMode("register");
+    document.getElementById("auClose").onclick = ()=>m.classList.add("hidden");
+    m.onclick = (e)=>{ if(e.target===m) m.classList.add("hidden"); };
+    document.getElementById("auGo").onclick = ()=>fvSubmit(mode);
+    ["auAcct","auPw","auPw2"].forEach(id=>{
+      document.getElementById(id).onkeydown = (e)=>{ if(e.key==="Enter") fvSubmit(mode); }; });
+    (async ()=>{
+      if(!FV_HOST){ fvUI(); return; }
+      try{ const r = await fvApi("me");
+        if(r.ok){ FV_USER = (await r.json()).acct; fvUI(); await fvPull(false); }
+        else fvUI();
+      }catch(e){ fvUI(); }
+    })();
+  })();
   // ---------- 启动 ----------
   if(!DATA.candidates.length){ $("#emptyHint").classList.remove("hidden"); }
   syncWeightUI(); recomputeScores();
