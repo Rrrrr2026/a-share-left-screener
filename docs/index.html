@@ -152,7 +152,7 @@
   body:not(.navClosed) header{ margin-left:-1rem; }
   section{ scroll-margin-top:64px; }
   @media (max-width: 960px){ #sideNav{ display:none; } body:not(.navClosed){ padding-left:0; } #navToggle{ display:none; } }
-  #ovMini{ font-size:11px; color:var(--muted); font-weight:400; margin-left:12px; white-space:nowrap; }
+  #ovMini{ color:var(--muted); font-weight:400; white-space:nowrap; }
   #ovMini b{ color:var(--dim); font-weight:600; }
   .merged-into-deck{ border:0!important; padding:0!important; margin:0 0 8px!important; box-shadow:none!important;
     background:transparent!important; animation:none!important; }
@@ -188,12 +188,12 @@
   /* ===== 日期滑动条 ===== */
   #dateScrub{ display:inline-flex; flex-direction:column; align-items:center; vertical-align:middle; }
   #dateScrub.hidden{ display:none; }
-  #dsTrack{ position:relative; width:232px; max-width:34vw; height:30px; overflow:hidden; display:block; cursor:pointer; }
+  #dsTrack{ position:relative; width:190px; max-width:26vw; height:26px; overflow:hidden; display:block; cursor:pointer; }
   #dsBars{ position:absolute; left:0; bottom:0; height:100%; display:flex; align-items:flex-end; gap:3px; will-change:transform; }
   #dsBars .dsb{ width:5px; border-radius:2px 2px 0 0; background:var(--inputborder); flex:none; }
   #dsBars .dsb:hover{ background:var(--dim); }
   #dsBars .dsb.on{ background:#2962ff; }
-  #dsLabel{ font-size:10px; line-height:1; margin-top:3px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  #dsLabel{ font-size:9.5px; line-height:1; margin-top:2px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
   /* ===== 全局搜索 ===== */
   #searchCard{ overflow:visible; }
   #gSearch{ color:var(--text); }
@@ -216,22 +216,19 @@
 <div class="max-w-[1900px] mx-auto px-4 md:px-6 py-5">
 
   <!-- 标题 -->
-  <header class="flex items-center justify-between flex-wrap gap-3 mb-4">
-    <div>
-      <h1 class="text-2xl font-bold text-white" data-i18n="title">美股 · 「左侧支撑位」筛选与监控台</h1><span id="ovMini"></span>
-      <p class="text-sm text-slate-400 mt-1" data-i18n="subtitle">全美股(市值≥$1亿) · 高景气板块内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分</p>
+  <header class="mb-3">
+    <div class="flex items-center flex-wrap gap-x-3 gap-y-2">
+      <h1 class="text-xl font-bold text-white whitespace-nowrap" data-i18n="title">美股 · 「左侧支撑位」筛选与监控台</h1>
+      <div class="flex-1"></div>
+      <span class="flex items-center gap-1" id="mktTabs"><a href="https://fairvalpha.com/a/" class="segbtn on">📊 A股</a> <a href="https://fairvalpha.com/us/" class="segbtn">🇺🇸 美股</a></span>
+      <select id="dateSel" class="hidden" data-i18n-title="date_sel_title" title="回看历史扫描结果"></select><span id="dateScrub" class="hidden" data-i18n-title="date_sel_title" title="回看历史扫描结果"><span id="dsTrack"><span id="dsBars"></span></span><span id="dsLabel">—</span></span>
+      <button id="refreshBtn" class="segbtn" title="拉取最新已发布数据（重新扫描需运行本地更新脚本）" data-i18n="refresh_btn">🔄 刷新数据</button>
+      <button id="langBtn" class="segbtn" title="中文 / English">EN</button>
+      <button id="themeBtn" class="segbtn" title="点击切换：白天 / 黑夜 / 跟随系统">🌙 黑夜</button>
     </div>
-    <div class="text-right text-sm text-slate-400">
-      <div class="flex items-center justify-end gap-3">
-        <span class="flex items-center gap-1 mr-1" id="mktTabs"><a href="https://fairvalpha.com/a/" class="segbtn on">📊 A股</a>
-      <a href="https://fairvalpha.com/us/" class="segbtn">🇺🇸 美股</a></span>
-        <select id="dateSel" class="hidden" data-i18n-title="date_sel_title" title="回看历史扫描结果"></select><span id="dateScrub" class="hidden" data-i18n-title="date_sel_title" title="回看历史扫描结果"><span id="dsTrack"><span id="dsBars"></span></span><span id="dsLabel">—</span></span>
-        <button id="refreshBtn" class="segbtn" title="拉取最新已发布数据（重新扫描需运行本地更新脚本）" data-i18n="refresh_btn">🔄 刷新数据</button>
-        <button id="langBtn" class="segbtn" title="中文 / English">EN</button>
-        <button id="themeBtn" class="segbtn" title="点击切换：白天 / 黑夜 / 跟随系统">🌙 黑夜</button>
-        <span><span data-i18n="updated">最后更新：</span><span id="updatedAt" class="text-slate-200">—</span></span>
-      </div>
-      <div class="mt-1" data-i18n="datasource">数据源：Yahoo Finance（全美股 · GICS 板块）· 价格单位 USD</div>
+    <div class="flex items-center justify-between flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-slate-400">
+      <div class="flex items-center gap-x-3 flex-wrap"><span id="ovMini"></span><span class="hidden 2xl:inline" data-i18n="subtitle">全美股(市值≥$1亿) · 高景气板块内 · 回踩支撑/接近前低的左侧机会 · 技术 × 基本面交叉打分</span></div>
+      <div class="flex items-center gap-x-3 flex-wrap"><span><span data-i18n="updated">最后更新：</span><span id="updatedAt" class="text-slate-200">—</span></span><span data-i18n="datasource">数据源：Yahoo Finance（全美股 · GICS 板块）· 价格单位 USD</span></div>
     </div>
   </header>
 
@@ -2224,7 +2221,15 @@
     if(cand){ openDetail(cand); return; }
     if(window.__QL__ && __QL__.profiles && __QL__.profiles[code]){ btOpen(code); return; }
     const inf=wlInfo(code);
-    openDetail({code:code, name:inf.name||code, price:inf.price, industry:"", tag:"🔎 观察"});
+    const a=(window.__ALL__||{})[code]||[];
+    const lite={code:code, name:inf.name||code, price:inf.price, industry:a[3]||"", tag:"🔎 观察"};
+    if(isNum(a[4])) lite.pe_ttm=a[4];
+    if(isNum(a[5])) lite.pb=a[5];
+    if(a[3]){
+      const pes=[]; for(const k in __ALL__){ const r2=__ALL__[k]; if(r2[3]===a[3]&&isNum(r2[4])&&r2[4]>0&&r2[4]<300) pes.push(r2[4]); }
+      if(pes.length>=3){ pes.sort((x,y)=>x-y); lite.pe_industry_median=pes[Math.floor(pes.length/2)]; }
+    }
+    openDetail(lite);
   }
   function renderWL(){
     const el=document.getElementById("wlWrap"); if(!el) return;

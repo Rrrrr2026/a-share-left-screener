@@ -332,8 +332,18 @@ def write_watch_js() -> None:
             except (TypeError, ValueError):
                 continue
             if px > 0:
+                def _f(k, nd=2):
+                    try:
+                        v = float(r.get(k))
+                        return round(v, nd) if v == v else None
+                    except (TypeError, ValueError):
+                        return None
+                mv = _f("total_mv", 4)
                 out[code] = [str(r.get("name") or ""), round(px, 2),
-                             round(chg, 2) if chg is not None else None]
+                             round(chg, 2) if chg is not None else None,
+                             str(r.get("industry") or ""),
+                             _f("pe_ttm", 1), _f("pb", 2),
+                             round(mv / 1e8, 1) if mv else None]
         path = os.path.join(DASHBOARD_DIR, "watch_data.js")
         with open(path, "w", encoding="utf-8") as f:
             f.write("window.__ALL__ = " + json.dumps(out, ensure_ascii=False) + ";\n")
