@@ -274,8 +274,17 @@ def write_history_snapshot(run_date: str | None = None) -> str | None:
         except OSError:
             pass
     dates = dates[:keep]
-    with open(os.path.join(HISTORY_DIR, "index.json"), "w", encoding="utf-8") as f:
-        json.dump({"dates": dates}, f)
+    idx_path = os.path.join(HISTORY_DIR, "index.json")
+    hits: dict = {}
+    try:
+        with open(idx_path, encoding="utf-8") as f:
+            hits = json.load(f).get("hits") or {}
+    except Exception:
+        hits = {}
+    hits[rd] = len(payload["candidates"])
+    hits = {d: hits[d] for d in dates if d in hits}
+    with open(idx_path, "w", encoding="utf-8") as f:
+        json.dump({"dates": dates, "hits": hits}, f)
     log.info("历史快照已写出: %s (%d 天可回看)", path, len(dates))
     return path
 

@@ -4,6 +4,8 @@
 window.LS = window.LS || {};
 LS.init = function(ctx){
   const {$, t, isNum, escH, tagClass, tagText, dash, getData, openDetail, getCur, market} = ctx;
+  // 历史回看时 getData() 是旧快照; 模拟盘入账/现价必须用"最新一天"的数据
+  const getLive = ctx.getLive || getData;
   // ---------- 📊 信号回测 ----------
   function btOpen(code){
     mergeQLProfiles();
@@ -357,7 +359,7 @@ LS.init = function(ctx){
   const LIVE = {};                       // A股实时价缓存 (腾讯行情, 点"实时"按钮填充)
   function cpfPrice(code){
     if(LIVE[code] && isNum(LIVE[code].price)) return LIVE[code];
-    const c=(getData().candidates||[]).find(x=>x.code===code);
+    const c=(getLive().candidates||[]).find(x=>x.code===code);
     if(c && isNum(c.price)) return {price:c.price, name:c.name};
     const prof = window.__QL__ && __QL__.profiles && __QL__.profiles[code];
     if(prof && isNum(prof.price)) return {price:prof.price, name:prof.name};
@@ -430,7 +432,7 @@ LS.init = function(ctx){
         let entry = live? live.price : parseFloat(prompt(t("cpf_entry_ph"))||"");
         if(!isNum(entry)||entry<=0) { alert(t("cpf_bad_entry")); return; }
         cur.positions.push({code, name: live?live.name:code, entry: entry,
-          date: ((getData().meta||{}).run_date)||new Date().toISOString().slice(0,10)});
+          date: ((getLive().meta||{}).run_date)||new Date().toISOString().slice(0,10)});
         cpfSave(pfs); renderCustomPf();
       };
       el.querySelector("#cpfCode").onkeydown = (e)=>{ if(e.key==="Enter") ab.onclick(); };
@@ -530,5 +532,6 @@ LS.init = function(ctx){
   window.btOpen = btOpen;
   LS.renderBacktest = renderBacktest; LS.renderCuosha = renderCuosha; LS.renderQuality = renderQuality;
   LS.renderJournal = renderJournal; LS.renderPaper = renderPaper; LS.renderBiweekly = renderBiweekly; LS.renderDeck = renderDeck; LS.renderCustomPf = renderCustomPf; LS.btOpen = btOpen;
+  LS.cpf = {load:cpfLoad, save:cpfSave, price:cpfPrice, liveA:fetchLiveA};
   LS.ready = true;
 };
