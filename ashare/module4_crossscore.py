@@ -72,8 +72,17 @@ def _fund_score(f: dict) -> float:
     return round(clamp(s, 0.0, 100.0), 1)
 
 
-def _tag(tech_score: float, fund_score: float, prosperity: float) -> str:
+WATCH_FAMILY = ("🔎 观察·技术弱", "🔎 观察·缺数据", "☑️ 次强左侧", "🔎 观察·景气冷")
+
+
+def _tag(tech_score: float, fund_score: float, prosperity: float,
+         n_core: int | None = None) -> str:
     cc = CONFIG["cross"]
+    # 兜底桶拆分(2026-08-30): 旧"🔎 观察"混着 技术弱/缺数据/基本面平庸/景气冷 四类
+    # 异质残余, 占53%样本量且胜率最差, 无法归因。缺数据判定必须置顶——否则
+    # 全缺数据股的 fund_score 恰为40.0, 会撞线灌进 ⚠️ 桶造成新的归因污染。
+    if n_core == 0:
+        return "🔎 观察·缺数据"
     # 景气未知(全市场回退, prosperity=None)时, 无法验证"高景气", 只按 技术+基本面 判定;
     # 此时展示的景气分为 "—"(见 cross_score), 不会伪称已通过 60 分位门槛。
     if (tech_score >= cc["strong_left_tech"] and fund_score >= cc["strong_left_fund"]
@@ -81,12 +90,20 @@ def _tag(tech_score: float, fund_score: float, prosperity: float) -> str:
         return "✅ 强左侧"
     if tech_score >= cc["strong_left_tech"] and fund_score < cc["fund_weak_threshold"]:
         return "⚠️ 技术好但基本面弱"
-    return "🔎 观察"
+    if tech_score < cc["strong_left_tech"]:
+        return "🔎 观察·技术弱"
+    if fund_score < cc["strong_left_fund"]:
+        return "☑️ 次强左侧"
+    return "🔎 观察·景气冷"
 
 
 _TAG_EN = {"✅ 强左侧": "✅ Strong Left",
            "⚠️ 技术好但基本面弱": "⚠️ Tech-strong, Weak Fundamentals",
            "🔎 观察": "🔎 Watch",
+           "🔎 观察·技术弱": "🔎 Watch · Weak Tech",
+           "🔎 观察·缺数据": "🔎 Watch · No Data",
+           "☑️ 次强左侧": "☑️ Near-Strong Left",
+           "🔎 观察·景气冷": "🔎 Watch · Cold Sector",
            "🪸 深跌抄底": "🪸 Deep-Dip Bottom-Fish",
            "🚀 蓄势待发": "🚀 Coiled to Launch"}
 _COIL_CONFIRM_EN = {"波动挤压": "volatility squeeze", "MACD走强": "MACD strengthening",
@@ -269,13 +286,14 @@ def cross_score(tech_rec: dict, fund: dict, prosperity_score: float | None) -> d
              + cc["w_prosperity"] * prosp_for_score)
     final = round(final, 2)
 
-    tag = _tag(tech_score, fund_score, prosperity_score)
-    # 深跌抄底: 仅当支撑模型只把它当"观察"(没有真支撑信号)时才改挂 🪸 标签,
+    _n_core = sum(1 for k in ("roe", "pe_ttm", "netprofit_yoy", "gross_margin", "debt_ratio")
+                  if fund.get(k) is not None)
+    tag = _tag(tech_score, fund_score, prosperity_score, n_core=_n_core)
+    # 深跌/蓄势 接管整个观察族 (含次强左侧 — 审核: 保留其接管资格, 否则深跌桶构成断档);
     # 已是 ✅强左侧 / ⚠️技术好但基本面弱 的(确有支撑结构)保留原标签, 不抢标。
-    if tech_rec.get("dip") and tag == "🔎 观察":
+    if tech_rec.get("dip") and tag in WATCH_FAMILY:
         tag = "🪸 深跌抄底"
-    # 蓄势待发: 同理只接管"观察"; 若同时命中 dip(极少见), dip 优先
-    elif tech_rec.get("coil") and tag == "🔎 观察":
+    elif tech_rec.get("coil") and tag in WATCH_FAMILY:
         tag = "🚀 蓄势待发"
     text = _conclusion_text(tech_rec, fund, tag)
     text_en = _conclusion_text_en(tech_rec, fund, tag)
@@ -293,6 +311,7 @@ def cross_score(tech_rec: dict, fund: dict, prosperity_score: float | None) -> d
         "coil_score": round(float(tech_rec.get("coil_score") or 0.0), 3),
         "coil_confirm": tech_rec.get("coil_confirm") or "",
         "tech_score": round(tech_score, 3),
+        "drawdown_pct": tech_rec.get("drawdown_pct"),
         "tech_norm": round(tech_norm, 1),
         "fund_score": fund_score,
         # 展示真实景气分: 未知则为 None -> 前端显示 "—" (不再伪造 50)

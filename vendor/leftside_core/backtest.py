@@ -62,6 +62,27 @@ ANCHOR_TOL_EXACT = 0.0025  # 锚定: 收盘价与快照价偏差 <=0.25% 视为�
 ANCHOR_TOL_NEAR = 0.02     # 锚定: 兜底容差
 
 
+WATCH_CORE_FIELDS = ("roe", "pe_ttm", "netprofit_yoy", "gross_margin", "debt_ratio")
+
+
+def _watch_subtag(c: dict) -> str:
+    """旧快照的 🔎观察 兜底桶追溯拆分 (与 module4 新打标规则一致, 阈值两市同为2.5/40/60)。"""
+    if not any(c.get(k) is not None for k in WATCH_CORE_FIELDS):
+        return "🔎 观察·缺数据"
+    ts, fs = c.get("tech_score"), c.get("fund_score")
+    if ts is not None and ts < 2.5:
+        return "🔎 观察·技术弱"
+    if fs is not None and 40.0 <= fs < 60.0:
+        return "☑️ 次强左侧"
+    return "🔎 观察·景气冷"
+
+
+def _prosp_bucket(s):
+    if s is None:
+        return "na"
+    return "lt40" if s < 40 else ("40-60" if s < 60 else "ge60")
+
+
 def _tier(c):
     return current().growth_tier.get(c.get("growth_quality"), "NA")
 
@@ -145,7 +166,11 @@ def reconstruct_plan(c: dict) -> dict | None:
     a = float(np.clip(atr_pct / 100.0, 0.008, 0.08))
 
     box_hi, box_lo = c.get("box_hi"), c.get("box_lo")
-    if c.get("coil") and box_hi and box_lo and 0 < box_lo < box_hi:
+    # 突破剧本以"存档计划"为准: A股已停发新突破买点(M1九年判负), 旧快照的在途
+    # breakout 事件按原剧本走完保留为对照组, 不追溯改账; 无存档时按旧行为兜底。
+    _has_box = bool(box_hi and box_lo and 0 < box_lo < box_hi)
+    if _has_box and ((stored or {}).get("entry_mode") == "breakout"
+                     or (stored is None and c.get("coil"))):
         ref = float(box_hi)
         stop = max(float(box_lo) * 0.995, ref * (1.0 - MAX_STOP))
         if stored and stored.get("entry_mode") == "breakout":
@@ -355,9 +380,13 @@ def build_and_run(snaps: list[dict], prices: dict, rkeys=None, rmap=None) -> lis
                 continue
             r = simulate(plan, dates, ohlc, anchor + 1, scale)
             gt = _tier(c)
+            tag = (c.get("tag") or "").strip()
+            if tag == "🔎 观察":
+                tag = _watch_subtag(c)     # 追溯拆分: 旧527笔按新分类归因
             ep = {
                 "code": code, "name": c.get("name"), "sig_date": as_of,
-                "tag": (c.get("tag") or "").strip(), "growth": gt,
+                "tag": tag, "growth": gt,
+                "prosp": _prosp_bucket(c.get("prosperity_score")),
                 "kind": plan["kind"], "mode": plan.get("mode", "breakout"),
                 "final_score": c.get("final_score"), "fund_score": c.get("fund_score"),
                 "opp": _opp_bucket(snap.get("opp_score")),
@@ -507,6 +536,14 @@ def _seg_stats(eps: list[dict], p0: float) -> dict:
         "reach5": round(soft / len(res), 3) if res else None,
         "avg_ret": round(float(np.mean(rets)), 4) if rets else None,
         "med_days": int(np.median(days)) if days else None,
+        "mfe_q50": (round(float(np.median([e["max_gain"] for e in res if e.get("max_gain") is not None])), 4)
+                    if any(e.get("max_gain") is not None for e in res) else None),
+        "mfe_q75": (round(float(np.percentile([e["max_gain"] for e in res if e.get("max_gain") is not None], 75)), 4)
+                    if any(e.get("max_gain") is not None for e in res) else None),
+        "mae_q50": (round(float(np.median([e["max_dd"] for e in res if e.get("max_dd") is not None])), 4)
+                    if any(e.get("max_dd") is not None for e in res) else None),
+        "status_counts": {st: sum(1 for e in res if e["status"] == st)
+                          for st in ("won", "stopped", "expired")} if res else None,
     }
 
 
@@ -540,6 +577,18 @@ def aggregate(episodes: list[dict]) -> dict:
     out["by_regime"] = {}
     for k, eps in _group(lambda e: e.get("regime") or "na").items():
         out["by_regime"][k] = _seg_stats(eps, p0)
+    # 标签x温度 交叉 (复活门与温度影子分析的数据底座)
+    out["by_tag_opp"] = {}
+    for k, eps in _group(lambda e: f'{e["tag"]}|{e["opp"]}').items():
+        s = _seg_stats(eps, p0)
+        if s["n_signals"] >= 6:
+            out["by_tag_opp"][k] = s
+    # 景气分段 (景气门从未被度量过)
+    out["by_prosp"] = {}
+    for k, eps in _group(lambda e: e.get("prosp") or "na").items():
+        out["by_prosp"][k] = _seg_stats(eps, p0)
+    out["metric_note"] = ("win10 依赖出场参数(止损/目标/窗口), 跨配置不可比; "
+                          "横向比较请用扣成本 avg_ret")
     return out
 
 

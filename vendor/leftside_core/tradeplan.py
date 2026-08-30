@@ -14,6 +14,8 @@
 from __future__ import annotations
 import logging
 import numpy as np
+
+from .market import current
 import pandas as pd
 
 from . import indicators as ind
@@ -154,7 +156,10 @@ def build_trade_plan(rec: dict, stats: dict | None, prior: dict) -> dict | None:
     # 买点=放量突破箱体上沿, 止损=跌回箱体下沿, 目标=箱体高度量度目标 (不给回踩胜率 —
     # 事件回测统计的是支撑回踩, 描述不了突破交易, 强行标胜率是误导)。
     box_hi, box_lo = rec.get("box_hi"), rec.get("box_lo")
-    if rec.get("coil") and box_hi and box_lo and 0 < box_lo < box_hi:
+    # M1九年: A股追突破中位收益为负(①)、熊市突破为负(③)、缩量A股无效(⑤) ->
+    # A股不再发突破型买点, coil 股落回下方的支撑回踩剧本; 美股保留突破剧本。
+    if (rec.get("coil") and box_hi and box_lo and 0 < box_lo < box_hi
+            and current().name != "ashare"):
         entry_ref = float(box_hi)
         box_h = float(box_hi) - float(box_lo)
         stop_px = max(float(box_lo) * 0.995, entry_ref * (1.0 - MAX_STOP))

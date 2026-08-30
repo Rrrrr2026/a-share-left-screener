@@ -24,6 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 socket.setdefaulttimeout(30)
 
 from ashare.config import CONFIG
+from ashare.config import DATA_DIR
 from ashare import db
 from ashare import datasource as ds
 from ashare import module1_industry as m1
@@ -320,6 +321,20 @@ def run(full_market: bool, use_cache: bool):
     coil_tail = sorted([fr for fr in final_records[show_n:]
                         if fr.get("coil") and not fr.get("dip")],
                        key=lambda fr: -(fr.get("coil_score") or 0.0))[:CONFIG["output"].get("coil_top_n", 40)]
+    # 深跌全池留痕: 恐慌日命中远超top40, 公布的桶胜率实为前40名 — 全量落盘供分位验证
+    try:
+        import json as _json
+        _dp_dir = os.path.join(DATA_DIR, "dip_pool")
+        os.makedirs(_dp_dir, exist_ok=True)
+        _dp = [{"code": x.get("code"), "dip_score": x.get("dip_score"),
+                "drawdown_pct": x.get("drawdown_pct"), "tag": x.get("tag"), "rank": _i + 1}
+               for _i, x in enumerate(sorted([x for x in final_records if x.get("dip")],
+                                             key=lambda x: -(x.get("dip_score") or 0.0)))]
+        with open(os.path.join(_dp_dir, f"{run_date}.json"), "w", encoding="utf-8") as _f:
+            _json.dump(_dp, _f, ensure_ascii=False)
+    except Exception:
+        pass
+
     shown_extra = ({fr["code"] for fr in final_records[:show_n] if fr.get("dip") or fr.get("coil")}
                    | {fr["code"] for fr in dip_tail} | {fr["code"] for fr in coil_tail})
     for idx, (rec, detail, f, fr) in enumerate(results):
@@ -331,7 +346,26 @@ def run(full_market: bool, use_cache: bool):
 
     # ---------------- 阶段C1: 买卖点建议 (Trade Plan) ----------------
     # 历史数据走当日缓存(fetch_hist 命中即秒回); coil 股自动走"突破型"剧本。
-    plan_targets = final_records[:show_n] + dip_tail + coil_tail
+    # ⚠️ 技术好但基本面弱: 两市完整窗口与M1九年皆为负期望 -> 停发买点 (标签与展示
+    # 保留; 回测影子事件照常构建)。复活门(数据化, 杜绝手工翻案): 影子样本
+    # n_resolved>=12 且 win10_post>=max(0.55, 全池+3pp) 且 avg_ret>0 时自动恢复发放。
+    def _weak_tag_allowed() -> bool:
+        try:
+            import json as _json
+            with open(os.path.join(DATA_DIR, "backtest_result.json"), encoding="utf-8") as _f:
+                _agg = (_json.load(_f) or {}).get("agg") or {}
+            _s = (_agg.get("by_tag") or {}).get("⚠️ 技术好但基本面弱") or {}
+            _p0 = _agg.get("p0") or 0.0
+            return ((_s.get("n_resolved") or 0) >= 12
+                    and (_s.get("win10_post") or 0.0) >= max(0.55, _p0 + 0.03)
+                    and (_s.get("avg_ret") or 0.0) > 0)
+        except Exception:
+            return False
+    _weak_ok = _weak_tag_allowed()
+    if not _weak_ok:
+        log.info("⚠️标签复活门未达标: 本轮不为该标签生成买卖点 (影子统计继续)")
+    plan_targets = [fr for fr in (final_records[:show_n] + dip_tail + coil_tail)
+                    if _weak_ok or "基本面弱" not in (fr.get("tag") or "")]
     tech_by_code = {rec["code"]: rec for (rec, _, _, _) in results}
     log.info("阶段C1 买卖点回测: %d 只 ...", len(plan_targets))
     plan_stats = {}

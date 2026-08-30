@@ -390,6 +390,7 @@
           <option value="🪸 深跌抄底">🪸 深跌抄底</option>
           <option value="🚀 蓄势待发">🚀 蓄势待发</option>
           <option value="🔎 观察">🔎 观察</option>
+          <option value="☑️ 次强左侧">☑️ 次强左侧</option>
         </select>
         <span class="relative inline-block"><button id="colBtn" class="segbtn" data-i18n="col_btn">列 ▾</button><div id="colPanel" class="hidden"></div></span> <button id="advBtn" class="segbtn" data-i18n="adv_btn">高级筛选 ▾</button>
         <label class="flex items-center gap-1 text-slate-300 cursor-pointer select-none"><input id="favOnly" type="checkbox" class="w-auto"/> <span data-i18n="fav_only">只看自选</span></label>
@@ -1456,7 +1457,7 @@
       rows = rows.filter(c=> (c.code||"").toLowerCase().includes(q) || (c.name||"").toLowerCase().includes(q)); }
     if(state.ind) rows = rows.filter(c=> c.industry===state.ind);
     if(state.tag==="__cuosha__") rows = rows.filter(c=> c.cuosha_score);
-    else if(state.tag) rows = rows.filter(c=> c.tag===state.tag);
+    else if(state.tag) rows = rows.filter(c=> (c.tag||"").indexOf(state.tag)===0);
     if(state.favOnly) rows = rows.filter(c=> favs.has(c.code));
     if(state.minScore>0) rows = rows.filter(c=> isNum(getVal(c,"final_score")) && getVal(c,"final_score")>=state.minScore);
     if(state.maxDist<30) rows = rows.filter(c=> isNum(c.dist_support_pct) && Math.abs(c.dist_support_pct)<=state.maxDist);
