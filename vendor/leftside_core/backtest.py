@@ -383,6 +383,10 @@ def build_and_run(snaps: list[dict], prices: dict, rkeys=None, rmap=None) -> lis
             tag = (c.get("tag") or "").strip()
             if tag == "🔎 观察":
                 tag = _watch_subtag(c)     # 追溯拆分: 旧527笔按新分类归因
+            if tag == "🪸 深跌抄底":         # ⚡快弹 追溯细分 (与 module4 同条件)
+                _r, _a = c.get("rsi"), c.get("atr_pct")
+                if _r is not None and _r <= 28.0 and _a is not None and _a >= 5.0:
+                    tag = "🪸 深跌抄底·⚡快弹"
             ep = {
                 "code": code, "name": c.get("name"), "sig_date": as_of,
                 "tag": tag, "growth": gt,

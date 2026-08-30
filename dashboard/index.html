@@ -41,6 +41,8 @@
   body:not(.light) .tag-dip { color:#f9a8d4; }
   .tag-coil   { background:rgba(148,163,184,.12); color:#64748b; border:1px solid rgba(148,163,184,.4); }
   .tag-near   { background:rgba(45,212,191,.10); color:#0f766e; border:1px solid rgba(45,212,191,.4); }
+  .tag-fast   { background:rgba(251,191,36,.12); color:#b45309; border:1px solid rgba(251,191,36,.45); }
+  body:not(.light) .tag-fast { color:#fbbf24; }
   body:not(.light) .tag-near { color:#5eead4; }
   body:not(.light) .tag-coil { color:#94a3b8; }
   .num { font-variant-numeric: tabular-nums; text-align:right; }
@@ -628,7 +630,7 @@
       p_trend:"趋势", p_momentum:"动量", p_breadth:"广度", p_capital:"资金", p_fund:"基本面",
       prosperity_total:"景气总分", selected_paren:"(入选)",
       tag_strong:"✅ 强左侧", tag_weak:"⚠️ 技术好但基本面弱", tag_watch:"🔎 观察", tag_dip:"🪸 深跌抄底",
-      tag_nearstrong:"☑️ 次强左侧", tag_watch_tech:"🔎 观察·技术弱", tag_watch_nodata:"🔎 观察·缺数据", tag_watch_cold:"🔎 观察·景气冷",
+      tag_nearstrong:"☑️ 次强左侧", tag_watch_tech:"🔎 观察·技术弱", tag_watch_nodata:"🔎 观察·缺数据", tag_watch_cold:"🔎 观察·景气冷", tag_fast:"⚡ 深跌·快弹",
       bt_reach5:"曾达+5%", bt_reach5_sub:"含后来止损/到期的", bt_col_mfe:"MFE中位/75分",
       bt_seg_pending_a:"该标签 ", bt_seg_pending_b:" 笔在途 · 完整窗口需20个交易日, 了结后数字陆续计入",
       bthelp_reach5_t:"曾达+5% (雷达指标)",
@@ -835,7 +837,7 @@
       p_trend:"Trend", p_momentum:"Momentum", p_breadth:"Breadth", p_capital:"Capital", p_fund:"Fund.",
       prosperity_total:"Prosperity", selected_paren:"(selected)",
       tag_strong:"✅ Strong Left", tag_weak:"⚠️ Tech-strong, Weak Fund.", tag_watch:"🔎 Watch", tag_dip:"🪸 Deep-Dip",
-      tag_nearstrong:"☑️ Near-Strong", tag_watch_tech:"🔎 Watch·Weak Tech", tag_watch_nodata:"🔎 Watch·No Data", tag_watch_cold:"🔎 Watch·Cold Sector",
+      tag_nearstrong:"☑️ Near-Strong", tag_watch_tech:"🔎 Watch·Weak Tech", tag_watch_nodata:"🔎 Watch·No Data", tag_watch_cold:"🔎 Watch·Cold Sector", tag_fast:"⚡ Dip·Fast Rebound",
       bt_reach5:"Touched +5%", bt_reach5_sub:"incl. later stopped/expired", bt_col_mfe:"MFE p50/p75",
       bt_seg_pending_a:"", bt_seg_pending_b:" episodes in flight · full 20-day windows required before stats accrue",
       bthelp_reach5_t:"Touched +5% (radar metric)",
@@ -999,6 +1001,7 @@
   // 数据枚举值的显示翻译 (底层值保持中文, 只翻译展示)
   function tagText(tag){ if(!tag) return dash;
     // 细分标签先于父类匹配 (次强左侧 含"强左侧"、观察·x 含"观察", 子串匹配会串名)
+    if(tag.indexOf("快弹")>=0) return t("tag_fast");
     if(tag.indexOf("次强左侧")>=0) return t("tag_nearstrong");
     if(tag.indexOf("观察·技术弱")>=0) return t("tag_watch_tech");
     if(tag.indexOf("观察·缺数据")>=0) return t("tag_watch_nodata");
@@ -1094,6 +1097,7 @@
   }
   function tagClass(tag){
     if(!tag) return "tag-watch";
+    if(tag.indexOf("快弹")>=0) return "tag-fast";
     if(tag.indexOf("次强左侧")>=0) return "tag-near";
     if(tag.indexOf("强左侧")>=0) return "tag-strong";
     if(tag.indexOf("基本面弱")>=0) return "tag-warn";

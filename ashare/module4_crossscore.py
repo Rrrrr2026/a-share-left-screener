@@ -105,6 +105,7 @@ _TAG_EN = {"✅ 强左侧": "✅ Strong Left",
            "☑️ 次强左侧": "☑️ Near-Strong Left",
            "🔎 观察·景气冷": "🔎 Watch · Cold Sector",
            "🪸 深跌抄底": "🪸 Deep-Dip Bottom-Fish",
+           "🪸 深跌抄底·⚡快弹": "🪸 Deep-Dip · ⚡Fast Rebound",
            "🚀 蓄势待发": "🚀 Coiled to Launch"}
 _COIL_CONFIRM_EN = {"波动挤压": "volatility squeeze", "MACD走强": "MACD strengthening",
                     "KDJ多头": "KDJ bullish", "站上MA60": "above MA60", "放量上攻": "volume thrust"}
@@ -295,6 +296,13 @@ def cross_score(tech_rec: dict, fund: dict, prosperity_score: float | None) -> d
         tag = "🪸 深跌抄底"
     elif tech_rec.get("coil") and tag in WATCH_FAMILY:
         tag = "🚀 蓄势待发"
+    # ⚡快弹 (2026-08-30 两月挖掘, 九年验证进行中): 深跌 & 极度超卖 & 高波动 —
+    # 成交后3日内先摸+5%概率 ~50-62% (全池仅33%), 两市方向一致。含"深跌抄底"子串:
+    # 模拟盘归类/接管/筛选自动兼容。仅细分打标供统计展示, 不改任何买卖行为。
+    if tag == "🪸 深跌抄底":
+        _rsi, _atrp = tech_rec.get("rsi"), tech_rec.get("atr_pct")
+        if _rsi is not None and _rsi <= 28.0 and _atrp is not None and _atrp >= 5.0:
+            tag = "🪸 深跌抄底·⚡快弹"
     text = _conclusion_text(tech_rec, fund, tag)
     text_en = _conclusion_text_en(tech_rec, fund, tag)
 
