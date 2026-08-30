@@ -27,21 +27,45 @@ LS.init = function(ctx){
     const pct=(x,d)=>isNum(x)?(x*100).toFixed(d==null?0:d)+"%":dash;
     // 信号类型选择器: 选中后统计/优选/最近了结都切到该类
     LS._btTag = LS._btTag || "";
-    const tagKeys = Object.entries(B.agg.by_tag||{}).sort((a,b)=>(b[1].n_resolved||0)-(a[1].n_resolved||0)).map(([k])=>k);
+    const byTag = B.agg.by_tag || {};
+    // 观察子桶(技术弱/景气冷/缺数据)成绩无操作差异 -> 选择器合并为一个"观察"芯片;
+    // 数据层保持拆分: 详情"按标签"表/复活门/研究仍用细分。次强左侧(真正的分化项)独立。
+    const WATCH_FAM = Object.keys(byTag).filter(k => k.indexOf("观察·") >= 0);
+    const famAgg = (keys) => {
+      const segs = keys.map(k => byTag[k]).filter(Boolean);
+      const sum = f => segs.reduce((a, x) => a + (x[f] || 0), 0);
+      const n = sum("n_resolved");
+      const won = segs.reduce((a, x) => a + Math.round((x.win10 || 0) * (x.n_resolved || 0)), 0);
+      const w = f => n ? segs.reduce((a, x) => a + ((x[f] || 0) * (x.n_resolved || 0)), 0) / n : null;
+      const p0f = B.agg.p0 || 0.4;
+      return { n_signals: sum("n_signals"), n_filled: sum("n_filled"), n_resolved: n,
+        n_open: sum("n_open"),
+        fill_rate: sum("n_signals") ? sum("n_filled") / sum("n_signals") : null,
+        win10: n ? won / n : null, win10_post: n ? (won + 12 * p0f) / (n + 12) : null,
+        reach5: w("reach5"), avg_ret: w("avg_ret"),
+        med_days: n ? Math.round(w("med_days")) : null };
+    };
+    const FAM_KEY = "__watchfam__";
+    const entries = Object.entries(byTag).filter(([k]) => WATCH_FAM.indexOf(k) < 0);
+    if (WATCH_FAM.length) entries.push([FAM_KEY, famAgg(WATCH_FAM)]);
+    const segOf = (k) => k === FAM_KEY ? famAgg(WATCH_FAM) : byTag[k];
+    const tagOf = (k) => k === FAM_KEY ? "🔎 观察" : k;
+    const inSeg = (tg) => !LS._btTag || (LS._btTag === FAM_KEY ? String(tg).indexOf("观察·") >= 0 : tg === LS._btTag);
+    const tagKeys = entries.sort((a,b)=>(b[1].n_resolved||0)-(a[1].n_resolved||0)).map(([k])=>k);
     const selEl = $("#btSel");
     if(selEl){
       selEl.innerHTML = [`<button class="segbtn ${LS._btTag===""?"on":""}" data-tag="">${t("bt_all")}</button>`]
-        .concat(tagKeys.map(k=>`<button class="segbtn ${LS._btTag===k?"on":""}" data-tag="${escH(k)}">${escH(tagText(k))}</button>`)).join(" ");
+        .concat(tagKeys.map(k=>`<button class="segbtn ${LS._btTag===k?"on":""}" data-tag="${escH(k)}">${escH(tagText(tagOf(k)))}</button>`)).join(" ");
       selEl.querySelectorAll("button").forEach(b=>{ b.onclick=()=>{ LS._btTag=b.dataset.tag; renderBacktest(); }; });
     }
-    const SEG = LS._btTag && (B.agg.by_tag||{})[LS._btTag];
+    const SEG = LS._btTag && segOf(LS._btTag);
     const P = SEG || P0;
     $("#btMeta").textContent = `${M.first_day} → ${M.last_day} · ${M.n_days}${t("bt_days")} · ${t("bt_hz")}${M.horizon}${t("bt_hz2")}`;
     const INFO=(k)=>` <span class="btInfo cursor-pointer" data-help="${k}" title="${t("bt_info_tip")}">ⓘ</span>`;
     const stat=(lab,val,sub,col,hk)=>`<div class="rounded-lg p-2.5" style="background:rgba(148,163,184,.07)"><div class="text-[11px] text-slate-400">${lab}${hk?INFO(hk):""}</div><div class="text-xl font-bold ${col||"text-white"}">${val}</div>${sub?`<div class="text-[10px] text-slate-500">${sub}</div>`:""}</div>`;
     const fillR = isNum(P.fill_rate) ? P.fill_rate : (P.n_signals ? (P.n_filled||0)/P.n_signals : null);
     $("#btStats").innerHTML =
-      (LS._btTag? `<div class="col-span-full text-xs" style="color:var(--muted)">${t("bt_seg_showing")} <span class="badge ${tagClass(LS._btTag)}">${escH(tagText(LS._btTag))}</span> · ${t("bt_reco_vs")} ${pct(B.agg.p0)}</div>`:"") +
+      (LS._btTag? `<div class="col-span-full text-xs" style="color:var(--muted)">${t("bt_seg_showing")} <span class="badge ${tagClass(tagOf(LS._btTag))}">${escH(tagText(tagOf(LS._btTag)))}</span> · ${t("bt_reco_vs")} ${pct(B.agg.p0)}</div>`:"") +
       stat(t("bt_n"), P.n_resolved, `${t("bt_n_open")} ${P.n_open||0}`, null, "n") +
       stat(t("bt_fill"), pct(fillR), null, null, "fill") +
       stat(t("bt_win"), pct(P.win10), t("bt_win_sub"), P.win10>=0.6?"text-emerald-300":"text-amber-300", "win") +
@@ -70,7 +94,7 @@ LS.init = function(ctx){
        dim(t("bt_g_G"),G.G), dim(t("bt_g_M"),G.M), dim(t("bt_g_W"),G.W),
        dim(t("bt_cs"),CS.cs), dim(t("bt_cselig"),CS.elig), dim(t("bt_noncs"),CS.other),
        dim(t("bt_reg_bull"),(B.agg.by_regime||{}).bull), dim(t("bt_reg_bear"),(B.agg.by_regime||{}).bear)].filter(Boolean).join("");
-    const rec=(B.recos||[]).filter(r=>!LS._btTag || r.tag===LS._btTag).slice(0,20);
+    const rec=(B.recos||[]).filter(r=>inSeg(r.tag)).slice(0,20);
     // 胜率是"信号类型"的历史频率而非个股预测: 按类型分组, 类型只标一次, 个股显示各自综合分
     const groups={};
     rec.forEach(r=>{ const key=(r.seg_kind==="combo")? `${r.tag}|${r.growth}` : (r.tag||"?"); (groups[key]=groups[key]||{r, items:[]}).items.push(r); });
@@ -80,7 +104,7 @@ LS.init = function(ctx){
       return `<div class="w-full"><div class="text-xs text-slate-300 mb-1">${t("bt_reco_seg")} <span class="badge ${tagClass(r.tag)}">${lab}</span> ${t("bt_reco_hist")} <b class="text-emerald-300">${pct(r.seg_win_post)}</b> <span class="text-slate-500">(n=${r.seg_n} · ${t("bt_reco_vs")} ${pct(B.agg.p0)})</span></div><div class="flex flex-wrap gap-2">`+
         g.items.map(x=>`<span class="badge tag-strong cursor-pointer" onclick="btOpen('${escH(x.code)}')" title="${t("bt_reco_tip2")}">${escH(x.code)} ${escH(String(x.name||"").slice(0,10))} <span class="text-[10px] opacity-70">${t("composite")} ${isNum(x.fs)?x.fs.toFixed(1):dash}</span></span>`).join("")+`</div></div>`;
     }).join("") : `<span class="text-xs text-slate-500">${t("bt_reco_none")}</span>`;
-    const rc2=(B.recent||[]).filter(e=>!LS._btTag || e.tag===LS._btTag).slice(0,10);
+    const rc2=(B.recent||[]).filter(e=>inSeg(e.tag)).slice(0,10);
     $("#btRecent").innerHTML = rc2.length? `<div class="text-xs text-slate-400 mb-1">${t("bt_recent")}</div><div class="flex flex-wrap gap-2">`+rc2.map(e=>{
       const ic=e.status==="won"?"✅":(e.status==="stopped"?"⛔":"⏳");
       const rr=isNum(e.ret)?((e.ret>0?"+":"")+(e.ret*100).toFixed(1)+"%"):dash;
