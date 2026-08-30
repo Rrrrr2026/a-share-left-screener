@@ -69,9 +69,9 @@ LS.init = function(ctx){
       (SEG && !SEG.n_resolved ? `<div class="col-span-full text-xs" style="color:var(--muted)">⏳ ${t("bt_seg_pending_a")}${SEG.n_open||0}${t("bt_seg_pending_b")}</div>`:"") +
       stat(t("bt_n"), P.n_resolved, `${t("bt_n_open")} ${P.n_open||0}`, null, "n") +
       stat(t("bt_fill"), pct(fillR), null, null, "fill") +
-      stat(t("bt_win"), pct(P.win10), t("bt_win_sub"), P.win10>=0.6?"text-emerald-300":"text-amber-300", "win") +
+      stat(t("bt_win"), pct(P.win10), t("bt_win_sub") + (isNum(P.win_tR)?` · ${t("bt_tr")} ${pct(P.win_tR)}`:""), P.win10>=0.6?"text-emerald-300":"text-amber-300", "win") +
       stat(t("bt_reach5"), pct(P.reach5), t("bt_reach5_sub"), isNum(P.reach5)&&isNum(P.win10)&&(P.reach5-P.win10)>=0.2?"text-amber-300":null, "reach5") +
-      stat(t("bt_ret"), (P.avg_ret>0?"+":"")+pct(P.avg_ret,1), t("bt_ret_sub"), P.avg_ret>0?"text-emerald-300":"text-rose-300", "ret") +
+      stat(t("bt_ret"), (P.avg_ret>0?"+":"")+pct(P.avg_ret,1), t("bt_ret_sub") + (isNum(P.avg_ret_tR)?` · ${t("bt_tr")} ${(P.avg_ret_tR>0?"+":"")+pct(P.avg_ret_tR,1)}`:""), P.avg_ret>0?"text-emerald-300":"text-rose-300", "ret") +
       stat(t("bt_days_med"), isNum(P.med_days)?P.med_days:dash, t("bt_days_sub"), null, "days");
     card.querySelectorAll(".btInfo").forEach(ic=>{ ic.onclick=(e)=>{ e.stopPropagation();
       let pop = document.getElementById("btHelpPop");

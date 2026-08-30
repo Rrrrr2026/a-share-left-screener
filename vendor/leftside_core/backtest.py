@@ -329,11 +329,36 @@ def simulate(plan: dict, dates: list[str], ohlc: np.ndarray, start_idx: int,
     ret = exit_px / fill_px - 1.0
     cost = current().cost_rt
     ret -= cost if status != "open" else cost / 2.0   # 持仓中也已付了买入侧成本
+
+    # tR 并行口径 (exitgrid 九年裁决 2026-08-31: 目标=1.4×止损距 两市两族OOS全胜)。
+    # 独立重放同一窗口: 只统计、不改任何行为; 影子达标后再议切换主口径。
+    win_tR = ret_tR = None
+    if complete and fill_px > 0 and stop < fill_px:
+        _sret = 1.0 - stop / fill_px
+        _tgt = fill_px * (1.0 + 1.4 * _sret)
+        _it = _is = None
+        _j = fill_i + 1
+        _end = min(fill_i + HORIZON_BARS, n - 1)
+        while _j <= _end:
+            if ohlc[_j][2] <= stop:
+                _is = _j
+                break                       # 同bar先止损, 与主口径一致
+            if _it is None and ohlc[_j][1] >= _tgt:
+                _it = _j
+                break
+            _j += 1
+        if _it is not None:
+            win_tR, ret_tR = True, _tgt / fill_px - 1.0 - cost
+        elif _is is not None:
+            win_tR, ret_tR = False, stop / fill_px - 1.0 - cost
+        else:
+            win_tR, ret_tR = False, float(ohlc[_end][3]) / fill_px - 1.0 - cost
     return {"status": status, "fill_i": fill_i, "fill_px": fill_px,
             "fill_date": dates[fill_i], "exit_i": exit_i, "exit_px": exit_px,
             "exit_date": dates[exit_i], "ret": ret,
             "days": exit_i - fill_i, "complete": bool(complete),
             "max_gain": max_h / fill_px - 1.0, "max_dd": min_l / fill_px - 1.0,
+            "win_tR": win_tR, "ret_tR": (round(ret_tR, 4) if ret_tR is not None else None),
             "end_i": exit_i}
 
 
@@ -400,7 +425,7 @@ def build_and_run(snaps: list[dict], prices: dict, rkeys=None, rmap=None) -> lis
                 "regime": _at(rkeys, rmap, dates[anchor], "na") if rkeys else "na",   # 锚定bar而非标注日: 防一日前视
                 **{k: r.get(k) for k in ("status", "fill_date", "fill_px", "exit_date",
                                           "exit_px", "ret", "days", "complete",
-                                          "max_gain", "max_dd")},
+                                          "max_gain", "max_dd", "win_tR", "ret_tR")},
             }
             episodes.append(ep)
             busy_end = r.get("end_i")
@@ -548,6 +573,12 @@ def _seg_stats(eps: list[dict], p0: float) -> dict:
                     if any(e.get("max_dd") is not None for e in res) else None),
         "status_counts": {st: sum(1 for e in res if e["status"] == st)
                           for st in ("won", "stopped", "expired")} if res else None,
+        "win_tR": (round(sum(1 for e in res if e.get("win_tR")) /
+                         max(1, sum(1 for e in res if e.get("win_tR") is not None)), 3)
+                   if any(e.get("win_tR") is not None for e in res) else None),
+        "avg_ret_tR": (round(float(np.mean([e["ret_tR"] for e in res
+                                            if e.get("ret_tR") is not None])), 4)
+                       if any(e.get("ret_tR") is not None for e in res) else None),
     }
 
 
