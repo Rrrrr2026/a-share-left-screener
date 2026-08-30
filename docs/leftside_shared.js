@@ -66,9 +66,11 @@ LS.init = function(ctx){
     const fillR = isNum(P.fill_rate) ? P.fill_rate : (P.n_signals ? (P.n_filled||0)/P.n_signals : null);
     $("#btStats").innerHTML =
       (LS._btTag? `<div class="col-span-full text-xs" style="color:var(--muted)">${t("bt_seg_showing")} <span class="badge ${tagClass(tagOf(LS._btTag))}">${escH(tagText(tagOf(LS._btTag)))}</span> · ${t("bt_reco_vs")} ${pct(B.agg.p0)}</div>`:"") +
+      (SEG && !SEG.n_resolved ? `<div class="col-span-full text-xs" style="color:var(--muted)">⏳ ${t("bt_seg_pending_a")}${SEG.n_open||0}${t("bt_seg_pending_b")}</div>`:"") +
       stat(t("bt_n"), P.n_resolved, `${t("bt_n_open")} ${P.n_open||0}`, null, "n") +
       stat(t("bt_fill"), pct(fillR), null, null, "fill") +
       stat(t("bt_win"), pct(P.win10), t("bt_win_sub"), P.win10>=0.6?"text-emerald-300":"text-amber-300", "win") +
+      stat(t("bt_reach5"), pct(P.reach5), t("bt_reach5_sub"), isNum(P.reach5)&&isNum(P.win10)&&(P.reach5-P.win10)>=0.2?"text-amber-300":null, "reach5") +
       stat(t("bt_ret"), (P.avg_ret>0?"+":"")+pct(P.avg_ret,1), t("bt_ret_sub"), P.avg_ret>0?"text-emerald-300":"text-rose-300", "ret") +
       stat(t("bt_days_med"), isNum(P.med_days)?P.med_days:dash, t("bt_days_sub"), null, "days");
     card.querySelectorAll(".btInfo").forEach(ic=>{ ic.onclick=(e)=>{ e.stopPropagation();
@@ -80,12 +82,12 @@ LS.init = function(ctx){
       pop.style.cssText = `display:block;position:fixed;z-index:99;left:${Math.min(r.left, innerWidth-330)}px;top:${r.bottom+6}px;width:320px;background:var(--card);border:1px solid var(--inputborder);border-radius:8px;padding:10px 12px;box-shadow:0 12px 40px rgba(0,0,0,.5)`;
     }; });
     const rows = Object.entries(B.agg.by_tag||{}).sort((a,b)=>(b[1].n_resolved||0)-(a[1].n_resolved||0));
-    const th=`<tr class="text-slate-400 text-[11px]"><th class="text-left py-1">${t("bt_col_tag")}</th><th class="text-right">${t("bt_col_n")}</th><th class="text-right">${t("bt_col_win")}</th><th class="text-right">${t("bt_col_r5")}</th><th class="text-right">${t("bt_col_ret")}</th><th class="text-right">${t("bt_col_d")}</th></tr>`;
+    const th=`<tr class="text-slate-400 text-[11px]"><th class="text-left py-1">${t("bt_col_tag")}</th><th class="text-right">${t("bt_col_n")}</th><th class="text-right">${t("bt_col_win")}</th><th class="text-right">${t("bt_col_r5")}</th><th class="text-right">${t("bt_col_mfe")}</th><th class="text-right">${t("bt_col_ret")}</th><th class="text-right">${t("bt_col_d")}</th></tr>`;
     $("#btTagTbl").innerHTML = th + rows.map(([k,s])=>{
       const low=(s.n_resolved||0)<12;
       const wc=!isNum(s.win10)?"":(s.win10>=(B.agg.p0||0)?"text-emerald-300":"text-rose-300");
       const rc=!isNum(s.avg_ret)?"":(s.avg_ret>0?"text-emerald-300":"text-rose-300");
-      return `<tr class="border-t border-slate-700/40 ${low?"opacity-60":""}"><td class="py-1"><span class="badge ${tagClass(k)}">${escH(tagText(k))}</span>${low?` <span class="text-[10px] text-slate-500">${t("bt_low_n")}</span>`:""}</td><td class="text-right">${s.n_resolved||0}</td><td class="text-right ${wc}">${pct(s.win10)}</td><td class="text-right">${pct(s.reach5)}</td><td class="text-right ${rc}">${isNum(s.avg_ret)?((s.avg_ret>0?"+":"")+pct(s.avg_ret,1)):dash}</td><td class="text-right">${isNum(s.med_days)?s.med_days:dash}</td></tr>`;
+      return `<tr class="border-t border-slate-700/40 ${low?"opacity-60":""}"><td class="py-1"><span class="badge ${tagClass(k)}">${escH(tagText(k))}</span>${low?` <span class="text-[10px] text-slate-500">${t("bt_low_n")}</span>`:""}</td><td class="text-right">${s.n_resolved||0}</td><td class="text-right ${wc}">${pct(s.win10)}</td><td class="text-right">${pct(s.reach5)}</td><td class="text-right text-slate-400">${isNum(s.mfe_q50)?pct(s.mfe_q50,1):dash}<span class="text-[10px]">/${isNum(s.mfe_q75)?pct(s.mfe_q75,1):dash}</span></td><td class="text-right ${rc}">${isNum(s.avg_ret)?((s.avg_ret>0?"+":"")+pct(s.avg_ret,1)):dash}</td><td class="text-right">${isNum(s.med_days)?s.med_days:dash}</td></tr>`;
     }).join("");
     const dim=(lab,s)=> (s&&s.n_resolved)?`<span class="badge tag-watch" title="n=${s.n_resolved}">${lab} ${pct(s.win10)} <span class="text-[10px] opacity-70">n${s.n_resolved}</span></span>`:"";
     const O=B.agg.by_opp||{}, G=B.agg.by_growth||{}, CS=B.agg.by_cuosha||{};

@@ -324,7 +324,7 @@
     </div>
     <div class="text-[11px] text-slate-400 mb-2 leading-snug" data-i18n="bt_how">怎么读：系统每天给出的买卖点，事后用真实行情检验。「达标」= 按建议买入后 20 个交易日内先涨到 +10%（而不是先碰止损）；「达标率」= 同类信号过去达标的比例；「平均净收益」= 含成本的每笔平均结果。</div>
     <div id="btSel" class="flex flex-wrap gap-1.5 mb-2"></div>
-    <div id="btStats" class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2"></div>
+    <div id="btStats" class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-2"></div>
     <div class="text-xs text-slate-400 mb-1" data-i18n="bt_reco_title">📈 回测优选 — 今日候选中，其信号类型过去达标率最高的</div>
     <div id="btRecos" class="flex flex-wrap gap-2"></div>
     <details class="mt-2">
@@ -629,6 +629,11 @@
       prosperity_total:"景气总分", selected_paren:"(入选)",
       tag_strong:"✅ 强左侧", tag_weak:"⚠️ 技术好但基本面弱", tag_watch:"🔎 观察", tag_dip:"🪸 深跌抄底",
       tag_nearstrong:"☑️ 次强左侧", tag_watch_tech:"🔎 观察·技术弱", tag_watch_nodata:"🔎 观察·缺数据", tag_watch_cold:"🔎 观察·景气冷",
+      bt_reach5:"曾达+5%", bt_reach5_sub:"含后来止损/到期的", bt_col_mfe:"MFE中位/75分",
+      bt_seg_pending_a:"该标签 ", bt_seg_pending_b:" 笔在途 · 完整窗口需20个交易日, 了结后数字陆续计入",
+      bthelp_reach5_t:"曾达+5% (雷达指标)",
+      bthelp_reach5:"算法：已了结信号中，持有期内最高价曾触及 +5% 的比例（不论之后是否止损/到期）。用法：这是「信号质量雷达」不是策略胜率——它与止损规则耦合，想收割它必须整套重放验证（强左侧的 74% 就在九年重放中被证明不构成独立策略）。真正值得行动的信号是「曾达+5% 远高于达标率」的标签（黄色高亮，缺口≥20个百分点）：说明 alpha 集中在头部，应送入出场参数网格研究，而不是直接改规则。",
+
       tag_coil:"🚀 蓄势待发",
       kdj_gold:"金叉", kdj_dead:"死叉", kdj_ob:"超买", kdj_os:"超卖", kdj_neutral:"中性",
       kdj_bull:"偏多", kdj_bear:"偏空",
@@ -831,6 +836,11 @@
       prosperity_total:"Prosperity", selected_paren:"(selected)",
       tag_strong:"✅ Strong Left", tag_weak:"⚠️ Tech-strong, Weak Fund.", tag_watch:"🔎 Watch", tag_dip:"🪸 Deep-Dip",
       tag_nearstrong:"☑️ Near-Strong", tag_watch_tech:"🔎 Watch·Weak Tech", tag_watch_nodata:"🔎 Watch·No Data", tag_watch_cold:"🔎 Watch·Cold Sector",
+      bt_reach5:"Touched +5%", bt_reach5_sub:"incl. later stopped/expired", bt_col_mfe:"MFE p50/p75",
+      bt_seg_pending_a:"", bt_seg_pending_b:" episodes in flight · full 20-day windows required before stats accrue",
+      bthelp_reach5_t:"Touched +5% (radar metric)",
+      bthelp_reach5:"Method: share of resolved episodes whose intraday high touched +5% during the holding period (regardless of later stop/expiry). Usage: a signal-quality RADAR, not a strategy win rate — it is coupled to the stop rule, so harvesting it requires full re-simulation (Strong-Left's 74% failed exactly that test in the 9-year replay). The actionable pattern is a tag whose touched-+5% far exceeds its hit rate (amber highlight, gap >= 20pp): alpha concentrated near the entry — send it to the exit-grid research queue instead of changing rules directly.",
+
       tag_coil:"🚀 Coiled to Launch",
       kdj_gold:"Golden X", kdj_dead:"Dead X", kdj_ob:"Overbought", kdj_os:"Oversold", kdj_neutral:"Neutral",
       kdj_bull:"Bullish", kdj_bear:"Bearish",
