@@ -117,7 +117,10 @@ def hist(code: str, years: float = 9.8, adjust: str = "forward") -> pd.DataFrame
     if not need.issubset(df.columns):
         return None
     out = pd.DataFrame({
-        "date": pd.to_datetime(df["date_ms"], unit="ms").dt.strftime("%Y-%m-%d"),
+        # date_ms 是北京时间零点的epoch毫秒 — 必须按东八区转日期, 裸UTC会整体早一天
+        # (2026-08-31 事故: 九年价格库全库日期-1天, 详见 stock-core CHRONICLE R0.5)
+        "date": pd.to_datetime(df["date_ms"], unit="ms", utc=True)
+                  .dt.tz_convert("Asia/Shanghai").dt.strftime("%Y-%m-%d"),
         "open": pd.to_numeric(df["open_price"], errors="coerce"),
         "high": pd.to_numeric(df["high_price"], errors="coerce"),
         "low": pd.to_numeric(df["low_price"], errors="coerce"),
@@ -160,6 +163,7 @@ def income_statements(code: str, period: str = "quarterly") -> pd.DataFrame | No
         return None
     df = pd.DataFrame(items)
     if "period_end_ms" in df.columns:
-        df["date"] = pd.to_datetime(df["period_end_ms"], unit="ms")
+        df["date"] = (pd.to_datetime(df["period_end_ms"], unit="ms", utc=True)
+                      .dt.tz_convert("Asia/Shanghai").dt.tz_localize(None))
         df = df.sort_values("date").reset_index(drop=True)
     return df
