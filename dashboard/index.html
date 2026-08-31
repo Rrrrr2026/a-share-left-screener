@@ -249,6 +249,19 @@
     background:var(--card); color:var(--text); border:1px solid rgba(41,98,255,.45);
     border-radius:10px; padding:10px 14px; font-size:13px; display:flex; gap:10px;
     align-items:center; box-shadow:0 10px 30px rgba(0,0,0,.4); max-width:92vw; }
+
+  /* ===== 侧栏控件 v3: 等宽大按钮 ===== */
+  #navCtrls{ gap:7px; }
+  #navCtrls .nvbtn{ display:block; width:100%; box-sizing:border-box; text-align:center;
+    padding:7px 8px; font-size:12.5px; border-radius:8px; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis; }
+  #nvMkts{ display:flex; width:100%; border:1px solid var(--inputborder); border-radius:8px;
+    overflow:hidden; }
+  #nvMkts a{ flex:1; text-align:center; padding:7px 2px; font-size:12.5px; color:var(--dim);
+    background:var(--input); text-decoration:none; transition:background .15s; }
+  #nvMkts a:hover{ color:var(--text); }
+  #nvMkts a.on{ background:#2962ff; color:#fff; font-weight:600; }
+  #navCtrls select{ box-sizing:border-box; border-radius:8px; padding:7px 8px; font-size:12.5px; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -262,7 +275,7 @@
     <div class="flex items-center flex-wrap gap-x-3 gap-y-2">
       <h1 class="text-xl font-bold text-white whitespace-nowrap" data-i18n="title">美股 · 「左侧支撑位」筛选与监控台</h1>
       <div class="flex-1"></div>
-      <span class="flex items-center gap-1" id="mktTabs"><a href="https://fairvalpha.com/a/" class="segbtn on">📊 A股</a> <a href="https://fairvalpha.com/us/" class="segbtn">🇺🇸 美股</a></span>
+      <span class="flex items-center gap-1" id="mktTabs"><a href="https://fairvalpha.com/a/" class="segbtn on">🇨🇳 A股</a> <a href="https://fairvalpha.com/us/" class="segbtn">🇺🇸 美股</a></span>
       <select id="dateSel" class="hidden" data-i18n-title="date_sel_title" title="回看历史扫描结果"></select><span id="dateScrub" class="hidden" data-i18n-title="date_sel_title" title="回看历史扫描结果"><span id="dsTrack"><span id="dsBars"></span></span><span id="dsLabel">—</span></span>
       <button id="refreshBtn" class="segbtn" title="拉取最新已发布数据（重新扫描需运行本地更新脚本）" data-i18n="refresh_btn">🔄 刷新数据</button>
       <button id="langBtn" class="segbtn" title="中文 / English">EN</button>
@@ -2760,35 +2773,34 @@
     syncNav();
   })();
 
-  // ---------- 侧栏控制区: 图标化同步副本 (点击代理 + 状态镜像) ----------
+  // ---------- 侧栏控制区 v3: 等宽大按钮 (点击代理 + 状态镜像) ----------
   (function(){
     const nav = document.getElementById("sideNav"); if(!nav) return;
-    const iconOf = (t)=>{ const m = String(t).trim().match(/^\S+/); return m ? m[0] : t; };
     const box = document.createElement("div");
     box.id = "navCtrls";
-    box.innerHTML = `<div class="nvrow" id="nvMkts"></div>
+    box.innerHTML = `<div id="nvMkts"></div>
       <select id="navDateSel" class="hidden" data-i18n-title="date_sel_title" title="回看历史扫描结果"></select>
-      <div class="nvrow">
-        <button id="nvTheme" class="segbtn nvico"></button>
-        <button id="nvLang" class="segbtn nvico"></button>
-        <button id="nvAuth" class="segbtn nvico"></button>
-      </div>
+      <button id="nvTheme" class="segbtn nvbtn"></button>
+      <button id="nvLang" class="segbtn nvbtn"></button>
+      <button id="nvAuth" class="segbtn nvbtn"></button>
       <div class="nvupd"><span data-i18n="updated">最后更新：</span><br/><span id="nvUpd">—</span></div>`;
     nav.appendChild(box);
+    // 市场分段开关: 一个大控件, 两半 = 中国/美国
     const mk = document.getElementById("nvMkts");
     document.querySelectorAll("#mktTabs a").forEach(a=>{
       const c = document.createElement("a");
-      c.href = a.href; c.className = a.className + " nvico";
-      c.textContent = iconOf(a.textContent); c.title = a.textContent.trim();
-      c.style.flex = "1"; c.style.textAlign = "center";
+      c.href = a.href;
+      c.textContent = a.textContent.trim();
+      c.title = a.textContent.trim();
+      if(a.classList.contains("on")) c.classList.add("on");
       mk.appendChild(c);
     });
-    const proxy = (nid, src, mode)=>{
+    const proxy = (nid, src)=>{
       const b = document.getElementById(nid), s = document.getElementById(src);
       if(!b) return;
       if(!s){ b.style.display = "none"; return; }
       const syncTxt = ()=>{
-        b.textContent = mode === "icon" ? iconOf(s.textContent) : s.textContent;
+        b.textContent = s.textContent;
         b.title = s.textContent.trim() + (s.title ? " · " + s.title : "");
         b.style.display = s.style.display === "none" ? "none" : "";
       };
@@ -2797,9 +2809,9 @@
         subtree:true, attributes:true, attributeFilter:["style", "title"]});
       b.onclick = ()=>s.click();
     };
-    proxy("nvTheme", "themeBtn", "icon");
-    proxy("nvLang", "langBtn", "text");
-    proxy("nvAuth", "authBtn", "icon");
+    proxy("nvTheme", "themeBtn");
+    proxy("nvLang", "langBtn");
+    proxy("nvAuth", "authBtn");
     const upd = document.getElementById("updatedAt"), nu = document.getElementById("nvUpd");
     if(upd && nu){
       const su = ()=>{ nu.textContent = upd.textContent; };
@@ -2815,18 +2827,6 @@
       ds.addEventListener("change", ()=>{ nd.value = ds.value; });
       nd.onchange = ()=>{ ds.value = nd.value; ds.dispatchEvent(new Event("change")); };
     }
-    // 拖动功能首次引导 (看过一次即记住, 随账号云同步)
-    try{
-      const HKEY = "ashare_draghint_v1";
-      if(!localStorage.getItem(HKEY)){
-        const tip = document.createElement("div");
-        tip.id = "dragHint";
-        tip.innerHTML = `<span>⠿ 新功能：按住<b>板块右上角手柄</b>或<b>侧栏导航项</b>拖动，可自定义板块顺序</span><button class="segbtn" id="dragHintOk">知道了</button>`;
-        document.body.appendChild(tip);
-        document.getElementById("dragHintOk").onclick = ()=>{ tip.remove();
-          try{ localStorage.setItem(HKEY, "1"); }catch(e){} };
-      }
-    }catch(e){}
   })();
   // ---------- 启动 ----------
   if(!DATA.candidates.length){ $("#emptyHint").classList.remove("hidden"); }
