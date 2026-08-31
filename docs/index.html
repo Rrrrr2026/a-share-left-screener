@@ -217,6 +217,14 @@
     display:flex; align-items:center; justify-content:center; }
   #authModal.hidden{ display:none; }
   #authModal .aubox{ width:320px; max-width:92vw; }
+
+  /* ===== 板块拖动排序 ===== */
+  .secHandle{ position:absolute; top:6px; right:6px; cursor:grab; color:var(--muted);
+    font-size:14px; line-height:1; padding:2px 6px; border-radius:4px; user-select:none;
+    z-index:5; opacity:.4; }
+  .secHandle:hover{ opacity:1; background:rgba(148,163,184,.15); }
+  .secDragging{ opacity:.55; outline:2px dashed #2962ff; }
+  .secDropHint{ outline:1px dashed rgba(41,98,255,.5); }
 </style>
 </head>
 <body class="min-h-screen">
@@ -2627,6 +2635,57 @@
         else fvUI();
       }catch(e){ fvUI(); }
     })();
+  })();
+
+  // ---------- 板块自由拖动排序 (顺序存 ashare_seclayout_v1, 随账号云同步) ----------
+  (function(){
+    const SEC_IDS = ["searchCard","deckCard","ovStrip","wlCard","qlCard","btCard","indCard","tblCard","jnCard"];
+    const SEC_KEY = "ashare_seclayout_v1";
+    const first = document.getElementById(SEC_IDS[0]);
+    if(!first) return;
+    const cont = first.parentElement;
+    try{                                            // 应用保存的顺序
+      const saved = JSON.parse(localStorage.getItem(SEC_KEY) || "[]");
+      if(Array.isArray(saved) && saved.length){
+        let prev = null;
+        saved.forEach(id=>{
+          const el = document.getElementById(id); if(!el) return;
+          if(prev) prev.after(el);
+          else{ const anchor = SEC_IDS.map(i=>document.getElementById(i)).find(x=>x && x!==el);
+                if(anchor) cont.insertBefore(el, anchor); }
+          prev = el;
+        });
+      }
+    }catch(e){}
+    SEC_IDS.forEach(id=>{
+      const sec = document.getElementById(id); if(!sec) return;
+      if(!sec.style.position) sec.style.position = "relative";
+      const h = document.createElement("div");
+      h.className = "secHandle"; h.title = "按住拖动排序"; h.textContent = "⠿";
+      sec.appendChild(h);
+      h.addEventListener("mousedown", ()=>sec.setAttribute("draggable", "true"));
+      sec.addEventListener("dragstart", (e)=>{ sec.classList.add("secDragging");
+        e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed = "move"; });
+      sec.addEventListener("dragend", ()=>{
+        sec.removeAttribute("draggable"); sec.classList.remove("secDragging");
+        document.querySelectorAll(".secDropHint").forEach(x=>x.classList.remove("secDropHint"));
+        const order = SEC_IDS.filter(i=>document.getElementById(i)).sort((a,b)=>{
+          const ea = document.getElementById(a), eb = document.getElementById(b);
+          return (ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1; });
+        try{ localStorage.setItem(SEC_KEY, JSON.stringify(order)); }catch(e){}
+      });
+      sec.addEventListener("dragover", (e)=>{
+        const dragging = document.querySelector(".secDragging");
+        if(!dragging || dragging === sec) return;
+        e.preventDefault();
+        const r = sec.getBoundingClientRect();
+        document.querySelectorAll(".secDropHint").forEach(x=>x.classList.remove("secDropHint"));
+        sec.classList.add("secDropHint");
+        if(e.clientY < r.top + r.height / 2) cont.insertBefore(dragging, sec);
+        else sec.after(dragging);
+      });
+      sec.addEventListener("drop", (e)=>e.preventDefault());
+    });
   })();
   // ---------- 启动 ----------
   if(!DATA.candidates.length){ $("#emptyHint").classList.remove("hidden"); }
