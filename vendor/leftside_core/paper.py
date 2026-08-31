@@ -132,6 +132,87 @@ def _register(state: dict, new_sigs: list[tuple]) -> int:
     return n
 
 
+
+TIERS = (0.10, 0.15, 0.20)
+
+
+def _sim_hold(plan: dict, dates: list, ohlc, start_idx: int, scale: float) -> dict:
+    """成交逻辑与回测引擎同款 (突破/回踩/市价, 不接飞刀, 一字板), 但持有规则改为:
+    止损保护 + 满20个交易日窗口平仓 (不再+10%就卖), 逐bar记录最高涨幅与 10/15/20 档触及。"""
+    from .market import current
+    ref = plan["entry_ref"] * scale
+    stop = plan["stop"] * scale
+    ehigh = plan["entry_high"] * scale
+    kind = plan["kind"]
+    n = len(dates)
+    valid = bt.BREAKOUT_VALID_BARS if kind == "breakout" else bt.ENTRY_VALID_BARS
+
+    fill_i = fill_px = None
+    i = start_idx
+    while i < n and i < start_idx + valid:
+        o, h, l, c = ohlc[i]
+        prev_c = ohlc[i - 1][3] if i > 0 else o
+        sealed_up = current().limit_boards and bt._limit_up_oneline(o, h, l, c, prev_c)
+        if kind == "breakout":
+            px = max(o, ref)
+            if h >= ref and not sealed_up and px <= ehigh:
+                fill_i, fill_px = i, px
+                break
+            if l <= plan["box_lo"] * scale:
+                return {"status": "box_broke", "end_i": i}
+        else:
+            if o <= stop:
+                return {"status": "gap_invalid", "end_i": i}
+            if plan.get("mode") in ("market", "none"):
+                if not sealed_up:
+                    fill_i, fill_px = i, o
+                    break
+            elif l <= ehigh:
+                fill_i, fill_px = i, min(o, ehigh)
+                break
+        i += 1
+    if fill_i is None:
+        return {"status": "no_fill" if i >= start_idx + valid else "pending",
+                "end_i": min(i, n - 1)}
+
+    end = min(fill_i + bt.HORIZON_BARS, n - 1)
+    complete = (fill_i + bt.HORIZON_BARS) <= (n - 1)
+    max_h = fill_px
+    status = exit_i = exit_px = None
+    if not current().t_plus_one:
+        o, h, l, c = ohlc[fill_i]
+        if l <= stop:
+            status, exit_i, exit_px = "stopped", fill_i, (stop if fill_px > stop else c)
+    if status is None:
+        j = fill_i + 1
+        while j <= end:
+            o, h, l, c = ohlc[j]
+            prev_c = ohlc[j - 1][3]
+            if l <= stop:
+                if (current().limit_boards and bt._limit_down_oneline(o, h, l, c, prev_c)
+                        and j < n - 1):
+                    status, exit_i, exit_px = "stopped", j + 1, ohlc[j + 1][0]
+                else:
+                    status, exit_i, exit_px = "stopped", j, min(o, stop)
+                break
+            max_h = max(max_h, h)
+            j += 1
+        else:
+            if complete:
+                status, exit_i, exit_px = "expired", end, ohlc[end][3]
+            else:
+                status, exit_i, exit_px = "open", n - 1, ohlc[n - 1][3]
+    max_gain = max_h / fill_px - 1.0
+    ret = float(exit_px) / fill_px - 1.0
+    ret -= current().cost_rt if status != "open" else current().cost_rt / 2.0
+    return {"status": status, "fill_i": fill_i, "fill_px": fill_px,
+            "fill_date": dates[fill_i], "exit_i": exit_i, "exit_px": float(exit_px),
+            "exit_date": dates[exit_i], "ret": ret, "days": exit_i - fill_i,
+            "complete": bool(complete), "max_gain": float(max_gain),
+            "max_dd": float(min(ohlc[fill_i:exit_i + 1, 2].min() / fill_px - 1.0, 0.0)),
+            "hits": [g for g in TIERS if max_gain >= g]}
+
+
 def _simulate_signal(sig: dict, ser: dict, budget: float, lot: int) -> dict:
     """一条注册信号 -> 用最新行情重新模拟; 返回展示/统计用结果 dict。"""
     dates, ohlc = ser["dates"], np.asarray(ser["ohlc"], dtype=float)
@@ -157,7 +238,7 @@ def _simulate_signal(sig: dict, ser: dict, budget: float, lot: int) -> dict:
     plan = bt.reconstruct_plan(cand)
     if plan is None:
         return {"status": "bad_anchor"}
-    r = bt.simulate(plan, dates, ohlc, anchor + 1, scale)
+    r = _sim_hold(plan, dates, ohlc, anchor + 1, scale)
     status = r.get("status")
     if status in ("pending", "no_fill", "box_broke", "gap_invalid"):
         return {"status": status,
@@ -177,6 +258,7 @@ def _simulate_signal(sig: dict, ser: dict, budget: float, lot: int) -> dict:
         "ret": round(ret, 5), "days": int(r["days"]), "complete": bool(r["complete"]),
         "shares": int(shares), "used": round(used, 2), "pnl": round(used * ret, 2),
         "max_gain": round(float(r["max_gain"]), 4), "max_dd": round(float(r["max_dd"]), 4),
+        "hits": [round(g * 100) for g in (r.get("hits") or [])],
     }
 
 
@@ -221,10 +303,14 @@ def update_portfolio() -> dict | None:
         res_ = [r for r in rs if r["status"] in ("won", "stopped", "expired")]
         opn = [r for r in rs if r["status"] == "open"]
         wins = [r for r in res_ if r["ret"] > 0]
+        def tier(g):
+            hh = [r for r in res_ if g in (r.get("hits") or [])]
+            return round(len(hh) / len(res_) * 100, 1) if res_ else None
         return {
             "n_signals": len(rs), "n_filled": len([r for r in rs if r.get("shares")]),
             "n_open": len(opn), "n_resolved": len(res_), "n_won": len(wins),
-            "win_rate": round(len(wins) / len(res_) * 100, 1) if res_ else None,
+            "win_rate": tier(10),
+            "win10": tier(10), "win15": tier(15), "win20": tier(20),
             "realized": round(sum(r["pnl"] for r in res_), 2),
             "unrealized": round(sum(r["pnl"] for r in opn), 2),
             "avg_ret": round(float(np.mean([r["ret"] for r in res_])) * 100, 2) if res_ else None,
@@ -248,7 +334,8 @@ def update_portfolio() -> dict | None:
         "total": total, "by_cat": by_cat,
         "open": sorted(open_rows, key=lambda r: r["fill_date"], reverse=True),
         "positions": [{k: r.get(k) for k in ("cat", "code", "name", "sig_date", "status",
-                        "fill_date", "fill_px", "exit_date", "exit_px", "ret", "pnl")}
+                        "fill_date", "fill_px", "exit_date", "exit_px", "ret", "pnl",
+                        "max_gain", "hits")}
                        for r in rows],
         "recent": sorted(resolved, key=lambda r: r["exit_date"] or "", reverse=True)[:15],
         "daily": state["daily"],
