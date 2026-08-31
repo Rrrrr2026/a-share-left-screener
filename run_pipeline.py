@@ -447,6 +447,9 @@ def run(full_market: bool, use_cache: bool):
             break
         except Exception as e:
             log.debug("深度档案失败 %s: %s", fr["code"], e)
+        # 心跳: 阶段C成功时不打日志, 曾致 25min 零日志被看门狗误杀 (服务器单只10-13s
+        # ×182只=36min > 25min 呆滞线; PC 网络快从未触发) — 2026-08-31 第三跑 130/182 冤死
+        _prog["n"] += 1
     # 回落: 没拉到(或全空)的股票, 用库里最近一个run_date的档案顶上
     _miss = [fr["code"] for fr in prof_targets if fr["code"] not in _done_codes]
     n_fb = db.backfill_profiles_from_latest(run_date, _miss) if _miss else 0
