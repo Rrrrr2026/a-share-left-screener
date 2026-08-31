@@ -225,6 +225,8 @@
   .secHandle:hover{ opacity:1; background:rgba(148,163,184,.15); }
   .secDragging{ opacity:.55; outline:2px dashed #2962ff; }
   .secDropHint{ outline:1px dashed rgba(41,98,255,.5); }
+  #sideNav a{ user-select:none; }
+  #sideNav a.secDragging{ opacity:.5; outline:1px dashed #2962ff; border-radius:6px; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -2676,7 +2678,7 @@
           const ea = document.getElementById(a), eb = document.getElementById(b);
           return (ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1; });
         try{ localStorage.setItem(SEC_KEY, JSON.stringify(order)); }catch(e){}
-        glueOv();
+        glueOv(); syncNav();
       });
       sec.addEventListener("dragover", (e)=>{
         const dragging = document.querySelector(".secDragging");
@@ -2690,6 +2692,50 @@
       });
       sec.addEventListener("drop", (e)=>e.preventDefault());
     });
+
+    // ---- 侧栏导航: 与板块顺序双向同步 + 可拖动快速排序 ----
+    const navOf = (id)=>document.querySelector(`#sideNav a[href="#${id}"]`);
+    const domOrder = ()=>SEC_IDS.filter(i=>document.getElementById(i)).sort((a,b)=>{
+      const ea=document.getElementById(a), eb=document.getElementById(b);
+      return (ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1; });
+    const syncNav = ()=>{
+      const nav = document.getElementById("sideNav"); if(!nav) return;
+      domOrder().forEach(id=>{ const a = navOf(id); if(a) nav.appendChild(a); });
+    };
+    document.querySelectorAll("#sideNav a").forEach(a=>{
+      const id = (a.getAttribute("href")||"").slice(1);
+      if(SEC_IDS.indexOf(id) < 0 || !document.getElementById(id)) return;
+      a.setAttribute("draggable", "true");
+      a.addEventListener("dragstart", (e)=>{ a.classList.add("secDragging");
+        e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed="move"; });
+      a.addEventListener("dragover", (e)=>{
+        const dragging = document.querySelector("#sideNav a.secDragging");
+        if(!dragging || dragging === a) return;
+        e.preventDefault();
+        const r = a.getBoundingClientRect();
+        if(e.clientY < r.top + r.height/2) a.before(dragging); else a.after(dragging);
+      });
+      a.addEventListener("drop", (e)=>e.preventDefault());
+      a.addEventListener("dragend", ()=>{
+        a.classList.remove("secDragging");
+        // 按导航新顺序重排真实板块; 不在导航里的板块 (如搜索条) 位置保持不变
+        const navIds = Array.from(document.querySelectorAll("#sideNav a"))
+          .map(x=>(x.getAttribute("href")||"").slice(1))
+          .filter(i=>SEC_IDS.indexOf(i)>=0 && document.getElementById(i));
+        const cur = domOrder();
+        let k = 0;
+        const finalIds = cur.map(i=>navIds.indexOf(i)>=0 ? navIds[k++] : i);
+        const firstEl = document.getElementById(cur[0]);
+        let prev = null;
+        finalIds.forEach(i=>{ const el = document.getElementById(i);
+          if(prev) prev.after(el);
+          else if(el !== firstEl) cont.insertBefore(el, firstEl);
+          prev = el; });
+        glueOv();
+        try{ localStorage.setItem(SEC_KEY, JSON.stringify(domOrder())); }catch(e){}
+      });
+    });
+    syncNav();
   })();
   // ---------- 启动 ----------
   if(!DATA.candidates.length){ $("#emptyHint").classList.remove("hidden"); }
