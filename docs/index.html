@@ -238,6 +238,17 @@
   #navCtrls .nvrow .segbtn{ width:auto; flex:1; }
   #navCtrls select{ width:100%; font-size:12px; padding:4px 6px; }
   #navCtrls .nvupd{ font-size:10px; color:var(--muted); line-height:1.35; word-break:break-all; }
+
+  /* ===== 侧栏控件图标化 + 拖动提示 ===== */
+  #navCtrls .nvico{ text-align:center; padding:4px 2px; font-size:14px; }
+  #sideNav a[draggable="true"]{ cursor:grab; position:relative; }
+  #sideNav a[draggable="true"]::after{ content:"⠿"; float:right; opacity:.18; font-size:11px; }
+  #sideNav a[draggable="true"]:hover::after{ opacity:.75; }
+  section:hover > .secHandle{ opacity:.9; }
+  #dragHint{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:65;
+    background:var(--card); color:var(--text); border:1px solid rgba(41,98,255,.45);
+    border-radius:10px; padding:10px 14px; font-size:13px; display:flex; gap:10px;
+    align-items:center; box-shadow:0 10px 30px rgba(0,0,0,.4); max-width:92vw; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -2749,34 +2760,46 @@
     syncNav();
   })();
 
-  // ---------- 侧栏控制区: 头部常用控件的同步副本 (点击代理 + 状态镜像) ----------
+  // ---------- 侧栏控制区: 图标化同步副本 (点击代理 + 状态镜像) ----------
   (function(){
     const nav = document.getElementById("sideNav"); if(!nav) return;
+    const iconOf = (t)=>{ const m = String(t).trim().match(/^\S+/); return m ? m[0] : t; };
     const box = document.createElement("div");
     box.id = "navCtrls";
-    const tabs = document.getElementById("mktTabs");
-    box.innerHTML = `<div class="nvrow">${tabs ? tabs.innerHTML : ""}</div>
+    box.innerHTML = `<div class="nvrow" id="nvMkts"></div>
       <select id="navDateSel" class="hidden" data-i18n-title="date_sel_title" title="回看历史扫描结果"></select>
-      <button id="nvRefresh" class="segbtn"></button>
-      <div class="nvrow"><button id="nvLang" class="segbtn"></button><button id="nvTheme" class="segbtn"></button></div>
-      <button id="nvAuth" class="segbtn"></button>
+      <div class="nvrow">
+        <button id="nvTheme" class="segbtn nvico"></button>
+        <button id="nvLang" class="segbtn nvico"></button>
+        <button id="nvAuth" class="segbtn nvico"></button>
+      </div>
       <div class="nvupd"><span data-i18n="updated">最后更新：</span><br/><span id="nvUpd">—</span></div>`;
     nav.appendChild(box);
-    const proxy = (nid, src)=>{
+    const mk = document.getElementById("nvMkts");
+    document.querySelectorAll("#mktTabs a").forEach(a=>{
+      const c = document.createElement("a");
+      c.href = a.href; c.className = a.className + " nvico";
+      c.textContent = iconOf(a.textContent); c.title = a.textContent.trim();
+      c.style.flex = "1"; c.style.textAlign = "center";
+      mk.appendChild(c);
+    });
+    const proxy = (nid, src, mode)=>{
       const b = document.getElementById(nid), s = document.getElementById(src);
       if(!b) return;
       if(!s){ b.style.display = "none"; return; }
-      const syncTxt = ()=>{ b.textContent = s.textContent; b.title = s.title || "";
-        b.style.display = s.style.display === "none" ? "none" : ""; };
+      const syncTxt = ()=>{
+        b.textContent = mode === "icon" ? iconOf(s.textContent) : s.textContent;
+        b.title = s.textContent.trim() + (s.title ? " · " + s.title : "");
+        b.style.display = s.style.display === "none" ? "none" : "";
+      };
       syncTxt();
       new MutationObserver(syncTxt).observe(s, {childList:true, characterData:true,
         subtree:true, attributes:true, attributeFilter:["style", "title"]});
       b.onclick = ()=>s.click();
     };
-    proxy("nvRefresh", "refreshBtn");
-    proxy("nvLang", "langBtn");
-    proxy("nvTheme", "themeBtn");
-    proxy("nvAuth", "authBtn");
+    proxy("nvTheme", "themeBtn", "icon");
+    proxy("nvLang", "langBtn", "text");
+    proxy("nvAuth", "authBtn", "icon");
     const upd = document.getElementById("updatedAt"), nu = document.getElementById("nvUpd");
     if(upd && nu){
       const su = ()=>{ nu.textContent = upd.textContent; };
@@ -2792,6 +2815,18 @@
       ds.addEventListener("change", ()=>{ nd.value = ds.value; });
       nd.onchange = ()=>{ ds.value = nd.value; ds.dispatchEvent(new Event("change")); };
     }
+    // 拖动功能首次引导 (看过一次即记住, 随账号云同步)
+    try{
+      const HKEY = "ashare_draghint_v1";
+      if(!localStorage.getItem(HKEY)){
+        const tip = document.createElement("div");
+        tip.id = "dragHint";
+        tip.innerHTML = `<span>⠿ 新功能：按住<b>板块右上角手柄</b>或<b>侧栏导航项</b>拖动，可自定义板块顺序</span><button class="segbtn" id="dragHintOk">知道了</button>`;
+        document.body.appendChild(tip);
+        document.getElementById("dragHintOk").onclick = ()=>{ tip.remove();
+          try{ localStorage.setItem(HKEY, "1"); }catch(e){} };
+      }
+    }catch(e){}
   })();
   // ---------- 启动 ----------
   if(!DATA.candidates.length){ $("#emptyHint").classList.remove("hidden"); }
