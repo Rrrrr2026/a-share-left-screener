@@ -409,16 +409,42 @@ def run(full_market: bool, use_cache: bool):
     log.info("阶段C 深度档案: %d 只 (主营/现金流/新闻/两融/大宗) 单线程, 预算 %d 分钟 ...",
              len(prof_targets), _budget_sec // 60)
     _done_codes = set()
+
+    # 单只硬期限: pull_profile 内部可能出现任何超时都覆盖不到的阻塞 (对端滴流钓连接等,
+    # 2026-08-31 阶段C 首只挂死25分钟, 看门狗只能杀全程 → 当日榜单没发布)。
+    # 放守护线程里等 180s; 超时即判定源站不可用, 直接结束阶段C走回落 —— 不逐只重试:
+    # 东财F10走 V8 解密非线程安全, 弃掉的卡死线程若复活会与新调用并发, 必须避免。
+    def _pull_with_deadline(code, sector, deadline_sec=180):
+        import queue as _q
+        import threading as _th
+        box = _q.Queue(maxsize=1)
+        def _run():
+            try:
+                box.put((True, m6.pull_profile(code, sector=sector)))
+            except Exception as e:      # noqa: BLE001
+                box.put((False, e))
+        _th.Thread(target=_run, daemon=True, name=f"prof-{code}").start()
+        try:
+            ok, val = box.get(timeout=deadline_sec)
+        except _q.Empty:
+            raise TimeoutError(f"pull_profile {code} 超过 {deadline_sec}s 硬期限")
+        if ok:
+            return val
+        raise val
+
     for fr in tqdm(prof_targets):
         if time.time() - _t0 > _budget_sec:
             log.warning("深度档案超出时间预算, 已拉 %d/%d, 其余回落到最近档案",
                         len(_done_codes), len(prof_targets))
             break
         try:
-            p = m6.pull_profile(fr["code"], sector=fr.get("industry"))
+            p = _pull_with_deadline(fr["code"], fr.get("industry"))
             db.save_profile(run_date, fr["code"], p)
             if p.get("summary") or (p.get("revenue") or {}).get("years"):
                 _done_codes.add(fr["code"])
+        except TimeoutError as e:
+            log.warning("深度档案挂死: %s — 判定源站不可用, 提前结束阶段C, 其余回落", e)
+            break
         except Exception as e:
             log.debug("深度档案失败 %s: %s", fr["code"], e)
     # 回落: 没拉到(或全空)的股票, 用库里最近一个run_date的档案顶上
