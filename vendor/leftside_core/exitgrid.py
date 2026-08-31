@@ -220,7 +220,10 @@ def scan():
                 continue
             cells = _sim(o, h, l, c, fill_i, fill, ref, a, deepen, cost)
             if cells:
-                ep = {"fam": fam, "date": dates[t], "cells": cells}
+                ep = {"fam": fam, "date": dates[t], "code": code, "cells": cells,
+                      # 生产 ⚡快弹 子标签口径: dip 且 RSI<=28 且 ATR%>=5
+                      "fast": bool(fam == "dip" and rsi[t] <= 28.0
+                                   and atr[t] / c[t] >= 0.05)}
                 if reg is not None:
                     ri = int(np.searchsorted(np.array(reg[0]), dates[t], side="right")) - 1
                     ep["regime"] = "bull" if (0 <= ri < len(reg[1]) and reg[1][ri]) else "bear"
