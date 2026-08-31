@@ -227,6 +227,17 @@
   .secDropHint{ outline:1px dashed rgba(41,98,255,.5); }
   #sideNav a{ user-select:none; }
   #sideNav a.secDragging{ opacity:.5; outline:1px dashed #2962ff; border-radius:6px; }
+
+  /* ===== 侧栏控制区 ===== */
+  #sideNav{ overflow-y:auto; }
+  #navCtrls{ margin:10px 10px 14px 0; padding-top:10px; border-top:1px solid var(--border);
+    display:flex; flex-direction:column; gap:6px; }
+  #navCtrls .segbtn{ width:100%; text-align:left; font-size:12px; padding:4px 8px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #navCtrls .nvrow{ display:flex; gap:4px; }
+  #navCtrls .nvrow .segbtn{ width:auto; flex:1; }
+  #navCtrls select{ width:100%; font-size:12px; padding:4px 6px; }
+  #navCtrls .nvupd{ font-size:10px; color:var(--muted); line-height:1.35; word-break:break-all; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -2736,6 +2747,51 @@
       });
     });
     syncNav();
+  })();
+
+  // ---------- 侧栏控制区: 头部常用控件的同步副本 (点击代理 + 状态镜像) ----------
+  (function(){
+    const nav = document.getElementById("sideNav"); if(!nav) return;
+    const box = document.createElement("div");
+    box.id = "navCtrls";
+    const tabs = document.getElementById("mktTabs");
+    box.innerHTML = `<div class="nvrow">${tabs ? tabs.innerHTML : ""}</div>
+      <select id="navDateSel" class="hidden" data-i18n-title="date_sel_title" title="回看历史扫描结果"></select>
+      <button id="nvRefresh" class="segbtn"></button>
+      <div class="nvrow"><button id="nvLang" class="segbtn"></button><button id="nvTheme" class="segbtn"></button></div>
+      <button id="nvAuth" class="segbtn"></button>
+      <div class="nvupd"><span data-i18n="updated">最后更新：</span><br/><span id="nvUpd">—</span></div>`;
+    nav.appendChild(box);
+    const proxy = (nid, src)=>{
+      const b = document.getElementById(nid), s = document.getElementById(src);
+      if(!b) return;
+      if(!s){ b.style.display = "none"; return; }
+      const syncTxt = ()=>{ b.textContent = s.textContent; b.title = s.title || "";
+        b.style.display = s.style.display === "none" ? "none" : ""; };
+      syncTxt();
+      new MutationObserver(syncTxt).observe(s, {childList:true, characterData:true,
+        subtree:true, attributes:true, attributeFilter:["style", "title"]});
+      b.onclick = ()=>s.click();
+    };
+    proxy("nvRefresh", "refreshBtn");
+    proxy("nvLang", "langBtn");
+    proxy("nvTheme", "themeBtn");
+    proxy("nvAuth", "authBtn");
+    const upd = document.getElementById("updatedAt"), nu = document.getElementById("nvUpd");
+    if(upd && nu){
+      const su = ()=>{ nu.textContent = upd.textContent; };
+      su();
+      new MutationObserver(su).observe(upd, {childList:true, characterData:true, subtree:true});
+    }
+    const ds = document.getElementById("dateSel"), nd = document.getElementById("navDateSel");
+    if(ds && nd){
+      const pop = ()=>{ if(!ds.options.length) return;
+        nd.innerHTML = ds.innerHTML; nd.value = ds.value; nd.classList.remove("hidden"); };
+      pop();
+      new MutationObserver(pop).observe(ds, {childList:true});
+      ds.addEventListener("change", ()=>{ nd.value = ds.value; });
+      nd.onchange = ()=>{ ds.value = nd.value; ds.dispatchEvent(new Event("change")); };
+    }
   })();
   // ---------- 启动 ----------
   if(!DATA.candidates.length){ $("#emptyHint").classList.remove("hidden"); }
