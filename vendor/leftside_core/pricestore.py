@@ -96,9 +96,12 @@ def backfill(codes: list | None = None, years: int = YEARS) -> dict:
     return {"target": len(codes), "fetched": n_ok, "skipped": len(have), "aborted": aborted}
 
 
-def update_daily(codes: list | None = None, lookback_days: int = 10) -> int:
+def update_daily(codes: list | None = None, lookback_days: int = 150) -> int:
     """增量: 对库里已有代码抓最近 lookback_days 补上新bar (前复权价可能因除权
-    整体平移 —— 增量只适合日常; 检测到大偏差的代码应重新全量, 这里先记日志)。"""
+    整体平移 —— 增量只适合日常; 检测到大偏差的代码应重新全量, 这里先记日志)。
+    lookback 必须 >= ~90自然日: fetch_bars_bulk 有 len<60 根即弃的残缺序列检查
+    (为长历史重建而设), 10天回看会被整批吞掉 — 2026-09-01 r1shadow 增量静默零写入
+    事故的根因, 守卫直到指数先更新才暴露。150天还顺带刷新近期复权漂移。"""
     m = current()
     conn = _conn()
     have = last_dates(conn)
