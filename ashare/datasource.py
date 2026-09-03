@@ -181,15 +181,39 @@ def _cache_save(key: str, obj) -> None:
 #  通用: 带重试的调用 + 字段映射
 # ===========================================================================
 _HARD_DEADLINE_SEC = 150     # akshare 单次调用硬期限 (墙钟)
+_POOL = None
+_POOL_LOCK = None
 
 
-def _call_with_deadline(fn, args, kwargs, deadline_sec):
-    """在守护线程里跑 fn, 主线程最多等 deadline_sec 秒。
+def _pool():
+    """惰性创建的独立工作进程池 (POSIX 用 forkserver, Windows 用 spawn — 两者都与
+    主进程的多线程安全共存)。超时时整池 terminate 并置空, 下次调用重建。"""
+    global _POOL, _POOL_LOCK
+    import multiprocessing as _mp
+    import threading as _th
+    if _POOL_LOCK is None:
+        _POOL_LOCK = _th.Lock()
+    with _POOL_LOCK:
+        if _POOL is None:
+            ctx = _mp.get_context("spawn" if os.name == "nt" else "forkserver")
+            _POOL = ctx.Pool(processes=2)
+        return _POOL
 
-    为什么需要: socket 超时只管"单次读多久没数据", 对端被限流后滴流钓连接
-    (每次 recv 都在超时前给几个字节) 时任何超时都不会触发 — 2026-08-31~09-03 一周内
-    阶段A(4线程)/阶段C(档案)/导出后段(业绩报表) 三次以此形态挂死 25min+ 被看门狗杀。
-    超时的线程无法强杀, 作守护线程弃之 (进程退出不受阻)。"""
+
+def _pool_reset():
+    global _POOL
+    p = _POOL
+    _POOL = None
+    if p is not None:
+        try:
+            p.terminate()
+            p.join()
+        except Exception:       # noqa: BLE001
+            pass
+
+
+def _call_in_thread(fn, args, kwargs, deadline_sec):
+    """线程版兜底 (仅用于不可序列化的调用): 超时的线程无法强杀, 弃之为守护线程。"""
     import queue as _q
     import threading as _th
     box = _q.Queue(maxsize=1)
@@ -204,10 +228,33 @@ def _call_with_deadline(fn, args, kwargs, deadline_sec):
     try:
         ok, val = box.get(timeout=deadline_sec)
     except _q.Empty:
-        raise TimeoutError(f"{getattr(fn, '__name__', fn)} 超过 {deadline_sec}s 硬期限 (源站滴流/黑洞)")
+        raise TimeoutError(f"{getattr(fn, '__name__', fn)} 超过 {deadline_sec}s 硬期限 (线程版, 源站滴流/黑洞)")
     if ok:
         return val
     raise val
+
+
+def _call_with_deadline(fn, args, kwargs, deadline_sec):
+    """在独立工作进程里跑 fn, 主进程最多等 deadline_sec 秒, 超时 terminate 整池。
+
+    为什么必须是进程而不是线程 (2026-09-03 两次事故):
+    ① socket 超时只管"单次读多久没数据", 对端滴流钓连接时永不触发 — 一周内阶段A/阶段C/
+       导出后段三次挂死 25min+ 被看门狗杀;
+    ② 线程版硬期限 (同日下午) 更糟: 被弃的 stock_margin_detail_sse 线程不是在等网络,
+       是在死循环分配内存, 主线程继续跑心跳正常, 它在后台把进程吃到 3.5GB 直到 OOM。
+    Python 杀不死线程, 只有进程能被真正终止。不可序列化的 fn/参数退回线程版。"""
+    import pickle
+    try:
+        pickle.dumps((fn, args, kwargs))
+    except Exception:           # noqa: BLE001
+        return _call_in_thread(fn, args, kwargs, deadline_sec)
+    import multiprocessing as _mp
+    try:
+        res = _pool().apply_async(fn, args, kwargs)
+        return res.get(timeout=deadline_sec)
+    except _mp.TimeoutError:
+        _pool_reset()
+        raise TimeoutError(f"{getattr(fn, '__name__', fn)} 超过 {deadline_sec}s 硬期限 (工作进程已终止)")
 
 
 def call_with_retry(fn, *args, **kwargs):
