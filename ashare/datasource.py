@@ -180,14 +180,55 @@ def _cache_save(key: str, obj) -> None:
 # ===========================================================================
 #  通用: 带重试的调用 + 字段映射
 # ===========================================================================
+_HARD_DEADLINE_SEC = 150     # akshare 单次调用硬期限 (墙钟)
+
+
+def _call_with_deadline(fn, args, kwargs, deadline_sec):
+    """在守护线程里跑 fn, 主线程最多等 deadline_sec 秒。
+
+    为什么需要: socket 超时只管"单次读多久没数据", 对端被限流后滴流钓连接
+    (每次 recv 都在超时前给几个字节) 时任何超时都不会触发 — 2026-08-31~09-03 一周内
+    阶段A(4线程)/阶段C(档案)/导出后段(业绩报表) 三次以此形态挂死 25min+ 被看门狗杀。
+    超时的线程无法强杀, 作守护线程弃之 (进程退出不受阻)。"""
+    import queue as _q
+    import threading as _th
+    box = _q.Queue(maxsize=1)
+
+    def _run():
+        try:
+            box.put((True, fn(*args, **kwargs)))
+        except Exception as e:      # noqa: BLE001
+            box.put((False, e))
+    _th.Thread(target=_run, daemon=True,
+               name=f"ak-{getattr(fn, '__name__', 'call')}").start()
+    try:
+        ok, val = box.get(timeout=deadline_sec)
+    except _q.Empty:
+        raise TimeoutError(f"{getattr(fn, '__name__', fn)} 超过 {deadline_sec}s 硬期限 (源站滴流/黑洞)")
+    if ok:
+        return val
+    raise val
+
+
 def call_with_retry(fn, *args, **kwargs):
-    """对一个 akshare 调用做 限频sleep + 重试 + 超时容错。失败抛出最后一次异常。"""
+    """对一个 akshare 调用做 限频sleep + 重试 + 超时容错。失败抛出最后一次异常。
+    硬期限超时不重试 (源站已进入挂死态, 重试只会再白等) — 直接标记东财不可用并抛出,
+    调用方走既有回退 (腾讯/新浪/缓存/回落)。"""
     f = CONFIG["fetch"]
     last_exc = None
+    deadline = f.get("hard_deadline_sec", _HARD_DEADLINE_SEC)
     for attempt in range(f["max_retries"]):
         try:
             time.sleep(f["sleep_sec"])
-            return fn(*args, **kwargs)
+            return _call_with_deadline(fn, args, kwargs, deadline)
+        except TimeoutError as e:
+            log.warning("akshare 调用挂死: %s — 标记东财不可用, 不重试", e)
+            try:
+                _mark_em_down(str(e))
+                _mark_em_hist_down(str(e))
+            except Exception:       # noqa: BLE001
+                pass
+            raise
         except Exception as e:  # noqa
             last_exc = e
             wait = f["retry_backoff_sec"] * (2 ** attempt)
