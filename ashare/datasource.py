@@ -195,7 +195,10 @@ def _pool():
         _POOL_LOCK = _th.Lock()
     with _POOL_LOCK:
         if _POOL is None:
-            ctx = _mp.get_context("spawn" if os.name == "nt" else "forkserver")
+            # 统一 spawn: forkserver 在服务器 (systemd/journald 管道环境) 崩于
+            # BlockingIOError EAGAIN (2026-09-03 实测, 池反复重建反复崩); spawn 起全新
+            # 解释器, 与主进程多线程安全共存, 代价是每个工作进程启动多 ~3s (池常驻, 仅首次)
+            ctx = _mp.get_context("spawn")
             _POOL = ctx.Pool(processes=2)
         return _POOL
 
